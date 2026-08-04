@@ -3,7 +3,7 @@ import { useAuthStore } from "@/store/auth.store";
 import type { User, LoginRequest, RegisterRequest, ForgotPasswordRequest } from "@/types/auth.types";
 
 /**
- * Supabase Auth Service handling Sign Up, Sign In, OAuth, OTP, and Session Sync.
+ * Supabase Auth Service handling Sign Up, Sign In, OAuth, OTP, Magic Link, and Session Sync.
  */
 export const authService = {
   /**
@@ -81,6 +81,21 @@ export const authService = {
    */
   async login(credentials: LoginRequest) {
     return this.signInWithEmail(credentials.email, credentials.password);
+  },
+
+  /**
+   * Sign in / Sign up with Passwordless Magic Link email.
+   */
+  async signInWithMagicLink(email: string) {
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/profile-setup`,
+      },
+    });
+
+    if (error) throw error;
+    return data;
   },
 
   /**

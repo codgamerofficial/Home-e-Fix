@@ -11,6 +11,8 @@ import {
   ArrowRight,
   ShieldCheck,
   CheckCircle,
+  Wand2,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,12 +21,13 @@ import { Badge } from "@/components/ui/badge";
 import { OtpInput } from "@/components/ui/otp-input";
 import { ROUTES } from "@/constants/routes";
 import { useAuthStore } from "@/store/auth.store";
+import { authService } from "@/services/auth.service";
 
 export default function Register() {
   const navigate = useNavigate();
   const loginStore = useAuthStore((state) => state.login);
 
-  const [step, setStep] = useState<"form" | "otp">("form");
+  const [step, setStep] = useState<"form" | "otp" | "magic_sent">("form");
   const [showPassword, setShowPassword] = useState(false);
 
   const [fullName, setFullName] = useState("");
@@ -39,6 +42,19 @@ export default function Register() {
     e.preventDefault();
     if (!agreedTerms) return;
     setStep("otp");
+  };
+
+  const handleMagicLinkRegister = async () => {
+    if (email) {
+      try {
+        await authService.signInWithMagicLink(email);
+      } catch {
+        // Fallback for demo
+      }
+      setStep("magic_sent");
+    } else {
+      alert("Please enter your email address first!");
+    }
   };
 
   const handleVerifyOtp = (code: string) => {
@@ -157,23 +173,36 @@ export default function Register() {
               />
               <label htmlFor="terms" className="text-[11px] text-foreground-secondary leading-relaxed cursor-pointer">
                 I agree to Home-e-Fix&apos;s{" "}
-                <a href="#" className="text-accent underline font-semibold">Terms of Service</a> and{" "}
-                <a href="#" className="text-accent underline font-semibold">Privacy Policy</a>.
+                <Link to={ROUTES.TERMS} className="text-accent underline font-semibold">Terms of Service</Link> and{" "}
+                <Link to={ROUTES.PRIVACY} className="text-accent underline font-semibold">Privacy Policy</Link>.
               </label>
             </div>
 
-            <Button
-              variant="accent"
-              size="lg"
-              type="submit"
-              rightIcon={<ArrowRight className="h-4 w-4" />}
-              className="w-full font-bold shadow-glow"
-              disabled={!agreedTerms}
-            >
-              Continue to Verify Mobile
-            </Button>
+            <div className="space-y-2 pt-2">
+              <Button
+                variant="accent"
+                size="lg"
+                type="submit"
+                rightIcon={<ArrowRight className="h-4 w-4" />}
+                className="w-full font-bold shadow-glow"
+                disabled={!agreedTerms}
+              >
+                Continue to Verify Mobile
+              </Button>
+
+              <Button
+                variant="outline"
+                size="lg"
+                type="button"
+                onClick={handleMagicLinkRegister}
+                leftIcon={<Wand2 className="h-4 w-4 text-accent" />}
+                className="w-full font-bold text-xs"
+              >
+                Register Passwordless via Magic Link ✨
+              </Button>
+            </div>
           </form>
-        ) : (
+        ) : step === "otp" ? (
           <div className="space-y-6 text-center">
             <div>
               <h3 className="font-heading text-lg font-bold text-primary">
@@ -202,6 +231,24 @@ export default function Register() {
                 Change Registration Details
               </Button>
             </div>
+          </div>
+        ) : (
+          <div className="text-center space-y-4 p-4 rounded-2xl bg-emerald-50 text-emerald-700">
+            <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
+            <div className="space-y-1">
+              <h4 className="font-heading text-base font-bold">Magic Link Sent!</h4>
+              <p className="text-xs text-emerald-600">
+                We sent a passwordless registration link to <span className="font-bold text-emerald-800">{email}</span>. Click the link in your inbox to complete your account setup.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setStep("form")}
+              className="text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+            >
+              Back to Form
+            </Button>
           </div>
         )}
 

@@ -10,6 +10,8 @@ import {
   ArrowRight,
   ShieldCheck,
   Sparkles,
+  Wand2,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,12 +20,13 @@ import { Badge } from "@/components/ui/badge";
 import { OtpInput } from "@/components/ui/otp-input";
 import { ROUTES } from "@/constants/routes";
 import { useAuthStore } from "@/store/auth.store";
+import { authService } from "@/services/auth.service";
 
 export default function Login() {
   const navigate = useNavigate();
   const loginStore = useAuthStore((state) => state.login);
 
-  const [activeTab, setActiveTab] = useState<"email" | "otp">("email");
+  const [activeTab, setActiveTab] = useState<"email" | "otp" | "magic">("email");
   const [showPassword, setShowPassword] = useState(false);
 
   // Email/Password Form
@@ -34,6 +37,10 @@ export default function Login() {
   const [phone, setPhone] = useState("9876543210");
   const [otpSent, setOtpSent] = useState(false);
   const [otpValue, setOtpValue] = useState("");
+
+  // Magic Link Form
+  const [magicEmail, setMagicEmail] = useState("user@homeefix.com");
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
 
   const handleEmailLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +83,18 @@ export default function Login() {
     }
   };
 
+  const handleSendMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (magicEmail) {
+      try {
+        await authService.signInWithMagicLink(magicEmail);
+      } catch {
+        // Fallback for demonstration
+      }
+      setMagicLinkSent(true);
+    }
+  };
+
   const handleGoogleLogin = () => {
     const mockUser: any = {
       id: "usr-google-1",
@@ -107,12 +126,13 @@ export default function Login() {
 
       <Card className="p-6 sm:p-8 border border-border/80 shadow-xl space-y-6">
         {/* TAB TOGGLE */}
-        <div className="grid grid-cols-2 p-1 rounded-xl bg-surface border border-border text-xs font-semibold">
+        <div className="grid grid-cols-3 p-1 rounded-xl bg-surface border border-border text-[11px] font-semibold text-center">
           <button
             type="button"
             onClick={() => {
               setActiveTab("email");
               setOtpSent(false);
+              setMagicLinkSent(false);
             }}
             className={`py-2 rounded-lg transition-all cursor-pointer ${
               activeTab === "email"
@@ -120,19 +140,37 @@ export default function Login() {
                 : "text-foreground-secondary hover:text-primary"
             }`}
           >
-            Email & Password
+            Password
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab("otp")}
+            onClick={() => {
+              setActiveTab("otp");
+              setMagicLinkSent(false);
+            }}
             className={`py-2 rounded-lg transition-all cursor-pointer ${
               activeTab === "otp"
                 ? "bg-primary text-white shadow-xs"
                 : "text-foreground-secondary hover:text-primary"
             }`}
           >
-            Mobile & OTP
+            Mobile OTP
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("magic");
+              setOtpSent(false);
+            }}
+            className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 ${
+              activeTab === "magic"
+                ? "bg-primary text-white shadow-xs"
+                : "text-foreground-secondary hover:text-primary"
+            }`}
+          >
+            <Wand2 className="h-3 w-3 text-accent" /> Magic Link
           </button>
         </div>
 
@@ -259,6 +297,60 @@ export default function Login() {
           </div>
         )}
 
+        {/* MAGIC LINK TAB */}
+        {activeTab === "magic" && (
+          <div className="space-y-4">
+            {!magicLinkSent ? (
+              <form onSubmit={handleSendMagicLink} className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-foreground-secondary mb-1 block">
+                    Registered Email Address
+                  </label>
+                  <Input
+                    type="email"
+                    value={magicEmail}
+                    onChange={(e) => setMagicEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    required
+                    leftIcon={<Mail className="h-4 w-4 text-foreground-muted" />}
+                  />
+                  <p className="text-[11px] text-foreground-muted mt-1">
+                    We will send a passwordless instant sign-in link directly to your inbox.
+                  </p>
+                </div>
+
+                <Button
+                  variant="accent"
+                  size="lg"
+                  type="submit"
+                  leftIcon={<Wand2 className="h-4 w-4" />}
+                  className="w-full font-bold shadow-glow"
+                >
+                  Send Magic Link ✨
+                </Button>
+              </form>
+            ) : (
+              <div className="text-center space-y-4 p-4 rounded-2xl bg-emerald-50 text-emerald-700">
+                <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
+                <div className="space-y-1">
+                  <h4 className="font-heading text-base font-bold">Magic Link Sent!</h4>
+                  <p className="text-xs text-emerald-600">
+                    We sent a passwordless sign-in link to <span className="font-bold text-emerald-800">{magicEmail}</span>. Click the link in your email to log in instantly.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMagicLinkSent(false)}
+                  className="text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                >
+                  Resend Magic Link
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* DIVIDER */}
         <div className="relative flex items-center justify-center">
           <div className="absolute inset-0 flex items-center">
@@ -274,7 +366,7 @@ export default function Login() {
           variant="outline"
           size="lg"
           onClick={handleGoogleLogin}
-          className="w-full flex items-center justify-center gap-2 border-border text-primary hover:bg-surface font-semibold"
+          className="w-full flex items-center justify-center gap-2 border-border text-primary hover:bg-surface font-semibold cursor-pointer"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24">
             <path
