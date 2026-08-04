@@ -8,6 +8,8 @@ import { PageSkeleton } from "../components/shared/LoadingSkeleton";
 /* ─── Lazy-loaded Pages ─── */
 
 const Home = lazy(() => import("../pages/Home"));
+const ServiceCatalog = lazy(() => import("../pages/services/ServiceCatalog"));
+const CategoryDetail = lazy(() => import("../pages/services/CategoryDetail"));
 const NotFound = lazy(() => import("../pages/NotFound"));
 const Login = lazy(() => import("../pages/auth/Login"));
 const Register = lazy(() => import("../pages/auth/Register"));
@@ -31,6 +33,22 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <Home />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.SERVICES,
+        element: (
+          <LazyPage>
+            <ServiceCatalog />
+          </LazyPage>
+        ),
+      },
+      {
+        path: `${ROUTES.SERVICES}/:categorySlug`,
+        element: (
+          <LazyPage>
+            <CategoryDetail />
           </LazyPage>
         ),
       },
