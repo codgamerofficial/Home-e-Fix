@@ -16,6 +16,8 @@ const NotFound = lazy(() => import("../pages/NotFound"));
 const Login = lazy(() => import("../pages/auth/Login"));
 const Register = lazy(() => import("../pages/auth/Register"));
 const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword"));
+const OtpVerification = lazy(() => import("../pages/auth/OtpVerification"));
+const ProfileSetup = lazy(() => import("../pages/auth/ProfileSetup"));
 
 /* ─── Suspense Wrapper ─── */
 
@@ -106,6 +108,22 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <ForgotPassword />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "otp",
+        element: (
+          <LazyPage>
+            <OtpVerification />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "profile-setup",
+        element: (
+          <LazyPage>
+            <ProfileSetup />
           </LazyPage>
         ),
       },

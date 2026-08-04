@@ -1,118 +1,99 @@
+import { useState } from "react";
 import { Link } from "react-router";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { motion } from "framer-motion";
-import { Mail, ArrowLeft } from "lucide-react";
+import { Mail, ArrowLeft, CheckCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ROUTES } from "@/constants/routes";
 
-/* ─── Validation Schema ─── */
-
-const forgotPasswordSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-});
-
-type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
-
-/* ─── Component ─── */
-
 export default function ForgotPassword() {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting, isSubmitSuccessful },
-  } = useForm<ForgotPasswordFormData>({
-    resolver: zodResolver(forgotPasswordSchema),
-    defaultValues: { email: "" },
-  });
+  const [email, setEmail] = useState("");
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const onSubmit = async (data: ForgotPasswordFormData) => {
-    // TODO: Implement actual forgot password
-    console.log("Forgot Password:", data);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email) {
+      setIsSubmitted(true);
+    }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
-      <Link
-        to={ROUTES.LOGIN}
-        className="inline-flex items-center gap-1 text-sm text-foreground-secondary hover:text-accent mb-6 transition-colors"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to login
-      </Link>
-
-      <div className="mb-8">
-        <h1 className="font-heading text-2xl font-bold text-primary">
-          Forgot your password?
+    <div className="w-full max-w-md mx-auto space-y-6">
+      <div className="text-center space-y-2">
+        <Badge variant="accent" className="px-3 py-1 text-xs">
+          🔑 Password Reset
+        </Badge>
+        <h1 className="font-heading text-2xl sm:text-3xl font-extrabold text-primary">
+          Reset Your Password
         </h1>
-        <p className="mt-2 text-sm text-foreground-secondary">
-          No worries. Enter your email and we&apos;ll send you a reset link.
+        <p className="text-xs text-foreground-secondary">
+          Enter your registered email address and we&apos;ll send you a password reset link
         </p>
       </div>
 
-      {isSubmitSuccessful ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-2xl bg-success-light border border-success/20 p-6 text-center"
-        >
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-success/20">
-            <Mail className="h-6 w-6 text-success" />
-          </div>
-          <h3 className="font-heading font-semibold text-primary mb-1">
-            Check your email
-          </h3>
-          <p className="text-sm text-foreground-secondary">
-            We&apos;ve sent a password reset link to your email address.
-            Please check your inbox.
-          </p>
-        </motion.div>
-      ) : (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <label
-              htmlFor="email"
-              className="text-sm font-medium text-foreground"
+      <Card className="p-6 sm:p-8 border border-border/80 shadow-xl space-y-6">
+        {!isSubmitted ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-foreground-secondary mb-1 block">
+                Registered Email Address
+              </label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
+                required
+                leftIcon={<Mail className="h-4 w-4 text-foreground-muted" />}
+              />
+            </div>
+
+            <Button
+              variant="accent"
+              size="lg"
+              type="submit"
+              rightIcon={<ArrowRight className="h-4 w-4" />}
+              className="w-full font-bold shadow-glow"
             >
-              Email Address
-            </label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              leftIcon={<Mail className="h-4 w-4" />}
-              error={errors.email?.message}
-              {...register("email")}
-            />
+              Send Reset Link
+            </Button>
+          </form>
+        ) : (
+          <div className="text-center space-y-4">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+              <CheckCircle className="h-8 w-8" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-heading text-lg font-bold text-primary">
+                Check Your Inbox
+              </h3>
+              <p className="text-xs text-foreground-secondary">
+                We sent a password reset link to <span className="font-bold text-primary">{email}</span>. Click the link in the email to set a new password.
+              </p>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSubmitted(false)}
+              className="text-xs"
+            >
+              Didn&apos;t receive email? Resend
+            </Button>
           </div>
+        )}
 
-          <Button
-            type="submit"
-            variant="accent"
-            size="lg"
-            className="w-full"
-            isLoading={isSubmitting}
+        <div className="pt-2 border-t border-border text-center">
+          <Link
+            to={ROUTES.LOGIN}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline"
           >
-            Send Reset Link
-          </Button>
-        </form>
-      )}
-
-      <p className="mt-6 text-center text-sm text-foreground-secondary">
-        Remember your password?{" "}
-        <Link
-          to={ROUTES.LOGIN}
-          className="font-medium text-accent hover:underline"
-        >
-          Sign in
-        </Link>
-      </p>
-    </motion.div>
+            <ArrowLeft className="h-4 w-4" /> Back to Login
+          </Link>
+        </div>
+      </Card>
+    </div>
   );
 }
