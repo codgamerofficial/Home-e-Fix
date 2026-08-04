@@ -8,10 +8,10 @@ import { Rating } from "@/components/ui/rating";
 import type { Service } from "@/types/service.types";
 
 export interface ServiceCardProps {
-  service: Partial<Service>;
+  service: any;
   isAdded?: boolean;
-  onAdd?: (service: Partial<Service>) => void;
-  onRemove?: (service: Partial<Service>) => void;
+  onAdd?: (service: any) => void;
+  onRemove?: (service: any) => void;
   variant?: "grid" | "horizontal";
   className?: string;
 }
