@@ -82,17 +82,15 @@ export const TECHNICIAN_SIDEBAR_LINKS: NavLink[] = [
 /* ─── Admin Sidebar Navigation ─── */
 
 export const ADMIN_SIDEBAR_LINKS: NavLink[] = [
-  { label: "Dashboard", href: ROUTES.ADMIN_DASHBOARD, icon: LayoutDashboard },
-  { label: "Users", href: ROUTES.ADMIN_USERS, icon: Users },
-  { label: "Services", href: ROUTES.ADMIN_SERVICES, icon: Wrench },
-  { label: "Bookings", href: ROUTES.ADMIN_BOOKINGS, icon: ClipboardList },
-  {
-    label: "Technicians",
-    href: ROUTES.ADMIN_TECHNICIANS,
-    icon: UserCog,
-  },
-  { label: "Analytics", href: ROUTES.ADMIN_ANALYTICS, icon: BarChart3 },
-  { label: "Settings", href: ROUTES.ADMIN_SETTINGS, icon: Settings },
+  { label: "Analytics Overview", href: "/admin/analytics", icon: BarChart3 },
+  { label: "Customer CRM", href: "/admin/customers", icon: Users },
+  { label: "Technician Queue", href: "/admin/technicians", icon: UserCog },
+  { label: "Master Bookings", href: "/admin/bookings", icon: ClipboardList },
+  { label: "Payments & Payouts", href: "/admin/payments", icon: DollarSign },
+  { label: "Coupons CMS", href: "/admin/coupons", icon: Tag },
+  { label: "Membership CMS", href: "/admin/membership", icon: Award },
+  { label: "Services CMS", href: "/admin/services", icon: Wrench },
+  { label: "Reports & Export", href: "/admin/reports", icon: Settings },
 ];
 
 /* ─── Footer Links ─── */

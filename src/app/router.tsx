@@ -4,7 +4,7 @@ import { RootLayout } from "../layouts/RootLayout";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { DashboardLayout } from "../layouts/DashboardLayout";
 import { ROUTES } from "../constants/routes";
-import { CUSTOMER_SIDEBAR_LINKS, TECHNICIAN_SIDEBAR_LINKS } from "../constants/navigation";
+import { CUSTOMER_SIDEBAR_LINKS, TECHNICIAN_SIDEBAR_LINKS, ADMIN_SIDEBAR_LINKS } from "../constants/navigation";
 import { PageSkeleton } from "../components/shared/LoadingSkeleton";
 
 /* ─── Lazy-loaded Pages ─── */
@@ -41,6 +41,17 @@ const TechRatings = lazy(() => import("../pages/dashboard/technician/Ratings"));
 const TechAvailability = lazy(() => import("../pages/dashboard/technician/Availability"));
 const TechInventory = lazy(() => import("../pages/dashboard/technician/Inventory"));
 const TechAttendance = lazy(() => import("../pages/dashboard/technician/Attendance"));
+
+/* ─── Admin Dashboard Pages ─── */
+const AdminAnalytics = lazy(() => import("../pages/dashboard/admin/Analytics"));
+const AdminCustomers = lazy(() => import("../pages/dashboard/admin/Customers"));
+const AdminTechnicians = lazy(() => import("../pages/dashboard/admin/Technicians"));
+const AdminBookings = lazy(() => import("../pages/dashboard/admin/Bookings"));
+const AdminPayments = lazy(() => import("../pages/dashboard/admin/Payments"));
+const AdminCouponsCMS = lazy(() => import("../pages/dashboard/admin/CouponsCMS"));
+const AdminMembershipCMS = lazy(() => import("../pages/dashboard/admin/MembershipCMS"));
+const AdminServicesCMS = lazy(() => import("../pages/dashboard/admin/ServicesCMS"));
+const AdminReports = lazy(() => import("../pages/dashboard/admin/Reports"));
 
 /* ─── Suspense Wrapper ─── */
 
@@ -305,6 +316,89 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <TechAttendance />
+          </LazyPage>
+        ),
+      },
+    ],
+  },
+  {
+    // Admin Dashboard routes with DashboardLayout
+    path: "/admin",
+    element: <DashboardLayout links={ADMIN_SIDEBAR_LINKS} title="Admin Center" />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/admin/analytics" replace />,
+      },
+      {
+        path: "analytics",
+        element: (
+          <LazyPage>
+            <AdminAnalytics />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "customers",
+        element: (
+          <LazyPage>
+            <AdminCustomers />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "technicians",
+        element: (
+          <LazyPage>
+            <AdminTechnicians />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "bookings",
+        element: (
+          <LazyPage>
+            <AdminBookings />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "payments",
+        element: (
+          <LazyPage>
+            <AdminPayments />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "coupons",
+        element: (
+          <LazyPage>
+            <AdminCouponsCMS />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "membership",
+        element: (
+          <LazyPage>
+            <AdminMembershipCMS />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "services",
+        element: (
+          <LazyPage>
+            <AdminServicesCMS />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "reports",
+        element: (
+          <LazyPage>
+            <AdminReports />
           </LazyPage>
         ),
       },
