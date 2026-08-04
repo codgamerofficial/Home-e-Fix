@@ -8,7 +8,6 @@ interface ProvidersProps {
 
 /**
  * All context providers wrapped in one component.
- * Add new providers here (e.g., ThemeProvider, AuthProvider).
  */
 export function Providers({ children }: ProvidersProps) {
   return (
