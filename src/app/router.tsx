@@ -10,6 +10,8 @@ import { PageSkeleton } from "../components/shared/LoadingSkeleton";
 const Home = lazy(() => import("../pages/Home"));
 const ServiceCatalog = lazy(() => import("../pages/services/ServiceCatalog"));
 const CategoryDetail = lazy(() => import("../pages/services/CategoryDetail"));
+const BookingWizard = lazy(() => import("../pages/booking/BookingWizard"));
+const BookingConfirmed = lazy(() => import("../pages/booking/BookingConfirmed"));
 const NotFound = lazy(() => import("../pages/NotFound"));
 const Login = lazy(() => import("../pages/auth/Login"));
 const Register = lazy(() => import("../pages/auth/Register"));
@@ -49,6 +51,22 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <CategoryDetail />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.BOOKING,
+        element: (
+          <LazyPage>
+            <BookingWizard />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "/booking/confirmation/:bookingId",
+        element: (
+          <LazyPage>
+            <BookingConfirmed />
           </LazyPage>
         ),
       },

@@ -303,7 +303,7 @@ export default function CategoryDetail() {
                 variant="accent"
                 size="default"
                 rightIcon={<ArrowRight className="h-4 w-4" />}
-                onClick={() => alert(`Proceeding to Booking Flow with ${selectedCount} items!`)}
+                onClick={() => navigate(ROUTES.BOOKING)}
                 className="font-bold shadow-lg"
               >
                 Book Now

@@ -9,8 +9,9 @@ import { StatusChip } from "@/components/ui/status-chip";
 import type { Technician } from "@/types/technician.types";
 
 export interface TechnicianCardProps {
-  technician: Partial<Technician>;
-  onSelect?: (technician: Partial<Technician>) => void;
+  technician: any;
+  onSelect?: (technician: any) => void;
+  onCall?: (technician: any) => void;
   selected?: boolean;
   className?: string;
 }
@@ -87,7 +88,7 @@ export function TechnicianCard({
         {/* Specializations Tags */}
         {specializations.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-1">
-            {specializations.slice(0, 3).map((spec) => (
+            {specializations.slice(0, 3).map((spec: string) => (
               <Badge key={spec} variant="secondary" className="text-[10px]">
                 {spec}
               </Badge>
