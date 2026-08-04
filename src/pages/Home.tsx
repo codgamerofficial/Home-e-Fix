@@ -356,7 +356,7 @@ export default function Home() {
 
       {/* ─── 5. EMERGENCY 24/7 SERVICES BANNER ─── */}
       <section className="container-app py-16">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-600 via-rose-600 to-orange-600 text-white p-8 sm:p-12 shadow-2xl">
+        <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-red-600 via-rose-600 to-orange-600 text-white p-8 sm:p-12 shadow-2xl">
           {/* Background Ambient Circle */}
           <div className="absolute -top-24 -right-24 h-80 w-80 rounded-full bg-white/10 blur-3xl pointer-events-none" />
 
