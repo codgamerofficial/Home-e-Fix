@@ -1,17 +1,17 @@
 import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router";
-import { RootLayout } from "@/layouts/RootLayout";
-import { AuthLayout } from "@/layouts/AuthLayout";
-import { ROUTES } from "@/constants/routes";
-import { PageSkeleton } from "@/components/shared/LoadingSkeleton";
+import { RootLayout } from "../layouts/RootLayout";
+import { AuthLayout } from "../layouts/AuthLayout";
+import { ROUTES } from "../constants/routes";
+import { PageSkeleton } from "../components/shared/LoadingSkeleton";
 
 /* ─── Lazy-loaded Pages ─── */
 
-const Home = lazy(() => import("@/pages/Home"));
-const NotFound = lazy(() => import("@/pages/NotFound"));
-const Login = lazy(() => import("@/pages/auth/Login"));
-const Register = lazy(() => import("@/pages/auth/Register"));
-const ForgotPassword = lazy(() => import("@/pages/auth/ForgotPassword"));
+const Home = lazy(() => import("../pages/Home"));
+const NotFound = lazy(() => import("../pages/NotFound"));
+const Login = lazy(() => import("../pages/auth/Login"));
+const Register = lazy(() => import("../pages/auth/Register"));
+const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword"));
 
 /* ─── Suspense Wrapper ─── */
 
@@ -34,7 +34,6 @@ export const router = createBrowserRouter([
           </LazyPage>
         ),
       },
-      // Future: Services, Booking, About, Contact, etc.
       {
         path: ROUTES.NOT_FOUND,
         element: (
@@ -76,20 +75,4 @@ export const router = createBrowserRouter([
       },
     ],
   },
-  // Future: Dashboard routes with DashboardLayout
-  // {
-  //   path: "/dashboard",
-  //   element: <DashboardLayout links={CUSTOMER_SIDEBAR_LINKS} title="Customer" />,
-  //   children: [ ... ],
-  // },
-  // {
-  //   path: "/technician",
-  //   element: <DashboardLayout links={TECHNICIAN_SIDEBAR_LINKS} title="Technician" />,
-  //   children: [ ... ],
-  // },
-  // {
-  //   path: "/admin",
-  //   element: <DashboardLayout links={ADMIN_SIDEBAR_LINKS} title="Admin" />,
-  //   children: [ ... ],
-  // },
 ]);
