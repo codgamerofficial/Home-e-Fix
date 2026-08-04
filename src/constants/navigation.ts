@@ -16,6 +16,9 @@ import {
   Users,
   Settings,
   BarChart3,
+  Award,
+  Tag,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 import { ROUTES } from "./routes";
@@ -44,24 +47,24 @@ export const MAIN_NAV_LINKS: NavLink[] = [
 export const MOBILE_NAV_LINKS: NavLink[] = [
   { label: "Home", href: ROUTES.HOME, icon: Home },
   { label: "Services", href: ROUTES.SERVICES, icon: Wrench },
-  { label: "Bookings", href: ROUTES.CUSTOMER_BOOKINGS, icon: CalendarCheck },
-  { label: "Profile", href: ROUTES.CUSTOMER_PROFILE, icon: User },
+  { label: "Bookings", href: "/dashboard/orders", icon: CalendarCheck },
+  { label: "Profile", href: "/dashboard/profile", icon: User },
   { label: "More", href: "#more", icon: MoreHorizontal },
 ];
 
 /* ─── Customer Sidebar Navigation ─── */
 
 export const CUSTOMER_SIDEBAR_LINKS: NavLink[] = [
-  {
-    label: "Dashboard",
-    href: ROUTES.CUSTOMER_DASHBOARD,
-    icon: LayoutDashboard,
-  },
-  { label: "My Bookings", href: ROUTES.CUSTOMER_BOOKINGS, icon: ClipboardList },
-  { label: "Addresses", href: ROUTES.CUSTOMER_ADDRESSES, icon: MapPin },
-  { label: "Wallet", href: ROUTES.CUSTOMER_WALLET, icon: Wallet },
-  { label: "Profile", href: ROUTES.CUSTOMER_PROFILE, icon: UserCog },
-  { label: "Support", href: ROUTES.CUSTOMER_SUPPORT, icon: HelpCircle },
+  { label: "Orders", href: "/dashboard/orders", icon: ClipboardList },
+  { label: "Wallet", href: "/dashboard/wallet", icon: Wallet },
+  { label: "Membership", href: "/dashboard/membership", icon: Award },
+  { label: "Coupons", href: "/dashboard/coupons", icon: Tag },
+  { label: "Addresses", href: "/dashboard/addresses", icon: MapPin },
+  { label: "My Reviews", href: "/dashboard/reviews", icon: Star },
+  { label: "Notifications", href: "/dashboard/notifications", icon: Bell, badge: "2" },
+  { label: "Profile", href: "/dashboard/profile", icon: UserCog },
+  { label: "Settings", href: "/dashboard/settings", icon: Settings },
+  { label: "Help Center", href: "/dashboard/help", icon: HelpCircle },
 ];
 
 /* ─── Technician Sidebar Navigation ─── */

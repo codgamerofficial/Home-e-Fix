@@ -1,0 +1,102 @@
+import { useState } from "react";
+import { Moon, Sun, Lock, Shield, Trash2, KeyRound } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useUIStore } from "@/store/ui.store";
+
+export default function Settings() {
+  const { theme, toggleTheme } = useUIStore();
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  const handleChangePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword === confirmPassword) {
+      alert("Password updated successfully!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } else {
+      alert("New passwords do not match!");
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h1 className="font-heading text-2xl font-extrabold text-primary">App Settings</h1>
+        <p className="text-xs text-foreground-secondary mt-1">
+          Customize themes, password security, and privacy controls
+        </p>
+      </div>
+
+      {/* THEME PREFERENCE */}
+      <Card className="p-6 border border-border space-y-4">
+        <h3 className="font-heading text-sm font-bold text-primary pb-2 border-b border-border flex items-center gap-2">
+          {theme === "dark" ? <Moon className="h-4 w-4 text-accent" /> : <Sun className="h-4 w-4 text-accent" />}
+          Appearance & Theme
+        </h3>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xs font-semibold text-primary">Dark Mode</div>
+            <p className="text-[11px] text-foreground-secondary">Toggle between sleek dark & light interface</p>
+          </div>
+
+          <Button variant="outline" size="sm" onClick={toggleTheme}>
+            {theme === "dark" ? "Switch to Light Mode ☀️" : "Switch to Dark Mode 🌙"}
+          </Button>
+        </div>
+      </Card>
+
+      {/* CHANGE PASSWORD */}
+      <Card className="p-6 border border-border space-y-4">
+        <h3 className="font-heading text-sm font-bold text-primary pb-2 border-b border-border flex items-center gap-2">
+          <KeyRound className="h-4 w-4 text-accent" /> Change Password
+        </h3>
+
+        <form onSubmit={handleChangePassword} className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-foreground-secondary mb-1 block">Current Password</label>
+            <Input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-foreground-secondary mb-1 block">New Password</label>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Minimum 8 characters"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-foreground-secondary mb-1 block">Confirm New Password</label>
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+          </div>
+
+          <Button variant="accent" size="sm" type="submit" className="font-bold">
+            Update Password
+          </Button>
+        </form>
+      </Card>
+    </div>
+  );
+}
