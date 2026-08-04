@@ -70,16 +70,13 @@ export const CUSTOMER_SIDEBAR_LINKS: NavLink[] = [
 /* ─── Technician Sidebar Navigation ─── */
 
 export const TECHNICIAN_SIDEBAR_LINKS: NavLink[] = [
-  {
-    label: "Dashboard",
-    href: ROUTES.TECHNICIAN_DASHBOARD,
-    icon: LayoutDashboard,
-  },
-  { label: "My Jobs", href: ROUTES.TECHNICIAN_JOBS, icon: ClipboardList },
-  { label: "Schedule", href: ROUTES.TECHNICIAN_SCHEDULE, icon: Calendar },
-  { label: "Earnings", href: ROUTES.TECHNICIAN_EARNINGS, icon: DollarSign },
-  { label: "Reviews", href: ROUTES.TECHNICIAN_REVIEWS, icon: Star },
-  { label: "Profile", href: ROUTES.TECHNICIAN_PROFILE, icon: UserCog },
+  { label: "My Jobs", href: "/technician/jobs", icon: ClipboardList },
+  { label: "Earnings", href: "/technician/earnings", icon: DollarSign },
+  { label: "Wallet & Cash", href: "/technician/wallet", icon: Wallet },
+  { label: "Ratings & Badges", href: "/technician/ratings", icon: Star },
+  { label: "Availability", href: "/technician/availability", icon: UserCog },
+  { label: "Spare Inventory", href: "/technician/inventory", icon: Wrench },
+  { label: "Attendance", href: "/technician/attendance", icon: CalendarCheck },
 ];
 
 /* ─── Admin Sidebar Navigation ─── */

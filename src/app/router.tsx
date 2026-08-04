@@ -4,7 +4,7 @@ import { RootLayout } from "../layouts/RootLayout";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { DashboardLayout } from "../layouts/DashboardLayout";
 import { ROUTES } from "../constants/routes";
-import { CUSTOMER_SIDEBAR_LINKS } from "../constants/navigation";
+import { CUSTOMER_SIDEBAR_LINKS, TECHNICIAN_SIDEBAR_LINKS } from "../constants/navigation";
 import { PageSkeleton } from "../components/shared/LoadingSkeleton";
 
 /* ─── Lazy-loaded Pages ─── */
@@ -32,6 +32,15 @@ const Notifications = lazy(() => import("../pages/dashboard/customer/Notificatio
 const Profile = lazy(() => import("../pages/dashboard/customer/Profile"));
 const Settings = lazy(() => import("../pages/dashboard/customer/Settings"));
 const HelpCenter = lazy(() => import("../pages/dashboard/customer/HelpCenter"));
+
+/* ─── Technician App Pages ─── */
+const TechJobList = lazy(() => import("../pages/dashboard/technician/JobList"));
+const TechEarnings = lazy(() => import("../pages/dashboard/technician/Earnings"));
+const TechWallet = lazy(() => import("../pages/dashboard/technician/Wallet"));
+const TechRatings = lazy(() => import("../pages/dashboard/technician/Ratings"));
+const TechAvailability = lazy(() => import("../pages/dashboard/technician/Availability"));
+const TechInventory = lazy(() => import("../pages/dashboard/technician/Inventory"));
+const TechAttendance = lazy(() => import("../pages/dashboard/technician/Attendance"));
 
 /* ─── Suspense Wrapper ─── */
 
@@ -229,6 +238,73 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <HelpCenter />
+          </LazyPage>
+        ),
+      },
+    ],
+  },
+  {
+    // Technician App routes with DashboardLayout
+    path: "/technician",
+    element: <DashboardLayout links={TECHNICIAN_SIDEBAR_LINKS} title="Technician Portal" />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="/technician/jobs" replace />,
+      },
+      {
+        path: "jobs",
+        element: (
+          <LazyPage>
+            <TechJobList />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "earnings",
+        element: (
+          <LazyPage>
+            <TechEarnings />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "wallet",
+        element: (
+          <LazyPage>
+            <TechWallet />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "ratings",
+        element: (
+          <LazyPage>
+            <TechRatings />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "availability",
+        element: (
+          <LazyPage>
+            <TechAvailability />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "inventory",
+        element: (
+          <LazyPage>
+            <TechInventory />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "attendance",
+        element: (
+          <LazyPage>
+            <TechAttendance />
           </LazyPage>
         ),
       },
