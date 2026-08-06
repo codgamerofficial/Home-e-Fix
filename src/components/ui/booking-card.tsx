@@ -78,8 +78,8 @@ export function BookingCard({
         {/* Footer: Amount & Actions */}
         <div className="flex items-center justify-between pt-3 border-t border-border/60">
           <div>
-            <span className="text-[11px] text-foreground-muted block">Total Amount</span>
-            <span className="font-heading text-base font-bold text-primary">
+            <span className="text-[11px] text-foreground-muted block font-medium">Total Amount</span>
+            <span className="font-heading text-lg font-extrabold text-accent">
               {formatCurrency(total)}
             </span>
           </div>

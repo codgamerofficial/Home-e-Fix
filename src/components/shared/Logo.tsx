@@ -57,11 +57,11 @@ export function Logo({
               config.text
             )}
           >
-            <span className="text-primary">Home-e-</span>
-            <span className="text-accent">Fix</span>
+            <span className="text-foreground dark:text-white">Home-e-</span>
+            <span className="text-accent font-extrabold">Fix</span>
           </span>
           {size !== "sm" && (
-            <span className="text-[0.6rem] font-medium uppercase tracking-[0.15em] text-foreground-muted">
+            <span className="text-[0.6rem] font-bold uppercase tracking-[0.15em] text-foreground-secondary dark:text-foreground-muted">
               Fixing Homes. Earning Trust.
             </span>
           )}

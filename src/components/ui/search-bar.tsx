@@ -72,40 +72,40 @@ export function SearchBar({
       <form
         onSubmit={handleSubmit}
         className={cn(
-          "flex items-center rounded-2xl border bg-surface p-1.5 shadow-card transition-all duration-200",
+          "flex items-center rounded-2xl border bg-[#07172E] border-white/20 p-2 shadow-glow-blue transition-all duration-200",
           isFocused
-            ? "border-accent ring-2 ring-accent/20 shadow-card-hover"
-            : "border-border hover:border-foreground-muted"
+            ? "border-accent ring-2 ring-accent/30 shadow-card-hover"
+            : "hover:border-white/40"
         )}
       >
         {/* Location Selector Pill */}
         <button
           type="button"
           onClick={onLocationClick}
-          className="flex items-center gap-1.5 rounded-xl bg-muted/60 px-3 py-2 text-xs font-medium text-primary hover:bg-muted transition-colors shrink-0 max-w-37.5 sm:max-w-50 truncate cursor-pointer"
+          className="flex items-center gap-1.5 rounded-xl bg-white/10 px-3 py-2.5 text-xs font-semibold text-white hover:bg-white/20 transition-colors shrink-0 max-w-37.5 sm:max-w-50 truncate cursor-pointer border border-white/10"
         >
-          <MapPin className="h-3.5 w-3.5 text-accent shrink-0" />
+          <MapPin className="h-4 w-4 text-accent shrink-0" />
           <span className="truncate">{location}</span>
         </button>
 
-        <div className="h-6 w-px bg-border mx-2 shrink-0 hidden sm:block" />
+        <div className="h-6 w-px bg-white/20 mx-2 shrink-0 hidden sm:block" />
 
         {/* Input */}
         <div className="relative flex-1 flex items-center">
-          <Search className="h-4 w-4 text-muted-foreground ml-2 shrink-0" />
+          <Search className="h-4 w-4 text-accent ml-2 shrink-0" />
           <input
             type="text"
             value={internalVal}
             onChange={handleChange}
             onFocus={() => setIsFocused(true)}
             placeholder={placeholder}
-            className="w-full bg-transparent px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+            className="w-full bg-transparent px-3 py-2 text-xs sm:text-sm text-white font-medium placeholder:text-white/60 focus:outline-hidden"
           />
           {internalVal && (
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 text-muted-foreground hover:text-foreground mr-1 cursor-pointer"
+              className="p-1 text-white/60 hover:text-white mr-1 cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
@@ -119,10 +119,10 @@ export function SearchBar({
             variant="ghost"
             size="icon"
             onClick={onFilterClick}
-            className="text-foreground-secondary shrink-0"
+            className="text-white/80 hover:text-white hover:bg-white/10 shrink-0 mr-1"
             aria-label="Open Filters"
           >
-            <SlidersHorizontal className="h-4 w-4" />
+            <SlidersHorizontal className="h-4 w-4 text-accent" />
           </Button>
         )}
 

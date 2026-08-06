@@ -28,6 +28,7 @@ import { SearchBar } from "@/components/ui/search-bar";
 import { ServiceCard } from "@/components/ui/service-card";
 import { MembershipCard } from "@/components/ui/membership-card";
 import { ReviewCard } from "@/components/ui/review-card";
+import { useCartStore } from "@/store/cart.store";
 import { ROUTES } from "@/constants/routes";
 import {
   SERVICE_CATEGORIES,
@@ -67,7 +68,7 @@ const stagger = {
 export default function Home() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [addedServices, setAddedServices] = useState<Record<string, boolean>>({});
+  const { items, addItem, removeItem } = useCartStore();
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [location, setLocation] = useState("Hitech City, Hyderabad");
 
@@ -81,10 +82,12 @@ export default function Home() {
   ];
 
   const handleToggleAddService = (service: any) => {
-    setAddedServices((prev) => ({
-      ...prev,
-      [service.id]: !prev[service.id],
-    }));
+    const isAlreadyAdded = items.some((i) => i.id === service.id);
+    if (isAlreadyAdded) {
+      removeItem(service.id);
+    } else {
+      addItem(service);
+    }
   };
 
   const handleSearchSubmit = (query: string) => {
@@ -104,7 +107,7 @@ export default function Home() {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-150 w-150 rounded-full bg-white/2 blur-3xl" />
         </div>
 
-        <div className="container-app relative py-16 sm:py-24 lg:py-32">
+        <div className="container-app relative py-12 sm:py-20 lg:py-24">
           <div className="mx-auto max-w-4xl text-center">
             <motion.div
               initial="hidden"
@@ -345,7 +348,7 @@ export default function Home() {
               <ServiceCard
                 key={service.id}
                 service={service}
-                isAdded={Boolean(addedServices[service.id])}
+                isAdded={items.some((i) => i.id === service.id)}
                 onAdd={handleToggleAddService}
                 onRemove={handleToggleAddService}
               />
@@ -505,7 +508,7 @@ export default function Home() {
       </section>
 
       {/* ─── 8. HOME-E-FIX PROMISE ─── */}
-      <section className="bg-primary text-white py-16 sm:py-20">
+      <section className="gradient-hero text-white py-16 sm:py-20 border-y border-white/10">
         <div className="container-app">
           <div className="mx-auto max-w-3xl text-center mb-12">
             <div className="inline-flex items-center gap-2 rounded-full bg-accent/20 px-3 py-1 text-xs font-bold text-accent mb-3">

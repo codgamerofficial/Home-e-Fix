@@ -8,46 +8,51 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-border bg-primary text-white">
+    <footer className="relative border-t border-white/10 bg-linear-to-b from-primary-dark to-[#02060E] text-white overflow-hidden">
+      {/* Ambient background glows */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-accent/10 blur-3xl" />
+        <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-primary-lighter/10 blur-3xl" />
+      </div>
+
       {/* Main Footer */}
-      <div className="container-app py-12 lg:py-16">
+      <div className="container-app relative py-12 lg:py-16">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-5">
           {/* Brand Column */}
-          <div className="lg:col-span-1">
-            <div className="mb-4">
-              <Logo size="md" linkToHome={false} />
-            </div>
-            <p className="mb-6 text-sm leading-relaxed text-white/60">
+          <div className="lg:col-span-1 space-y-4">
+            <Logo size="md" linkToHome={false} />
+            
+            <p className="text-xs sm:text-sm leading-relaxed text-white/85 font-body">
               {APP_CONFIG.description}
             </p>
 
-            {/* Contact Info */}
-            <div className="space-y-3 text-sm">
+            {/* Contact Info Card */}
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3 backdrop-blur-sm">
               <a
                 href={`mailto:${APP_CONFIG.supportEmail}`}
-                className="flex items-center gap-2 text-white/60 hover:text-accent transition-colors"
+                className="flex items-center gap-2.5 text-xs sm:text-sm text-white/90 hover:text-accent transition-colors group"
               >
-                <Mail className="h-4 w-4" />
-                {APP_CONFIG.supportEmail}
+                <Mail className="h-4 w-4 text-accent shrink-0 group-hover:scale-110 transition-transform" />
+                <span className="truncate">{APP_CONFIG.supportEmail}</span>
               </a>
               <a
                 href={`tel:${APP_CONFIG.supportPhone}`}
-                className="flex items-center gap-2 text-white/60 hover:text-accent transition-colors"
+                className="flex items-center gap-2.5 text-xs sm:text-sm text-white/90 hover:text-accent transition-colors group"
               >
-                <Phone className="h-4 w-4" />
-                {APP_CONFIG.supportPhone}
+                <Phone className="h-4 w-4 text-accent shrink-0 group-hover:scale-110 transition-transform" />
+                <span>{APP_CONFIG.supportPhone}</span>
               </a>
-              <div className="flex items-center gap-2 text-white/60">
-                <MapPin className="h-4 w-4" />
-                Hyderabad, India
+              <div className="flex items-center gap-2.5 text-xs sm:text-sm text-white/80">
+                <MapPin className="h-4 w-4 text-accent shrink-0" />
+                <span>Hyderabad, India</span>
               </div>
             </div>
           </div>
 
           {/* Link Columns */}
           {FOOTER_SECTIONS.map((section) => (
-            <div key={section.title}>
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white/80">
+            <div key={section.title} className="space-y-4">
+              <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-white border-b border-white/10 pb-2 inline-block">
                 {section.title}
               </h3>
               <ul className="space-y-2.5">
@@ -55,7 +60,7 @@ export function Footer() {
                   <li key={link.label}>
                     <Link
                       to={link.href}
-                      className="text-sm text-white/50 transition-colors hover:text-accent"
+                      className="text-xs sm:text-sm text-white/80 transition-all hover:text-accent hover:translate-x-1 inline-block"
                     >
                       {link.label}
                     </Link>
@@ -70,24 +75,24 @@ export function Footer() {
       <Separator className="bg-white/10" />
 
       {/* Bottom Bar */}
-      <div className="container-app flex flex-col items-center justify-between gap-4 py-6 md:flex-row">
-        <p className="text-xs text-white/40">
-          © {currentYear} {APP_CONFIG.name}. All rights reserved.
+      <div className="container-app relative flex flex-col items-center justify-between gap-4 py-6 md:flex-row text-xs text-white/70">
+        <p>
+          © {currentYear} <span className="font-semibold text-white">{APP_CONFIG.name}</span>. All rights reserved.
         </p>
 
-        <div className="flex items-center gap-1 text-xs text-white/40">
-          Made with <Heart className="mx-1 h-3 w-3 text-accent fill-accent" /> in India
+        <div className="flex items-center gap-1 font-medium">
+          Made with <Heart className="mx-1 h-3.5 w-3.5 text-accent fill-accent animate-pulse" /> in India
         </div>
 
         {/* Social Links */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {Object.entries(APP_CONFIG.socialLinks).map(([platform, url]) => (
             <a
               key={platform}
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-white/40 transition-colors hover:text-accent"
+              className="p-2 rounded-lg bg-white/5 border border-white/10 text-white/80 transition-all hover:text-accent hover:border-accent/40 hover:bg-accent/10"
               aria-label={platform}
             >
               <SocialIcon platform={platform} />

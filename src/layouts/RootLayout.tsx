@@ -1,7 +1,10 @@
 import { Outlet, useLocation } from "react-router";
 import { Navbar, MobileBottomNav, Footer } from "./components";
 import { NotificationToast } from "@/components/shared/NotificationToast";
+import { CommandMenu } from "@/components/shared/CommandMenu";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+
+import { FloatingCartBar } from "@/components/shared/FloatingCartBar";
 
 /**
  * Root layout — wraps all public pages with Navbar + Footer.
@@ -28,7 +31,9 @@ export function RootLayout() {
       {!isDashboard && <Footer />}
 
       <MobileBottomNav />
+      <FloatingCartBar />
       <NotificationToast />
+      <CommandMenu />
     </div>
   );
 }

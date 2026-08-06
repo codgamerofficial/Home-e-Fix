@@ -12,6 +12,17 @@ import {
   LogOut,
   Settings,
   LayoutDashboard,
+  HelpCircle,
+  ShoppingBag,
+  Wallet,
+  Crown,
+  Tag,
+  MapPin,
+  Star,
+  Info,
+  FileText,
+  ShieldCheck,
+  Phone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/shared/Logo";
@@ -26,6 +37,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { MAIN_NAV_LINKS } from "@/constants/navigation";
+import { SERVICE_CATEGORIES } from "@/constants/services";
 import { ROUTES } from "@/constants/routes";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
@@ -37,8 +49,8 @@ export function Navbar() {
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const { user, isAuthenticated } = useAuthStore();
-  const { theme, toggleTheme } = useUIStore();
+  const { user, isAuthenticated, logout } = useAuthStore();
+  const { theme, toggleTheme, setSearchOpen } = useUIStore();
   const { unreadCount } = useNotificationStore();
 
   return (
@@ -90,15 +102,29 @@ export function Navbar() {
           </div>
 
           {/* Right: Actions */}
-          <div className="flex items-center gap-2">
-            {/* Search (desktop) */}
+          <div className="flex items-center gap-3">
+            {/* Desktop Search Bar Trigger Pill */}
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="hidden md:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-white/20 bg-white/5 text-xs font-medium text-white/70 hover:text-white hover:border-accent hover:bg-white/10 transition-all cursor-pointer shadow-xs w-48 lg:w-64"
+            >
+              <Search className="h-3.5 w-3.5 text-accent shrink-0" />
+              <span className="truncate">Search 50+ services...</span>
+              <kbd className="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono border border-white/10 text-white/60">
+                ⌘K
+              </kbd>
+            </button>
+
+            {/* Mobile Search Icon Button */}
             <Button
               variant="ghost"
               size="icon"
-              className="hidden md:inline-flex text-foreground-secondary"
-              aria-label="Search"
+              onClick={() => setSearchOpen(true)}
+              className="md:hidden text-foreground-secondary hover:text-accent hover:bg-accent/10 transition-colors"
+              aria-label="Search services"
             >
-              <Search className="h-5 w-5" />
+              <Search className="h-5 w-5 text-accent" />
             </Button>
 
             {/* Theme Toggle */}
@@ -118,7 +144,7 @@ export function Navbar() {
 
             {/* Notifications (if authenticated) */}
             {isAuthenticated && (
-              <div className="relative">
+              <Link to="/dashboard/notifications" className="relative">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -132,7 +158,7 @@ export function Navbar() {
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
-              </div>
+              </Link>
             )}
 
             {/* Auth / Profile */}
@@ -202,8 +228,86 @@ export function Navbar() {
         <SheetHeader onClose={() => setMobileMenuOpen(false)}>
           <Logo size="sm" linkToHome={false} />
         </SheetHeader>
-        <SheetContent>
-          <div className="flex flex-col gap-1 py-4">
+        <SheetContent className="overflow-y-auto max-h-[88vh] space-y-6 pb-12">
+          {/* Quick Search Bar Trigger */}
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              setSearchOpen(true);
+            }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-white/20 bg-[#07172E] text-xs font-semibold text-white/80 hover:text-white hover:border-accent transition-all cursor-pointer shadow-xs"
+          >
+            <Search className="h-4 w-4 text-accent shrink-0" />
+            <span>Search 50+ Home Services...</span>
+            <Badge variant="accent" className="ml-auto text-[10px] px-1.5 py-0.5">
+              ⌘K
+            </Badge>
+          </button>
+
+          {/* User Profile Summary & Quick Stats */}
+          {isAuthenticated && user ? (
+            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+              <div className="flex items-center gap-3">
+                <Avatar size="md" className="ring-2 ring-accent">
+                  <AvatarFallback name={user.fullName} />
+                </Avatar>
+                <div className="truncate">
+                  <h4 className="font-heading text-sm font-bold text-white truncate">{user.fullName}</h4>
+                  <p className="text-xs text-white/60 truncate">{user.email || user.phone}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/10 text-xs">
+                <Link
+                  to="/dashboard/wallet"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 rounded-xl bg-white/5 flex items-center gap-2 text-white hover:bg-white/10"
+                >
+                  <Wallet className="h-4 w-4 text-accent shrink-0" />
+                  <div className="truncate">
+                    <span className="text-[10px] text-white/60 block">Wallet</span>
+                    <span className="font-bold text-accent">₹500.00</span>
+                  </div>
+                </Link>
+                <Link
+                  to="/dashboard/membership"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-2 rounded-xl bg-white/5 flex items-center gap-2 text-white hover:bg-white/10"
+                >
+                  <Crown className="h-4 w-4 text-amber-400 shrink-0" />
+                  <div className="truncate">
+                    <span className="text-[10px] text-white/60 block">VIP Pass</span>
+                    <span className="font-bold text-amber-400">ACTIVE</span>
+                  </div>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 rounded-2xl bg-radial from-[#07172E] to-primary-dark border border-white/15 text-center space-y-3">
+              <span className="text-xs text-white/80 font-medium block">
+                Sign in to manage bookings, track pros live, and access VIP discounts!
+              </span>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" size="sm" className="font-bold border-white/20 text-white bg-[#07172E]" asChild>
+                  <Link to={ROUTES.LOGIN} onClick={() => setMobileMenuOpen(false)}>
+                    Login
+                  </Link>
+                </Button>
+                <Button variant="accent" size="sm" className="font-bold shadow-glow" asChild>
+                  <Link to={ROUTES.REGISTER} onClick={() => setMobileMenuOpen(false)}>
+                    Sign Up
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Main Navigation Links */}
+          <div className="space-y-1">
+            <span className="text-[11px] font-bold text-accent uppercase tracking-wider block px-1 mb-1">
+              Main Pages
+            </span>
             {MAIN_NAV_LINKS.map((link) => {
               const Icon = link.icon;
               const isActive =
@@ -217,40 +321,156 @@ export function Navbar() {
                   to={link.href}
                   onClick={() => setMobileMenuOpen(false)}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition-colors",
+                    "flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all",
                     isActive
-                      ? "bg-accent/10 text-accent"
-                      : "text-foreground-secondary hover:bg-muted"
+                      ? "bg-accent/20 text-accent border border-accent/40"
+                      : "text-white/80 hover:bg-white/10 hover:text-white"
                   )}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-4 w-4 shrink-0 text-accent" />
                   {link.label}
                 </Link>
               );
             })}
           </div>
 
-          {/* Mobile Auth Buttons */}
-          {!isAuthenticated && (
-            <div className="mt-auto border-t border-border pt-4 space-y-2">
-              <Button variant="outline" className="w-full" asChild>
-                <Link
-                  to={ROUTES.LOGIN}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Login
-                </Link>
-              </Button>
-              <Button variant="accent" className="w-full" asChild>
-                <Link
-                  to={ROUTES.REGISTER}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Sign Up
-                </Link>
-              </Button>
+          {/* All 15 Service Categories Grid */}
+          <div className="space-y-2 pt-2 border-t border-white/10">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] font-bold text-accent uppercase tracking-wider block">
+                All 15 Service Categories
+              </span>
+              <Link
+                to="/services"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-[10px] font-bold text-accent hover:underline"
+              >
+                View All →
+              </Link>
             </div>
-          )}
+            <div className="grid grid-cols-2 gap-2">
+              {SERVICE_CATEGORIES.map((cat) => (
+                <Link
+                  key={cat.slug}
+                  to={`/services/category/${cat.slug}`}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/10 text-[11px] font-semibold text-white/90 hover:bg-white/10 hover:text-white transition-all truncate"
+                >
+                  <span className="text-sm shrink-0">{cat.icon}</span>
+                  <span className="truncate">{cat.name}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Customer Dashboard Quick Access */}
+          <div className="space-y-1 pt-2 border-t border-white/10">
+            <span className="text-[11px] font-bold text-accent uppercase tracking-wider block px-1 mb-1">
+              Customer Account & Orders
+            </span>
+            {[
+              { label: "My Bookings & Orders", href: "/dashboard/orders", icon: LayoutDashboard },
+              { label: "Wallet & Cashbacks", href: "/dashboard/wallet", icon: Wallet },
+              { label: "VIP Membership Pass", href: "/dashboard/membership", icon: Crown },
+              { label: "Coupons & Discounts", href: "/dashboard/coupons", icon: Tag },
+              { label: "Saved Delivery Addresses", href: "/dashboard/addresses", icon: MapPin },
+              { label: "Rate & Review Services", href: "/dashboard/reviews", icon: Star },
+              { label: "Notifications & Alerts", href: "/dashboard/notifications", icon: Bell },
+              { label: "Profile & Settings", href: "/dashboard/profile", icon: Settings },
+              { label: "Help & Support Center", href: "/dashboard/help-center", icon: HelpCircle },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 rounded-xl px-3.5 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white transition-all"
+                >
+                  <Icon className="h-4 w-4 shrink-0 text-white/60" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Support & Legal Links */}
+          <div className="space-y-1 pt-2 border-t border-white/10">
+            <span className="text-[11px] font-bold text-accent uppercase tracking-wider block px-1 mb-1">
+              Company & Legal
+            </span>
+            {[
+              { label: "About Home-e-Fix", href: "/about", icon: Info },
+              { label: "Contact Us & Support", href: "/contact", icon: Phone },
+              { label: "Terms of Service", href: "/terms", icon: FileText },
+              { label: "Privacy Policy", href: "/privacy", icon: ShieldCheck },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-3 rounded-xl px-3.5 py-2 text-xs font-semibold text-white/80 hover:bg-white/10 hover:text-white transition-all"
+                >
+                  <Icon className="h-4 w-4 shrink-0 text-white/60" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Role Switcher Shortcuts */}
+          <div className="space-y-2 pt-2 border-t border-white/10">
+            <span className="text-[11px] font-bold text-accent uppercase tracking-wider block px-1">
+              Portals & App Switchers
+            </span>
+            <Link
+              to="/technician/jobs"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-between rounded-xl px-3.5 py-2.5 bg-white/5 border border-white/10 text-xs font-bold text-white hover:bg-white/10 transition-all"
+            >
+              <span>👨‍🔧 Technician App</span>
+              <Badge variant="secondary" className="text-[10px]">PRO</Badge>
+            </Link>
+            <Link
+              to="/admin/analytics"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-between rounded-xl px-3.5 py-2.5 bg-white/5 border border-white/10 text-xs font-bold text-white hover:bg-white/10 transition-all"
+            >
+              <span>⚡ Admin Control Panel</span>
+              <Badge variant="accent" className="text-[10px]">ADMIN</Badge>
+            </Link>
+          </div>
+
+          {/* Appearance & Session Controls */}
+          <div className="pt-2 border-t border-white/10 space-y-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleTheme}
+              className="w-full flex items-center justify-between font-semibold border-white/20 text-white bg-[#07172E]"
+            >
+              <span className="flex items-center gap-2">
+                {theme === "dark" ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-blue-400" />}
+                Theme: <span className="capitalize font-bold text-accent">{theme}</span>
+              </span>
+              <span className="text-[10px] text-white/50">Toggle</span>
+            </Button>
+
+            {isAuthenticated && (
+              <Button
+                variant="destructive"
+                className="w-full font-bold"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  logout();
+                }}
+              >
+                <LogOut className="mr-2 h-4 w-4" /> Log Out Account
+              </Button>
+            )}
+          </div>
         </SheetContent>
       </Sheet>
     </>

@@ -29,6 +29,9 @@ import { AddressCard } from "@/components/ui/address-card";
 import { ProgressTimeline } from "@/components/ui/progress-timeline";
 import { ROUTES } from "@/constants/routes";
 import { POPULAR_SERVICES } from "@/constants/services";
+import { useCartStore } from "@/store/cart.store";
+import { useAuthStore } from "@/store/auth.store";
+import { displayRazorpayCheckout } from "@/lib/razorpay";
 import { formatCurrency } from "@/lib/utils";
 
 /* ─── Mock User Addresses ─── */
@@ -70,13 +73,13 @@ export default function BookingWizard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  const { items: cartItems, addItem, removeItem, updateQuantity, clearCart, getSubtotal } = useCartStore();
+
   // Wizard Stage (0 to 5)
   const [currentStep, setCurrentStep] = useState<number>(0);
 
-  // Selected Service Items
-  const [selectedServices, setSelectedServices] = useState<any[]>([
-    POPULAR_SERVICES[0], // default Split AC servicing
-  ]);
+  // Selected Service Items fallback
+  const selectedServices = cartItems.length > 0 ? cartItems : [POPULAR_SERVICES[0]];
 
   // Address State
   const [addresses, setAddresses] = useState<any[]>(INITIAL_ADDRESSES);
@@ -107,10 +110,13 @@ export default function BookingWizard() {
   const [couponError, setCouponError] = useState<string | null>(null);
 
   // Payment Method
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi" | "card" | "wallet">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi" | "card" | "wallet">("upi");
 
   // Calculation Logic
-  const itemsSubtotal = selectedServices.reduce((sum, s) => sum + (s.discountedPrice || s.basePrice || 0), 0);
+  const itemsSubtotal = selectedServices.reduce(
+    (sum, s: any) => sum + (s.discountedPrice || s.basePrice || 499) * (s.quantity || 1),
+    0
+  );
   const safetyHygieneFee = 29;
   const taxGst = Math.round(itemsSubtotal * 0.18);
   const totalAmount = Math.max(0, itemsSubtotal + safetyHygieneFee + taxGst - appliedDiscount);
@@ -178,9 +184,35 @@ export default function BookingWizard() {
     setShowAddAddressModal(false);
   };
 
-  const handleConfirmBooking = () => {
+  const { user } = useAuthStore();
+
+  const handleConfirmBooking = async () => {
     const bookingId = `HEF-${Math.floor(100000 + Math.random() * 900000)}`;
-    navigate(`/booking/confirmation/${bookingId}`);
+
+    // Cash / Pay after service
+    if (paymentMethod === "cash") {
+      clearCart();
+      navigate(`/booking/confirmation/${bookingId}`);
+      return;
+    }
+
+    // Razorpay Online Gateway Checkout (UPI, Card, Wallet)
+    await displayRazorpayCheckout({
+      amount: totalAmount,
+      currency: "INR",
+      name: "Home-e-Fix",
+      description: `Home Service Booking #${bookingId}`,
+      customerName: user?.fullName || "Valued Customer",
+      customerEmail: user?.email || "customer@homeefix.com",
+      customerPhone: user?.phone || "+91 98765 43210",
+      onSuccess: (paymentId) => {
+        clearCart();
+        navigate(`/booking/confirmation/${bookingId}?payment_id=${paymentId}`);
+      },
+      onFailure: (err) => {
+        console.error("Razorpay Payment Error:", err);
+      },
+    });
   };
 
   return (
@@ -237,10 +269,10 @@ export default function BookingWizard() {
                   {selectedServices.map((service) => (
                     <div
                       key={service.id}
-                      className="flex items-center justify-between p-4 rounded-xl border border-border bg-surface"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-border bg-surface gap-3"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center text-xl">
+                        <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center text-xl shrink-0">
                           🛠️
                         </div>
                         <div>
@@ -248,20 +280,55 @@ export default function BookingWizard() {
                             {service.name}
                           </h4>
                           <p className="text-xs text-foreground-secondary">
-                            Duration: {service.duration} mins • 30-Day Warranty
+                            Duration: {service.duration || 45} mins • 30-Day Warranty
                           </p>
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <div className="font-heading text-base font-bold text-primary">
-                          {formatCurrency(service.discountedPrice || service.basePrice)}
-                        </div>
-                        {service.basePrice > service.discountedPrice && (
-                          <span className="text-[11px] text-foreground-muted line-through">
-                            {formatCurrency(service.basePrice)}
+                      <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-2 sm:pt-0 border-border">
+                        {/* Quantity Controls */}
+                        <div className="flex items-center gap-1.5 border border-border rounded-lg p-1 bg-background">
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(service.id, -1)}
+                            className="h-6 w-6 rounded bg-surface hover:bg-muted text-primary font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <span className="text-xs font-bold px-2 text-primary">
+                            {(service as any).quantity || 1}
                           </span>
-                        )}
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(service.id, 1)}
+                            className="h-6 w-6 rounded bg-surface hover:bg-muted text-primary font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        {/* Price Display */}
+                        <div className="text-right">
+                          <div className="font-heading text-base font-bold text-primary">
+                            {formatCurrency((service.discountedPrice || service.basePrice) * ((service as any).quantity || 1))}
+                          </div>
+                          {service.discountedPrice && service.basePrice > service.discountedPrice && (
+                            <span className="text-[11px] text-foreground-muted line-through block">
+                              {formatCurrency(service.basePrice * ((service as any).quantity || 1))}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Delete Service Button */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => removeItem(service.id)}
+                          className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 h-8 w-8 shrink-0"
+                          title="Remove service"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}

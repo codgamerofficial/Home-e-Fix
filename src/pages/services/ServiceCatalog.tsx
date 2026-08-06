@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { SearchBar } from "@/components/ui/search-bar";
 import { ServiceCard } from "@/components/ui/service-card";
 import { FilterPanel } from "@/components/ui/filters";
+import { useCartStore } from "@/store/cart.store";
 import { ROUTES } from "@/constants/routes";
 import {
   SERVICE_CATEGORIES,
@@ -33,17 +34,19 @@ export default function ServiceCatalog() {
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("popular");
-  const [addedServices, setAddedServices] = useState<Record<string, boolean>>({});
+  const { items, addItem, removeItem } = useCartStore();
 
   const handleToggleAdd = (service: any) => {
-    setAddedServices((prev) => ({
-      ...prev,
-      [service.id]: !prev[service.id],
-    }));
+    const isAlreadyAdded = items.some((i) => i.id === service.id);
+    if (isAlreadyAdded) {
+      removeItem(service.id);
+    } else {
+      addItem(service);
+    }
   };
 
   // Combine services from all categories into one master list
-  const allServicesList = Object.values(CATEGORY_SERVICES_MAP).flat().concat(POPULAR_SERVICES);
+  const allServicesList = Object.values(CATEGORY_SERVICES_MAP).flat();
 
   // Filtered services
   const filteredServices = allServicesList.filter((service) => {
@@ -207,7 +210,7 @@ export default function ServiceCatalog() {
               <ServiceCard
                 key={service.id}
                 service={service}
-                isAdded={Boolean(addedServices[service.id])}
+                isAdded={items.some((i) => i.id === service.id)}
                 onAdd={handleToggleAdd}
                 onRemove={handleToggleAdd}
               />

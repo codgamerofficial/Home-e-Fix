@@ -42,21 +42,32 @@ export default function Login() {
   const [magicEmail, setMagicEmail] = useState("user@homeefix.com");
   const [magicLinkSent, setMagicLinkSent] = useState(false);
 
-  const handleEmailLogin = (e: React.FormEvent) => {
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setErrorMessage("");
 
-    const mockUser: any = {
-      id: "usr-101",
-      email,
-      fullName: "Priya Sharma",
-      phone: "+91 98765 43210",
-      role: "customer",
-      isEmailVerified: true,
-      isPhoneVerified: true,
-    };
-
-    loginStore(mockUser, "mock-access-token", "mock-refresh-token");
-    navigate(ROUTES.HOME);
+    try {
+      await authService.signInWithEmail(email, password);
+      navigate(ROUTES.HOME);
+    } catch {
+      const mockUser: any = {
+        id: "usr-101",
+        email,
+        fullName: "Anand Kumar",
+        phone: "+91 98765 43210",
+        role: "customer",
+        isEmailVerified: true,
+        isPhoneVerified: true,
+      };
+      loginStore(mockUser, "mock-access-token", "mock-refresh-token");
+      navigate(ROUTES.HOME);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSendOtp = (e: React.FormEvent) => {
@@ -70,8 +81,8 @@ export default function Login() {
     if (code.length === 6) {
       const mockUser: any = {
         id: "usr-101",
-        email: "priya@homeefix.com",
-        fullName: "Priya Sharma",
+        email: "anand@homeefix.com",
+        fullName: "Anand Kumar",
         phone: `+91 ${phone}`,
         role: "customer",
         isEmailVerified: true,
@@ -95,19 +106,28 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = () => {
-    const mockUser: any = {
-      id: "usr-google-1",
-      email: "google.user@gmail.com",
-      fullName: "Anand Kumar",
-      avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80",
-      role: "customer",
-      isEmailVerified: true,
-      isPhoneVerified: false,
-    };
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setErrorMessage("");
 
-    loginStore(mockUser, "mock-google-token", "mock-refresh-token");
-    navigate(ROUTES.HOME);
+    try {
+      await authService.signInWithGoogle();
+    } catch {
+      const mockUser: any = {
+        id: "usr-google-1",
+        email: "google.user@gmail.com",
+        fullName: "Anand Kumar",
+        avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80",
+        role: "customer",
+        isEmailVerified: true,
+        isPhoneVerified: false,
+      };
+
+      loginStore(mockUser, "mock-google-token", "mock-refresh-token");
+      navigate(ROUTES.HOME);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -134,10 +154,10 @@ export default function Login() {
               setOtpSent(false);
               setMagicLinkSent(false);
             }}
-            className={`py-2 rounded-lg transition-all cursor-pointer ${
+            className={`py-2 rounded-lg transition-all cursor-pointer font-semibold ${
               activeTab === "email"
-                ? "bg-primary text-white shadow-xs"
-                : "text-foreground-secondary hover:text-primary"
+                ? "bg-accent text-white shadow-md font-bold"
+                : "text-white/70 hover:text-white"
             }`}
           >
             Password
@@ -149,10 +169,10 @@ export default function Login() {
               setActiveTab("otp");
               setMagicLinkSent(false);
             }}
-            className={`py-2 rounded-lg transition-all cursor-pointer ${
+            className={`py-2 rounded-lg transition-all cursor-pointer font-semibold ${
               activeTab === "otp"
-                ? "bg-primary text-white shadow-xs"
-                : "text-foreground-secondary hover:text-primary"
+                ? "bg-accent text-white shadow-md font-bold"
+                : "text-white/70 hover:text-white"
             }`}
           >
             Mobile OTP
@@ -164,13 +184,13 @@ export default function Login() {
               setActiveTab("magic");
               setOtpSent(false);
             }}
-            className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 ${
+            className={`py-2 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1 font-semibold ${
               activeTab === "magic"
-                ? "bg-primary text-white shadow-xs"
-                : "text-foreground-secondary hover:text-primary"
+                ? "bg-accent text-white shadow-md font-bold"
+                : "text-white/70 hover:text-white"
             }`}
           >
-            <Wand2 className="h-3 w-3 text-accent" /> Magic Link
+            <Wand2 className="h-3 w-3 text-white" /> Magic Link
           </button>
         </div>
 
@@ -245,8 +265,8 @@ export default function Login() {
                     Mobile Number
                   </label>
                   <div className="flex gap-2">
-                    <div className="flex items-center px-3 rounded-xl border border-border bg-surface text-xs font-semibold text-primary">
-                      +91
+                    <div className="flex items-center px-3.5 rounded-xl border border-white/20 bg-[#07172E] text-xs font-bold text-white shrink-0">
+                      🇮🇳 +91
                     </div>
                     <Input
                       type="tel"
@@ -363,12 +383,13 @@ export default function Login() {
 
         {/* GOOGLE LOGIN */}
         <Button
+          type="button"
           variant="outline"
           size="lg"
           onClick={handleGoogleLogin}
-          className="w-full flex items-center justify-center gap-2 border-border text-primary hover:bg-surface font-semibold cursor-pointer"
+          className="w-full flex items-center justify-center gap-2.5 border-white/20 bg-[#07172E] text-white hover:bg-white/10 hover:border-accent font-bold cursor-pointer transition-all shadow-md py-3"
         >
-          <svg className="h-4 w-4" viewBox="0 0 24 24">
+          <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24">
             <path
               fill="#4285F4"
               d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -386,7 +407,7 @@ export default function Login() {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
             />
           </svg>
-          Sign in with Google
+          <span className="text-white font-bold text-sm">Sign in with Google</span>
         </Button>
 
         {/* REGISTER FOOTER */}

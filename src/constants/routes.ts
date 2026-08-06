@@ -13,46 +13,46 @@ export const ROUTES = {
   // Services
   SERVICES: "/services",
   SERVICE_CATEGORY: "/services/:categorySlug",
-  SERVICE_DETAIL: "/services/:categorySlug/:serviceSlug",
+  SERVICE_DETAIL: "/services/:categorySlug",
 
   // Booking
   BOOKING: "/booking",
-  BOOKING_NEW: "/booking/new",
-  BOOKING_CONFIRM: "/booking/confirm",
-  BOOKING_SUCCESS: "/booking/success",
-  BOOKING_DETAIL: "/booking/:bookingId",
+  BOOKING_NEW: "/booking",
+  BOOKING_CONFIRM: "/booking",
+  BOOKING_SUCCESS: "/booking/confirmation",
+  BOOKING_DETAIL: "/booking/confirmation/:bookingId",
 
   // Auth
   LOGIN: "/auth/login",
   REGISTER: "/auth/register",
   FORGOT_PASSWORD: "/auth/forgot-password",
-  RESET_PASSWORD: "/auth/reset-password",
-  VERIFY_EMAIL: "/auth/verify-email",
+  RESET_PASSWORD: "/auth/forgot-password",
+  VERIFY_EMAIL: "/auth/otp",
 
   // Customer Dashboard
-  CUSTOMER_DASHBOARD: "/dashboard",
-  CUSTOMER_BOOKINGS: "/dashboard/bookings",
+  CUSTOMER_DASHBOARD: "/dashboard/orders",
+  CUSTOMER_BOOKINGS: "/dashboard/orders",
   CUSTOMER_PROFILE: "/dashboard/profile",
   CUSTOMER_ADDRESSES: "/dashboard/addresses",
   CUSTOMER_WALLET: "/dashboard/wallet",
-  CUSTOMER_SUPPORT: "/dashboard/support",
+  CUSTOMER_SUPPORT: "/dashboard/help",
 
   // Technician Dashboard
-  TECHNICIAN_DASHBOARD: "/technician",
+  TECHNICIAN_DASHBOARD: "/technician/jobs",
   TECHNICIAN_JOBS: "/technician/jobs",
-  TECHNICIAN_SCHEDULE: "/technician/schedule",
+  TECHNICIAN_SCHEDULE: "/technician/availability",
   TECHNICIAN_EARNINGS: "/technician/earnings",
-  TECHNICIAN_REVIEWS: "/technician/reviews",
-  TECHNICIAN_PROFILE: "/technician/profile",
+  TECHNICIAN_REVIEWS: "/technician/ratings",
+  TECHNICIAN_PROFILE: "/technician/jobs",
 
   // Admin Dashboard
-  ADMIN_DASHBOARD: "/admin",
-  ADMIN_USERS: "/admin/users",
+  ADMIN_DASHBOARD: "/admin/analytics",
+  ADMIN_USERS: "/admin/customers",
   ADMIN_SERVICES: "/admin/services",
   ADMIN_BOOKINGS: "/admin/bookings",
   ADMIN_TECHNICIANS: "/admin/technicians",
   ADMIN_ANALYTICS: "/admin/analytics",
-  ADMIN_SETTINGS: "/admin/settings",
+  ADMIN_SETTINGS: "/admin/reports",
 
   // Catch-all
   NOT_FOUND: "*",

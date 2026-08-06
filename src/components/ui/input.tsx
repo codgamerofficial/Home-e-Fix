@@ -29,7 +29,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     },
     ref
   ) => {
-    const inputId = id || React.useId();
+    const generatedId = React.useId();
+    const inputId = id || generatedId;
 
     return (
       <div className="space-y-1.5 w-full">
@@ -53,8 +54,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             value={value}
             className={cn(
-              "flex h-10 w-full rounded-lg border bg-surface px-3 py-2 text-sm font-body",
+              "flex h-10 w-full rounded-lg border bg-surface px-3 py-2 text-sm font-body font-medium",
               "text-foreground placeholder:text-muted-foreground",
+              "dark:text-white dark:bg-surface-elevated dark:border-white/20 dark:placeholder:text-white/60",
               "transition-colors duration-200",
               "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
               "disabled:cursor-not-allowed disabled:opacity-50",

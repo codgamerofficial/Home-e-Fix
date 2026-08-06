@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { Logo } from "@/components/shared/Logo";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { Separator } from "@/components/ui/separator";
 import { useUIStore } from "@/store/ui.store";
 import type { NavLink } from "@/constants/navigation";
 

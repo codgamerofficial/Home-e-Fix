@@ -17,19 +17,19 @@ export type ButtonSize = "sm" | "default" | "lg" | "icon";
 
 const variantClasses: Record<ButtonVariant, string> = {
   default:
-    "bg-primary text-white shadow-sm hover:bg-primary-light active:bg-primary-dark",
+    "bg-primary text-white shadow-md hover:bg-primary-light hover:shadow-glow-blue active:bg-primary-dark active:scale-[0.98]",
   destructive:
-    "bg-error text-white shadow-sm hover:bg-error/90 active:bg-error/80",
+    "bg-error text-white shadow-sm hover:bg-error/90 active:bg-error/80 active:scale-[0.98]",
   outline:
-    "border border-border bg-surface text-foreground shadow-xs hover:bg-muted active:bg-muted/80",
+    "border border-border bg-surface text-foreground shadow-xs hover:bg-muted hover:border-accent/40 active:bg-muted/80 active:scale-[0.98]",
   secondary:
-    "bg-muted text-foreground shadow-xs hover:bg-muted/80 active:bg-muted/60",
+    "bg-muted text-foreground shadow-xs hover:bg-muted/80 active:bg-muted/60 active:scale-[0.98]",
   ghost:
-    "text-foreground hover:bg-muted active:bg-muted/80",
+    "text-foreground hover:bg-muted active:bg-muted/80 active:scale-[0.98]",
   link:
     "text-accent underline-offset-4 hover:underline",
   accent:
-    "bg-accent text-white shadow-sm hover:bg-accent-dark active:bg-accent-dark/90",
+    "bg-accent text-white font-semibold shadow-md hover:bg-accent-light hover:shadow-glow active:bg-accent-dark active:scale-[0.98] transition-all",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
