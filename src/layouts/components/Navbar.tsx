@@ -41,6 +41,7 @@ import { ROUTES } from "@/constants/routes";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
 import { useNotificationStore } from "@/store/notification.store";
+import { useCartStore } from "@/store/cart.store";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 
 export function Navbar() {
@@ -52,6 +53,8 @@ export function Navbar() {
   const { user, isAuthenticated, logout } = useAuthStore();
   const { theme, toggleTheme, setSearchOpen } = useUIStore();
   const { unreadCount } = useNotificationStore();
+  const { getItemCount } = useCartStore();
+  const cartCount = getItemCount();
 
   return (
     <>
@@ -103,6 +106,26 @@ export function Navbar() {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-3">
+            {/* Cart Icon Button */}
+            <Link
+              to={cartCount > 0 ? ROUTES.BOOKING : ROUTES.SERVICES}
+              className="relative"
+              title={cartCount > 0 ? `${cartCount} items in cart - Checkout` : "Browse Services"}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-foreground-secondary hover:text-accent"
+                aria-label="Shopping Cart"
+              >
+                <ShoppingBag className="h-5 w-5" />
+              </Button>
+              {cartCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-white shadow-md animate-pulse">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
 
 
             {/* Theme Toggle */}
