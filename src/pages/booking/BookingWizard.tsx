@@ -186,8 +186,12 @@ export default function BookingWizard() {
 
   const { user } = useAuthStore();
 
+  // Payment Notice State
+  const [paymentErrorNotice, setPaymentErrorNotice] = useState<string | null>(null);
+
   const handleConfirmBooking = async () => {
     const bookingId = `HEF-${Math.floor(100000 + Math.random() * 900000)}`;
+    setPaymentErrorNotice(null);
 
     // Cash / Pay after service
     if (paymentMethod === "cash") {
@@ -209,8 +213,11 @@ export default function BookingWizard() {
         clearCart();
         navigate(`/booking/confirmation/${bookingId}?payment_id=${paymentId}`);
       },
+      onCancel: (reason) => {
+        setPaymentErrorNotice(`❌ Payment Cancelled: ${reason}`);
+      },
       onFailure: (err) => {
-        console.error("Razorpay Payment Error:", err);
+        setPaymentErrorNotice(`❌ Payment Failed: ${err}`);
       },
     });
   };
@@ -684,6 +691,22 @@ export default function BookingWizard() {
                     Select how you want to pay for your service.
                   </p>
                 </div>
+
+                {/* PAYMENT ERROR / CANCELLATION NOTICE BANNER */}
+                {paymentErrorNotice && (
+                  <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-base shrink-0">❌</span>
+                      <span className="text-xs sm:text-sm font-semibold">{paymentErrorNotice}</span>
+                    </div>
+                    <button
+                      onClick={() => setPaymentErrorNotice(null)}
+                      className="text-xs text-rose-400 hover:text-rose-300 font-bold px-2 py-0.5"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   {[

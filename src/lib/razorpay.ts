@@ -10,7 +10,8 @@ export interface RazorpayOptions {
   customerEmail?: string;
   customerPhone?: string;
   onSuccess: (paymentId: string) => void;
-  onFailure?: (error: any) => void;
+  onCancel?: (reason: string) => void;
+  onFailure?: (errorMsg: string) => void;
 }
 
 /**
@@ -32,18 +33,25 @@ export function loadRazorpayScript(): Promise<boolean> {
 }
 
 /**
- * Display Razorpay Checkout modal popup.
+ * Display Razorpay Checkout modal popup with explicit success, cancel, and error handling.
  */
 export async function displayRazorpayCheckout(options: RazorpayOptions) {
   const isLoaded = await loadRazorpayScript();
   const testKey = import.meta.env.VITE_RAZORPAY_KEY_ID || "rzp_test_TM55pOM1Y37yUO";
 
   if (!isLoaded) {
-    options.onSuccess(`pay_simulated_${Date.now()}`);
+    // If SDK fails to load, trigger cancel or fallback error
+    if (options.onFailure) {
+      options.onFailure("Payment SDK failed to load. Please check your internet connection.");
+    } else if (options.onCancel) {
+      options.onCancel("Payment cancelled.");
+    }
     return;
   }
 
   try {
+    let paymentCompleted = false;
+
     const razorpayConfig = {
       key: testKey,
       amount: options.amount * 100, // Amount in paise
@@ -53,11 +61,18 @@ export async function displayRazorpayCheckout(options: RazorpayOptions) {
       image: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=150&q=80",
       order_id: options.orderId,
       handler: function (response: any) {
-        options.onSuccess(response.razorpay_payment_id || `pay_${Date.now()}`);
+        paymentCompleted = true;
+        const paymentId = response.razorpay_payment_id || `pay_${Date.now()}`;
+        options.onSuccess(paymentId);
       },
       modal: {
         ondismiss: function () {
-          options.onSuccess(`pay_test_completed_${Date.now()}`);
+          if (!paymentCompleted) {
+            const cancelMsg = "Payment was cancelled by user. No funds were charged.";
+            if (options.onCancel) {
+              options.onCancel(cancelMsg);
+            }
+          }
         },
       },
       prefill: {
@@ -71,13 +86,27 @@ export async function displayRazorpayCheckout(options: RazorpayOptions) {
     };
 
     const paymentObject = new window.Razorpay(razorpayConfig);
-    paymentObject.on("payment.failed", function () {
-      options.onSuccess(`pay_test_fallback_${Date.now()}`);
+
+    paymentObject.on("payment.failed", function (response: any) {
+      paymentCompleted = true;
+      const errorMsg =
+        response?.error?.description ||
+        "Payment failed. Please check your card/bank details and try again.";
+      if (options.onFailure) {
+        options.onFailure(errorMsg);
+      } else if (options.onCancel) {
+        options.onCancel(errorMsg);
+      }
     });
+
     paymentObject.open();
-  } catch (err) {
-    console.warn("Razorpay Checkout Error (Fallback to Test Mode):", err);
-    options.onSuccess(`pay_test_fallback_${Date.now()}`);
+  } catch (err: any) {
+    console.warn("Razorpay Checkout Exception:", err);
+    if (options.onFailure) {
+      options.onFailure("Payment gateway error occurred. Please try again.");
+    } else if (options.onCancel) {
+      options.onCancel("Payment cancelled.");
+    }
   }
 }
 

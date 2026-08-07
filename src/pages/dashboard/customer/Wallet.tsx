@@ -16,6 +16,7 @@ export default function Wallet() {
   const [addAmount, setAddAmount] = useState("500");
   const [isProcessing, setIsProcessing] = useState(false);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
+  const [cancelNotice, setCancelNotice] = useState<string | null>(null);
 
   const handleProceedToPay = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +24,7 @@ export default function Wallet() {
     if (!val || val < 50) return;
 
     setIsProcessing(true);
+    setCancelNotice(null);
 
     displayRazorpayCheckout({
       amount: val,
@@ -35,12 +37,21 @@ export default function Wallet() {
         addFunds(val, "Razorpay UPI / Cards", paymentId);
         setIsProcessing(false);
         setShowAddMoneyModal(false);
-        setSuccessNotice(`Successfully added ${formatCurrency(val)} to your Home-e-Fix Wallet!`);
-        setTimeout(() => setSuccessNotice(null), 6000);
+        setCancelNotice(null);
+        setSuccessNotice(`✅ Payment Successful: ${formatCurrency(val)} added to your Home-e-Fix Wallet! (Payment ID: ${paymentId})`);
+        setTimeout(() => setSuccessNotice(null), 8000);
+      },
+      onCancel: (reason) => {
+        setIsProcessing(false);
+        setSuccessNotice(null);
+        setCancelNotice(`❌ Payment Cancelled: ${reason}`);
+        setTimeout(() => setCancelNotice(null), 8000);
       },
       onFailure: (err) => {
         setIsProcessing(false);
-        console.warn("Wallet Topup Failed:", err);
+        setSuccessNotice(null);
+        setCancelNotice(`❌ Payment Failed: ${err}`);
+        setTimeout(() => setCancelNotice(null), 8000);
       },
     });
   };
@@ -53,6 +64,22 @@ export default function Wallet() {
           1-tap instant checkouts, instant refunds, and cashback credits
         </p>
       </div>
+
+      {/* CANCELLATION NOTIFICATION BANNER */}
+      {cancelNotice && (
+        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2.5">
+            <span className="text-base shrink-0">❌</span>
+            <span className="text-xs sm:text-sm font-semibold">{cancelNotice}</span>
+          </div>
+          <button
+            onClick={() => setCancelNotice(null)}
+            className="text-xs text-rose-400 hover:text-rose-300 font-bold px-2 py-0.5"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* SUCCESS NOTIFICATION BANNER */}
       {successNotice && (

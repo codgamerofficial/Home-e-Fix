@@ -8,8 +8,10 @@ import { useAuthStore } from "@/store/auth.store";
 export default function Membership() {
   const { user } = useAuthStore();
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [notice, setNotice] = useState<{ type: "success" | "cancel"; text: string } | null>(null);
 
   const handleSubscribeVIP = async () => {
+    setNotice(null);
     await displayRazorpayCheckout({
       amount: 299,
       currency: "INR",
@@ -18,8 +20,24 @@ export default function Membership() {
       customerName: user?.fullName || "Valued Customer",
       customerEmail: user?.email || "customer@homeefix.com",
       customerPhone: user?.phone || "+91 98765 43210",
-      onSuccess: () => {
+      onSuccess: (paymentId) => {
         setIsSubscribed(true);
+        setNotice({
+          type: "success",
+          text: `✅ Payment Successful! VIP Pass activated. Payment ID: ${paymentId}`,
+        });
+      },
+      onCancel: (reason) => {
+        setNotice({
+          type: "cancel",
+          text: `❌ Payment Cancelled: ${reason}`,
+        });
+      },
+      onFailure: (err) => {
+        setNotice({
+          type: "cancel",
+          text: `❌ Payment Failed: ${err}`,
+        });
       },
     });
   };
@@ -32,6 +50,25 @@ export default function Membership() {
           Enjoy extra 15% discount on all bookings, free inspection visits, and priority dispatches
         </p>
       </div>
+
+      {/* PAYMENT NOTIFICATION BANNER */}
+      {notice && (
+        <div
+          className={`p-4 rounded-2xl border flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 ${
+            notice.type === "success"
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+              : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+          }`}
+        >
+          <span className="text-xs sm:text-sm font-semibold">{notice.text}</span>
+          <button
+            onClick={() => setNotice(null)}
+            className="text-xs font-bold px-2 py-0.5"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* MEMBERSHIP CARD PRIMITIVE */}
       <MembershipCard
