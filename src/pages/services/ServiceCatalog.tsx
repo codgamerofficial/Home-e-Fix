@@ -61,6 +61,16 @@ export default function ServiceCatalog() {
     return matchesQuery && matchesCategory;
   });
 
+  // Sorted services
+  const sortedServices = [...filteredServices].sort((a, b) => {
+    const priceA = a.discountedPrice || a.basePrice;
+    const priceB = b.discountedPrice || b.basePrice;
+    if (sortBy === "price-low") return priceA - priceB;
+    if (sortBy === "price-high") return priceB - priceA;
+    if (sortBy === "rating") return (b.rating || 4.8) - (a.rating || 4.8);
+    return 0; // Default popular
+  });
+
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* ─── CATALOG HERO BANNER ─── */}
@@ -162,7 +172,7 @@ export default function ServiceCatalog() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-border mb-8">
           <div>
             <h3 className="font-heading text-lg font-bold text-primary">
-              Available Services ({filteredServices.length})
+              Available Services ({sortedServices.length})
             </h3>
             <p className="text-xs text-foreground-secondary">
               Showing verified services matching your criteria
@@ -184,7 +194,7 @@ export default function ServiceCatalog() {
           </div>
         </div>
 
-        {filteredServices.length === 0 ? (
+        {sortedServices.length === 0 ? (
           <div className="text-center py-16 space-y-3 bg-surface rounded-2xl border border-border">
             <Search className="mx-auto h-10 w-10 text-foreground-muted" />
             <h4 className="font-heading text-base font-semibold text-primary">
@@ -206,7 +216,7 @@ export default function ServiceCatalog() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredServices.map((service) => (
+            {sortedServices.map((service) => (
               <ServiceCard
                 key={service.id}
                 service={service}

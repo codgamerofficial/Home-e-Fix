@@ -4,6 +4,8 @@ import { NotificationToast } from "@/components/shared/NotificationToast";
 import { CommandMenu } from "@/components/shared/CommandMenu";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { FloatingCartBar } from "@/components/shared/FloatingCartBar";
+import { PwaInstallBanner } from "@/components/shared/PwaInstallBanner";
+import { RoleSwitcherWidget } from "@/components/shared/RoleSwitcherWidget";
 import { useAuthListener } from "@/hooks/useAuthListener";
 
 /**
@@ -33,6 +35,8 @@ export function RootLayout() {
 
       <MobileBottomNav />
       <FloatingCartBar />
+      <PwaInstallBanner />
+      <RoleSwitcherWidget />
       <NotificationToast />
       <CommandMenu />
     </div>
