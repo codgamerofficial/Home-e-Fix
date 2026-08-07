@@ -21,7 +21,7 @@ export function SearchBar({
   onChange,
   onSearch,
   placeholder = "Search for AC repair, plumbing, cleaning...",
-  location = "Hitech City, Hyderabad",
+  location = "Salt Lake, Kolkata",
   onLocationClick,
   onFilterClick,
   suggestions = [],

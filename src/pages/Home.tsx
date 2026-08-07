@@ -73,9 +73,12 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const { items, addItem, removeItem } = useCartStore();
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
-  const [location, setLocation] = useState("Hitech City, Hyderabad");
+  const [location, setLocation] = useState("Salt Lake, Kolkata");
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [customPincode, setCustomPincode] = useState("");
+  const [selectedUpcomingCity, setSelectedUpcomingCity] = useState<string | null>(null);
+  const [notifyInput, setNotifyInput] = useState("");
+  const [notifySuccess, setNotifySuccess] = useState<string | null>(null);
 
   const searchSuggestions = [
     "AC Deep Cleaning & Service",
@@ -738,23 +741,37 @@ export default function Home() {
             <DialogTitle>Select Your Service Location</DialogTitle>
           </div>
         </DialogHeader>
-        <DialogContent className="space-y-4">
-          <p className="text-xs text-foreground-secondary">
-            Select your city or enter a custom area/pincode to view local technicians & availability.
-          </p>
+        <DialogContent className="space-y-5">
+          {/* Active Startup Notice */}
+          <div className="p-3.5 rounded-xl bg-accent/10 border border-accent/30 space-y-1">
+            <div className="flex items-center gap-2 text-xs font-bold text-accent">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+              Home-e-Fix Kolkata HQ & Live Operations
+            </div>
+            <p className="text-[11px] text-foreground-secondary leading-relaxed">
+              We are a Kolkata-based startup operating across all Kolkata & Howrah zones with 30-minute instant technician arrival.
+            </p>
+          </div>
 
+          {/* 1. Live Kolkata Hubs */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-primary block">Popular Cities & Hubs</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-primary uppercase tracking-wider block">
+                🟢 Live in Kolkata (30-Min Dispatch)
+              </label>
+              <Badge variant="success" className="text-[10px]">9 Active Hubs</Badge>
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {[
-                "Hitech City, Hyderabad",
-                "Gachibowli, Hyderabad",
-                "Koramangala, Bengaluru",
-                "Indiranagar, Bengaluru",
-                "Bandra, Mumbai",
-                "Cyber City, Gurgaon",
-                "Connaught Place, Delhi",
-                "Viman Nagar, Pune",
+                "Salt Lake & Sector V, Kolkata",
+                "New Town & Rajarhat, Kolkata",
+                "Park Street & Camac St, Kolkata",
+                "Ballygunge & Gariahat, Kolkata",
+                "Alipore & New Alipore, Kolkata",
+                "Behala & Thakurpukur, Kolkata",
+                "Dum Dum & Lake Town, Kolkata",
+                "Tollygunge & Jadavpur, Kolkata",
+                "Howrah & Sibpur, Kolkata",
               ].map((loc) => (
                 <button
                   key={loc}
@@ -762,6 +779,7 @@ export default function Home() {
                   onClick={() => {
                     setLocation(loc);
                     setShowLocationModal(false);
+                    setSelectedUpcomingCity(null);
                   }}
                   className={cn(
                     "p-2.5 rounded-xl border text-xs font-medium text-left transition-all cursor-pointer flex items-center gap-1.5",
@@ -777,11 +795,84 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="pt-2 border-t border-border space-y-2">
-            <label className="text-xs font-semibold text-primary block">Enter Area or Pincode</label>
+          {/* 2. Expanding Soon Cities */}
+          <div className="pt-3 border-t border-border space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-primary uppercase tracking-wider block">
+                🚀 Expanding Soon (Join Waitlist)
+              </label>
+              <Badge variant="outline" className="text-[10px]">Coming 2026</Badge>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {[
+                { name: "Bengaluru", status: "Launching Q3" },
+                { name: "Mumbai", status: "Launching Q3" },
+                { name: "Delhi - NCR", status: "Launching Q4" },
+                { name: "Hyderabad", status: "Launching Q4" },
+                { name: "Pune", status: "Launching Q4" },
+              ].map((city) => (
+                <button
+                  key={city.name}
+                  type="button"
+                  onClick={() => {
+                    setSelectedUpcomingCity(city.name);
+                    setNotifySuccess(null);
+                  }}
+                  className={cn(
+                    "p-2.5 rounded-xl border text-xs font-medium text-left transition-all cursor-pointer flex flex-col justify-between",
+                    selectedUpcomingCity === city.name
+                      ? "border-accent bg-accent/10 text-accent font-bold"
+                      : "border-border/60 bg-muted/40 hover:border-accent/40 text-foreground-muted"
+                  )}
+                >
+                  <span className="font-semibold text-primary">{city.name}</span>
+                  <span className="text-[10px] text-accent font-normal mt-1">{city.status}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Launch Notification Form */}
+            {selectedUpcomingCity && (
+              <div className="p-3.5 rounded-xl bg-surface border border-accent/30 space-y-2.5 mt-2">
+                <div className="text-xs font-bold text-primary flex items-center justify-between">
+                  <span>Get notified when Home-e-Fix launches in {selectedUpcomingCity}!</span>
+                </div>
+                {notifySuccess ? (
+                  <div className="text-xs font-semibold text-emerald-500 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
+                    {notifySuccess}
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter phone or email..."
+                      value={notifyInput}
+                      onChange={(e) => setNotifyInput(e.target.value)}
+                      className="text-xs"
+                    />
+                    <Button
+                      variant="accent"
+                      size="sm"
+                      onClick={() => {
+                        if (notifyInput.trim()) {
+                          setNotifySuccess(`🎉 You're on the list for ${selectedUpcomingCity}! We'll send your VIP early launch pass soon.`);
+                          setNotifyInput("");
+                        }
+                      }}
+                    >
+                      Notify Me
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 3. Custom Area or Pincode Input */}
+          <div className="pt-3 border-t border-border space-y-2">
+            <label className="text-xs font-semibold text-primary block">Enter Custom Kolkata Area or Pincode</label>
             <div className="flex gap-2">
               <Input
-                placeholder="e.g. 500081 or Jubilee Hills"
+                placeholder="e.g. 700091 or Salt Lake Sector V"
                 value={customPincode}
                 onChange={(e) => setCustomPincode(e.target.value)}
                 className="text-xs"
@@ -791,7 +882,7 @@ export default function Home() {
                 size="sm"
                 onClick={() => {
                   if (customPincode.trim()) {
-                    setLocation(customPincode.trim());
+                    setLocation(`${customPincode.trim()}, Kolkata`);
                     setCustomPincode("");
                     setShowLocationModal(false);
                   }

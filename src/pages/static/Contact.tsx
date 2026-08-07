@@ -70,8 +70,8 @@ export default function Contact() {
             <MapPin className="h-6 w-6" />
           </div>
           <h3 className="font-heading text-base font-bold text-primary">Headquarters</h3>
-          <p className="text-xs text-foreground-secondary">Hitech City, Hyderabad, Telangana 500081</p>
-          <Button variant="outline" size="sm" onClick={() => window.open("https://maps.google.com/?q=Hitech+City+Hyderabad")}>
+          <p className="text-xs text-foreground-secondary">Sector V, Salt Lake, Kolkata, West Bengal 700091</p>
+          <Button variant="outline" size="sm" onClick={() => window.open("https://maps.google.com/?q=Salt+Lake+Sector+V+Kolkata")}>
             Open Maps Location
           </Button>
         </Card>

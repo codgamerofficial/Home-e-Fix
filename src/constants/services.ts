@@ -855,6 +855,28 @@ export const BOOKING_STATUSES = {
   refunded: { label: "Refunded", color: "muted" },
 } as const;
 
+export const OPERATIONAL_CITIES = {
+  activeCity: "Kolkata",
+  activeHubs: [
+    { id: "kolkata-saltlake", name: "Salt Lake & Sector V", pincode: "700091", status: "Active (30-Min Dispatch)" },
+    { id: "kolkata-newtown", name: "New Town & Rajarhat", pincode: "700156", status: "Active (30-Min Dispatch)" },
+    { id: "kolkata-parkstreet", name: "Park Street & Camac St", pincode: "700016", status: "Active (30-Min Dispatch)" },
+    { id: "kolkata-ballygunge", name: "Ballygunge & Gariahat", pincode: "700019", status: "Active (30-Min Dispatch)" },
+    { id: "kolkata-alipore", name: "Alipore & New Alipore", pincode: "700027", status: "Active (30-Min Dispatch)" },
+    { id: "kolkata-behala", name: "Behala & Thakurpukur", pincode: "700034", status: "Active (30-Min Dispatch)" },
+    { id: "kolkata-dumdum", name: "Dum Dum & Lake Town", pincode: "700028", status: "Active (30-Min Dispatch)" },
+    { id: "kolkata-tollygunge", name: "Tollygunge & Jadavpur", pincode: "700033", status: "Active (30-Min Dispatch)" },
+    { id: "kolkata-howrah", name: "Howrah & Sibpur", pincode: "711101", status: "Active (30-Min Dispatch)" },
+  ],
+  upcomingCities: [
+    { id: "bengaluru", name: "Bengaluru", status: "Launching Q3 2026" },
+    { id: "mumbai", name: "Mumbai", status: "Launching Q3 2026" },
+    { id: "delhi", name: "Delhi - NCR", status: "Launching Q4 2026" },
+    { id: "hyderabad", name: "Hyderabad", status: "Launching Q4 2026" },
+    { id: "pune", name: "Pune", status: "Launching Q4 2026" },
+  ],
+};
+
 export const PAGINATION = {
   DEFAULT_PAGE: 1,
   DEFAULT_PAGE_SIZE: 12,
