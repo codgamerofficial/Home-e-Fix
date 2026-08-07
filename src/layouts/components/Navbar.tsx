@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
   Menu,
@@ -44,6 +44,7 @@ import { useNotificationStore } from "@/store/notification.store";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 
 export function Navbar() {
+  const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -78,8 +79,8 @@ export function Navbar() {
                     className={cn(
                       "relative rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                       isActive
-                        ? "text-accent"
-                        : "text-foreground-secondary hover:text-foreground hover:bg-muted"
+                        ? "text-accent font-semibold"
+                        : "text-foreground-secondary hover:text-foreground"
                     )}
                   >
                     {link.label}
@@ -151,19 +152,32 @@ export function Navbar() {
                   {user.fullName}
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem icon={<LayoutDashboard className="h-4 w-4" />}>
-                  <Link to={ROUTES.CUSTOMER_DASHBOARD}>Dashboard</Link>
+                <DropdownMenuItem
+                  icon={<LayoutDashboard className="h-4 w-4" />}
+                  onClick={() => navigate(ROUTES.CUSTOMER_DASHBOARD)}
+                >
+                  Dashboard
                 </DropdownMenuItem>
-                <DropdownMenuItem icon={<User className="h-4 w-4" />}>
-                  <Link to={ROUTES.CUSTOMER_PROFILE}>Profile</Link>
+                <DropdownMenuItem
+                  icon={<User className="h-4 w-4" />}
+                  onClick={() => navigate(ROUTES.CUSTOMER_PROFILE)}
+                >
+                  Profile
                 </DropdownMenuItem>
-                <DropdownMenuItem icon={<Settings className="h-4 w-4" />}>
+                <DropdownMenuItem
+                  icon={<Settings className="h-4 w-4" />}
+                  onClick={() => navigate("/dashboard/profile")}
+                >
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   icon={<LogOut className="h-4 w-4" />}
                   destructive
+                  onClick={() => {
+                    logout();
+                    navigate(ROUTES.HOME);
+                  }}
                 >
                   Logout
                 </DropdownMenuItem>
