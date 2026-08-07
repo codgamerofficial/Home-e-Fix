@@ -166,7 +166,7 @@ export default function Home() {
                   variant="outline"
                   size="lg"
                   leftIcon={<Phone className="h-5 w-5 text-accent" />}
-                  className="w-full sm:w-auto border-white/25 text-white hover:bg-white/10 text-base py-3.5"
+                  className="w-full sm:w-auto border border-white/30 bg-white/10 text-white hover:bg-white/20 text-base py-3.5"
                   onClick={() => window.open(`tel:${APP_CONFIG.supportPhone}`)}
                 >
                   24/7 Helpline: 1800-123-4567
@@ -703,14 +703,14 @@ export default function Home() {
               <div className="flex flex-wrap items-center gap-4 pt-2">
                 <Button
                   variant="outline"
-                  className="border-white/30 text-white hover:bg-white/10 gap-2"
+                  className="border border-white/30 bg-white/10 text-white hover:bg-white/20 gap-2"
                 >
                   <Smartphone className="h-5 w-5 text-accent" />
                   Google Play Store
                 </Button>
                 <Button
                   variant="outline"
-                  className="border-white/30 text-white hover:bg-white/10 gap-2"
+                  className="border border-white/30 bg-white/10 text-white hover:bg-white/20 gap-2"
                 >
                   <Smartphone className="h-5 w-5 text-accent" />
                   Apple App Store
