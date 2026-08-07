@@ -127,6 +127,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "/services/category/:categorySlug",
+        element: (
+          <LazyPage>
+            <CategoryDetail />
+          </LazyPage>
+        ),
+      },
+      {
         path: ROUTES.BOOKING,
         element: (
           <LazyPage>

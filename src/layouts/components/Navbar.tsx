@@ -330,7 +330,7 @@ export function Navbar() {
               {SERVICE_CATEGORIES.map((cat) => (
                 <Link
                   key={cat.slug}
-                  to={`/services/category/${cat.slug}`}
+                  to={`/services/${cat.slug}`}
                   onClick={() => setMobileMenuOpen(false)}
                   className="flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/10 text-[11px] font-semibold text-white/90 hover:bg-white/10 hover:text-white transition-all truncate"
                 >
@@ -355,7 +355,7 @@ export function Navbar() {
               { label: "Rate & Review Services", href: "/dashboard/reviews", icon: Star },
               { label: "Notifications & Alerts", href: "/dashboard/notifications", icon: Bell },
               { label: "Profile & Settings", href: "/dashboard/profile", icon: Settings },
-              { label: "Help & Support Center", href: "/dashboard/help-center", icon: HelpCircle },
+              { label: "Help & Support Center", href: "/dashboard/help", icon: HelpCircle },
             ].map((item) => {
               const Icon = item.icon;
               return (
