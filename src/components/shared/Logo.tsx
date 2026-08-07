@@ -127,7 +127,7 @@ export function LogoBadge({
       )}
     >
       {/* Animated Mini Emblem */}
-      <div className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 shadow-md group-hover:scale-110 transition-transform">
+      <div className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-orange-500 to-amber-500 shadow-md group-hover:scale-110 transition-transform">
         <Zap className="h-3.5 w-3.5 text-white fill-white animate-pulse" />
       </div>
 
