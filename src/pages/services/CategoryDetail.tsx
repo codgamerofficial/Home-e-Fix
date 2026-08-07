@@ -299,14 +299,14 @@ export default function CategoryDetail() {
             exit={{ y: 100, opacity: 0 }}
             className="fixed bottom-20 md:bottom-6 left-4 right-4 z-40 max-w-3xl mx-auto"
           >
-            <div className="rounded-2xl bg-gradient-to-r from-[#040E1F] via-[#07172E] to-[#0D264A] text-white p-4 shadow-2xl border border-white/20 flex items-center justify-between backdrop-blur-xl">
+            <div className="rounded-2xl bg-linear-to-r from-primary-dark via-primary to-primary-light text-white p-4 shadow-2xl border border-white/20 flex items-center justify-between backdrop-blur-xl">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-accent flex items-center justify-center font-bold text-white shadow-glow">
                   {selectedCount}
                 </div>
                 <div>
                   <p className="text-xs text-white/80">Subtotal ({selectedCount} items)</p>
-                  <h4 className="font-heading text-lg font-bold !text-white">
+                  <h4 className="font-heading text-lg font-bold text-white!">
                     {formatCurrency(subtotal)}
                   </h4>
                 </div>

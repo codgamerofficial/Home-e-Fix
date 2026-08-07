@@ -106,26 +106,6 @@ export function Navbar() {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-3">
-            {/* Cart Icon Button */}
-            <Link
-              to={cartCount > 0 ? ROUTES.BOOKING : ROUTES.SERVICES}
-              className="relative"
-              title={cartCount > 0 ? `${cartCount} items in cart - Checkout` : "Browse Services"}
-            >
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-foreground-secondary hover:text-accent"
-                aria-label="Shopping Cart"
-              >
-                <ShoppingBag className="h-5 w-5" />
-              </Button>
-              {cartCount > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-white shadow-md animate-pulse">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
 
 
             {/* Theme Toggle */}

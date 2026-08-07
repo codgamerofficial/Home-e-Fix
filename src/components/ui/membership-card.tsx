@@ -31,7 +31,7 @@ export function MembershipCard({
     <Card
       className={cn(
         "relative overflow-hidden text-white border border-white/20 shadow-2xl",
-        "bg-gradient-to-br from-[#040E1F] via-[#0D264A] to-[#07172E]",
+        "bg-linear-to-br from-primary-dark via-primary-light to-primary",
         className
       )}
     >
@@ -50,7 +50,7 @@ export function MembershipCard({
               <span className="text-[10px] font-bold uppercase tracking-widest text-accent block">
                 Exclusive Pass
               </span>
-              <h3 className="font-heading text-lg font-bold !text-white">
+              <h3 className="font-heading text-lg font-bold text-white!">
                 {planName}
               </h3>
             </div>
@@ -63,17 +63,17 @@ export function MembershipCard({
             </span>
           ) : (
             <div className="text-right">
-              <span className="font-heading text-2xl font-extrabold !text-white">
+              <span className="font-heading text-2xl font-extrabold text-white!">
                 {formatCurrency(price)}
               </span>
-              <span className="text-xs !text-white/70 block">/ 6 Months</span>
+              <span className="text-xs text-white/70! block">/ 6 Months</span>
             </div>
           )}
         </div>
 
         {/* Savings Highlight */}
         <div className="rounded-xl bg-white/10 backdrop-blur-md p-3.5 border border-white/20 flex items-center justify-between">
-          <span className="text-xs !text-white/90 font-medium">Average Yearly Savings</span>
+          <span className="text-xs text-white/90! font-medium">Average Yearly Savings</span>
           <span className="font-heading text-base font-bold text-accent">
             Save up to {formatCurrency(savingsTotal)}
           </span>
@@ -82,11 +82,11 @@ export function MembershipCard({
         {/* Perks Checklist */}
         <div className="space-y-2 text-xs">
           {perks.map((perk, i) => (
-            <div key={i} className="flex items-center gap-2 !text-white/90 font-medium">
+            <div key={i} className="flex items-center gap-2 text-white/90! font-medium">
               <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent/20 text-accent">
                 <Check className="h-3 w-3" />
               </div>
-              <span className="!text-white/90">{perk}</span>
+              <span className="text-white/90!">{perk}</span>
             </div>
           ))}
         </div>
