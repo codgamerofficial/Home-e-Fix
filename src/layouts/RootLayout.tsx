@@ -3,14 +3,15 @@ import { Navbar, MobileBottomNav, Footer } from "./components";
 import { NotificationToast } from "@/components/shared/NotificationToast";
 import { CommandMenu } from "@/components/shared/CommandMenu";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-
 import { FloatingCartBar } from "@/components/shared/FloatingCartBar";
+import { useAuthListener } from "@/hooks/useAuthListener";
 
 /**
  * Root layout — wraps all public pages with Navbar + Footer.
  */
 export function RootLayout() {
   const location = useLocation();
+  useAuthListener();
 
   // Don't show footer/mobile nav on dashboard routes
   const isDashboard =
