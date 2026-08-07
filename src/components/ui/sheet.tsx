@@ -83,7 +83,7 @@ function Sheet({
             variants={slideVariants[side]}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className={cn(
-              "absolute bg-surface shadow-xl",
+              "absolute bg-surface text-foreground shadow-2xl flex flex-col",
               positionClasses[side],
               className
             )}

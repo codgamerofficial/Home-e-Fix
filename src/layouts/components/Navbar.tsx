@@ -224,11 +224,12 @@ export function Navbar() {
         open={mobileMenuOpen}
         onClose={() => setMobileMenuOpen(false)}
         side="right"
+        className="bg-[#07172E] text-white border-l border-white/20"
       >
-        <SheetHeader onClose={() => setMobileMenuOpen(false)}>
-          <Logo size="sm" linkToHome={false} />
+        <SheetHeader className="border-b border-white/10" onClose={() => setMobileMenuOpen(false)}>
+          <Logo size="sm" textColor="light" linkToHome={false} />
         </SheetHeader>
-        <SheetContent className="overflow-y-auto max-h-[88vh] space-y-6 pb-12">
+        <SheetContent className="overflow-y-auto space-y-6 pb-16">
           {/* Quick Search Bar Trigger */}
           <button
             type="button"
