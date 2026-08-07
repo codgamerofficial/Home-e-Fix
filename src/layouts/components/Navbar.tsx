@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router";
 import { motion } from "framer-motion";
 import {
-  Search,
   Menu,
   Sun,
   Moon,
@@ -103,29 +102,7 @@ export function Navbar() {
 
           {/* Right: Actions */}
           <div className="flex items-center gap-3">
-            {/* Desktop Search Bar Trigger Pill */}
-            <button
-              type="button"
-              onClick={() => setSearchOpen(true)}
-              className="hidden md:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border border-white/20 bg-white/5 text-xs font-medium text-white/70 hover:text-white hover:border-accent hover:bg-white/10 transition-all cursor-pointer shadow-xs w-48 lg:w-64"
-            >
-              <Search className="h-3.5 w-3.5 text-accent shrink-0" />
-              <span className="truncate">Search 50+ services...</span>
-              <kbd className="ml-auto text-[10px] bg-white/10 px-1.5 py-0.5 rounded font-mono border border-white/10 text-white/60">
-                ⌘K
-              </kbd>
-            </button>
 
-            {/* Mobile Search Icon Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSearchOpen(true)}
-              className="md:hidden text-foreground-secondary hover:text-accent hover:bg-accent/10 transition-colors"
-              aria-label="Search services"
-            >
-              <Search className="h-5 w-5 text-accent" />
-            </Button>
 
             {/* Theme Toggle */}
             <Button
@@ -230,21 +207,7 @@ export function Navbar() {
           <Logo size="sm" textColor="light" linkToHome={false} />
         </SheetHeader>
         <SheetContent className="overflow-y-auto space-y-6 pb-16">
-          {/* Quick Search Bar Trigger */}
-          <button
-            type="button"
-            onClick={() => {
-              setMobileMenuOpen(false);
-              setSearchOpen(true);
-            }}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-white/20 bg-[#07172E] text-xs font-semibold text-white/80 hover:text-white hover:border-accent transition-all cursor-pointer shadow-xs"
-          >
-            <Search className="h-4 w-4 text-accent shrink-0" />
-            <span>Search 50+ Home Services...</span>
-            <Badge variant="accent" className="ml-auto text-[10px] px-1.5 py-0.5">
-              ⌘K
-            </Badge>
-          </button>
+
 
           {/* User Profile Summary & Quick Stats */}
           {isAuthenticated && user ? (
