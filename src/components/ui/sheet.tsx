@@ -46,20 +46,15 @@ function Sheet({
   side = "left",
   className,
 }: SheetProps) {
-  // Close on Escape key
+  // Prevent body scroll when open
   React.useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
     if (open) {
-      document.addEventListener("keydown", handleEscape);
       document.body.style.overflow = "hidden";
     }
     return () => {
-      document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return (
     <AnimatePresence>

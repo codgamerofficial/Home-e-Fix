@@ -33,16 +33,7 @@ function DropdownMenu({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
-  // Close on Escape
-  React.useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    if (open) {
-      document.addEventListener("keydown", handleEscape);
-    }
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [open]);
+
 
   const alignClasses = {
     start: "left-0",

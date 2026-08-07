@@ -17,9 +17,6 @@ export function CommandMenu() {
         e.preventDefault();
         setSearchOpen(!searchOpen);
       }
-      if (e.key === "Escape") {
-        setSearchOpen(false);
-      }
     };
 
     window.addEventListener("keydown", handleKeyDown);

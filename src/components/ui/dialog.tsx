@@ -23,18 +23,13 @@ const sizeClasses = {
 
 function Dialog({ open, onClose, children, className, size = "md" }: DialogProps) {
   React.useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
     if (open) {
-      document.addEventListener("keydown", handleEscape);
       document.body.style.overflow = "hidden";
     }
     return () => {
-      document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return (
     <AnimatePresence>

@@ -13,18 +13,13 @@ export interface DrawerProps {
 
 export function Drawer({ open, onClose, title, children, className }: DrawerProps) {
   React.useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
     if (open) {
-      document.addEventListener("keydown", handleEscape);
       document.body.style.overflow = "hidden";
     }
     return () => {
-      document.removeEventListener("keydown", handleEscape);
       document.body.style.overflow = "";
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return (
     <AnimatePresence>
