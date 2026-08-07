@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { ServiceCard } from "@/components/ui/service-card";
 import { TechnicianCard } from "@/components/ui/technician-card";
 import { ReviewCard } from "@/components/ui/review-card";
@@ -44,6 +45,7 @@ export default function CategoryDetail() {
 
   const [selectedServices, setSelectedServices] = useState<Record<string, any>>({});
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+  const [showWarrantyModal, setShowWarrantyModal] = useState(false);
 
   const toggleSelectService = (service: any) => {
     setSelectedServices((prev) => {
@@ -189,7 +191,7 @@ export default function CategoryDetail() {
             <Button
               variant="accent"
               size="default"
-              onClick={() => alert("30-Day Warranty terms applied to all items!")}
+              onClick={() => setShowWarrantyModal(true)}
             >
               Warranty Details
             </Button>
@@ -312,6 +314,42 @@ export default function CategoryDetail() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ─── WARRANTY DETAILS DIALOG MODAL ─── */}
+      <Dialog open={showWarrantyModal} onClose={() => setShowWarrantyModal(false)} size="md">
+        <DialogHeader onClose={() => setShowWarrantyModal(false)}>
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-accent" />
+            <DialogTitle>Home-e-Fix 30-Day Protection Guarantee</DialogTitle>
+          </div>
+        </DialogHeader>
+        <DialogContent className="space-y-4 text-xs text-foreground-secondary leading-relaxed">
+          <p>
+            Every <strong>{category.name}</strong> service booked through Home-e-Fix includes our comprehensive 30-day workmanship and spare parts warranty.
+          </p>
+          <div className="p-3.5 rounded-xl bg-muted border border-border space-y-2">
+            <h5 className="font-bold text-primary flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-accent" /> Free Re-visit Guarantee
+            </h5>
+            <p>
+              If the issue reoccurs within 30 days of completion, our senior technician will re-inspect and fix it with zero service charges or labor fees.
+            </p>
+          </div>
+          <div className="p-3.5 rounded-xl bg-muted border border-border space-y-2">
+            <h5 className="font-bold text-primary flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-accent" /> Genuine Parts Promise
+            </h5>
+            <p>
+              All replacement parts supplied by Home-e-Fix are 100% brand-certified original spares with manufacturer warranty tags.
+            </p>
+          </div>
+        </DialogContent>
+        <DialogFooter>
+          <Button variant="accent" size="sm" onClick={() => setShowWarrantyModal(false)}>
+            Got it, thanks!
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }
