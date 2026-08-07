@@ -49,7 +49,6 @@ export const MOBILE_NAV_LINKS: NavLink[] = [
   { label: "Services", href: ROUTES.SERVICES, icon: Wrench },
   { label: "Bookings", href: "/dashboard/orders", icon: CalendarCheck },
   { label: "Profile", href: "/dashboard/profile", icon: User },
-  { label: "More", href: "#more", icon: MoreHorizontal },
 ];
 
 /* ─── Customer Sidebar Navigation ─── */
