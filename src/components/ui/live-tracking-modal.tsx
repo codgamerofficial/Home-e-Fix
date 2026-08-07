@@ -67,7 +67,7 @@ export function LiveTrackingModal({
           {/* Animated Map Graphic Preview */}
           <div className="relative h-48 w-full bg-[#0a1b36] overflow-hidden flex items-center justify-center border-b border-white/10">
             {/* Map Grid Pattern */}
-            <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]" />
+            <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#ffffff_1px,transparent_1px)] bg-size-[16px_16px]" />
 
             {/* Hub & Destination Lines */}
             <svg className="absolute inset-0 h-full w-full" xmlns="http://www.w3.org/2000/svg">
