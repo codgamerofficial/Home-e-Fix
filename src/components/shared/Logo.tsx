@@ -33,14 +33,14 @@ export function Logo({
       ? "text-white"
       : textColor === "dark"
       ? "text-slate-900"
-      : "text-white dark:text-white";
+      : "text-slate-900 dark:text-white";
 
   const taglineColor =
     textColor === "light"
       ? "text-white/80"
       : textColor === "dark"
       ? "text-slate-600"
-      : "text-white/70 dark:text-slate-300";
+      : "text-slate-600 dark:text-slate-300";
 
   const logoContent = (
     <div className={cn("flex items-center gap-2.5 group select-none relative", className)}>
@@ -72,7 +72,7 @@ export function Logo({
         <div className="flex flex-col leading-none">
           <span
             className={cn(
-              "font-heading font-extrabold tracking-tight text-white",
+              "font-heading font-extrabold tracking-tight",
               config.text,
               mainTextColor
             )}
