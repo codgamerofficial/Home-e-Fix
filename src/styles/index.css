@@ -401,14 +401,17 @@
 
 /* ─── Dark Mode Overrides (Pitch Black + Deep Oceanic Blue + Neon Orange) ─── */
 .dark {
+  --color-primary: #FFFFFF;
+  --color-primary-light: #F0F4FA;
+  --color-primary-lighter: #94A3B8;
   --color-background: #030814;
   --color-surface: #091224;
   --color-surface-elevated: #0E1A33;
   --color-muted: #12213D;
   --color-muted-foreground: #A4B8D5;
   --color-foreground: #FFFFFF;
-  --color-foreground-secondary: #E2ECF9;
-  --color-foreground-muted: #8FA4C5;
+  --color-foreground-secondary: #CBD5E1;
+  --color-foreground-muted: #94A3B8;
   --color-border: #1B2F52;
   --color-border-light: #122240;
   --color-ring: #FF6A00;
@@ -421,7 +424,11 @@
 .dark h4,
 .dark h5,
 .dark h6 {
-  color: #FFFFFF;
+  color: #FFFFFF !important;
+}
+
+.dark .text-primary {
+  color: #FFFFFF !important;
 }
 
 .dark p,

@@ -46,6 +46,7 @@ export default function CategoryDetail() {
   const [selectedServices, setSelectedServices] = useState<Record<string, any>>({});
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [showWarrantyModal, setShowWarrantyModal] = useState(false);
+  const [techNotice, setTechNotice] = useState<string | null>(null);
 
   const toggleSelectService = (service: any) => {
     setSelectedServices((prev) => {
@@ -218,10 +219,20 @@ export default function CategoryDetail() {
             <TechnicianCard
               key={tech.id}
               technician={tech}
-              onSelect={() => alert(`Assigned ${tech.displayName} to your booking preference!`)}
+              onSelect={() => {
+                setTechNotice(`✅ Selected ${tech.displayName} for your upcoming service!`);
+                setTimeout(() => setTechNotice(null), 5000);
+              }}
             />
           ))}
         </div>
+
+        {techNotice && (
+          <div className="mt-4 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs sm:text-sm font-semibold flex items-center justify-between">
+            <span>{techNotice}</span>
+            <button onClick={() => setTechNotice(null)} className="font-bold text-xs">Dismiss</button>
+          </div>
+        )}
       </section>
 
       {/* ─── 5. CATEGORY FAQS ─── */}

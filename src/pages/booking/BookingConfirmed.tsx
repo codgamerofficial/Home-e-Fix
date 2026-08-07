@@ -129,7 +129,7 @@ export default function BookingConfirmed() {
               variant="outline"
               size="lg"
               className="w-full sm:w-auto flex-1"
-              onClick={() => alert(`Receipt downloaded for ${bookingId}!`)}
+              onClick={() => window.print()}
               leftIcon={<Download className="h-4 w-4" />}
             >
               Download PDF Invoice

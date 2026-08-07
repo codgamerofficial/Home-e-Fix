@@ -6,10 +6,12 @@ import { formatCurrency } from "@/lib/utils";
 
 export default function Wallet() {
   const [cashCollected, setCashCollected] = useState(1200);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const handleDepositCash = () => {
     setCashCollected(0);
-    alert("Successfully deposited ₹1,200 collected cash to Home-e-Fix Platform account!");
+    setNotice("✅ Successfully deposited ₹1,200 collected cash to Home-e-Fix Platform account!");
+    setTimeout(() => setNotice(null), 6000);
   };
 
   return (
@@ -20,6 +22,13 @@ export default function Wallet() {
           Manage cash collected from customers during Cash-on-Delivery bookings
         </p>
       </div>
+
+      {notice && (
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center justify-between animate-in fade-in">
+          <span>{notice}</span>
+          <button onClick={() => setNotice(null)} className="font-bold text-xs">Dismiss</button>
+        </div>
+      )}
 
       <div className="rounded-3xl gradient-hero text-white p-6 sm:p-8 shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

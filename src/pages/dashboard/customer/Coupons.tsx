@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { CouponCard } from "@/components/ui/coupon-card";
 import { Badge } from "@/components/ui/badge";
 
@@ -32,6 +33,14 @@ const MOCK_COUPONS = [
 ];
 
 export default function Coupons() {
+  const [copiedNotice, setCopiedNotice] = useState<string | null>(null);
+
+  const handleCopyCoupon = (code: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedNotice(`✨ Promo code ${code} copied to clipboard! Paste it at checkout.`);
+    setTimeout(() => setCopiedNotice(null), 5000);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -40,6 +49,13 @@ export default function Coupons() {
           Apply these promotional promo codes at checkout for instant discounts
         </p>
       </div>
+
+      {copiedNotice && (
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs sm:text-sm font-semibold flex items-center justify-between animate-in fade-in">
+          <span>{copiedNotice}</span>
+          <button onClick={() => setCopiedNotice(null)} className="font-bold text-xs">Dismiss</button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {MOCK_COUPONS.map((coupon) => (
@@ -52,7 +68,7 @@ export default function Coupons() {
             discountPercentage={coupon.discountPercentage}
             minOrderAmount={coupon.minOrderAmount}
             expiresAt={coupon.expiresAt}
-            onApply={(code) => alert(`Copied promo code ${code}!`)}
+            onApply={handleCopyCoupon}
           />
         ))}
       </div>

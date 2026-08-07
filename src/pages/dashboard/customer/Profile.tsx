@@ -46,7 +46,28 @@ export default function Profile() {
               </div>
             </div>
             <div>
-              <Button variant="outline" size="sm" type="button" onClick={() => alert("Photo picker opened!")}>
+              <input
+                id="avatar-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      if (reader.result) setAvatar(reader.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                onClick={() => document.getElementById("avatar-upload")?.click()}
+              >
                 Change Avatar
               </Button>
               <p className="text-[11px] text-foreground-muted mt-1">JPG, PNG up to 5MB</p>

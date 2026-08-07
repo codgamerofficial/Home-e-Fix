@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Clock, Download, XCircle, Calendar, ShieldCheck, ArrowRight } from "lucide-react";
+import { Clock, Download, XCircle, Calendar, ShieldCheck, ArrowRight, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BookingCard } from "@/components/ui/booking-card";
+import { LiveTrackingModal } from "@/components/ui/live-tracking-modal";
 import { formatCurrency } from "@/lib/utils";
 
 const MOCK_BOOKINGS: any[] = [
@@ -50,6 +51,8 @@ const MOCK_BOOKINGS: any[] = [
 
 export default function Orders() {
   const [filterTab, setFilterTab] = useState<"all" | "upcoming" | "completed" | "cancelled">("all");
+  const [trackingBooking, setTrackingBooking] = useState<any | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const filteredBookings = MOCK_BOOKINGS.filter((b) => {
     if (filterTab === "upcoming") return b.status === "assigned" || b.status === "confirmed" || b.status === "pending";
@@ -57,6 +60,16 @@ export default function Orders() {
     if (filterTab === "cancelled") return b.status === "cancelled";
     return true;
   });
+
+  const handleCancelBooking = (booking: any) => {
+    setActionNotice(`Booking #${booking.bookingNumber || booking.id} has been cancelled. Refund initiated to Home-e-Fix Wallet.`);
+    setTimeout(() => setActionNotice(null), 6000);
+  };
+
+  const handleRescheduleBooking = (booking: any) => {
+    setActionNotice(`Reschedule request submitted for #${booking.bookingNumber || booking.id}. Support team will call you within 15 mins.`);
+    setTimeout(() => setActionNotice(null), 6000);
+  };
 
   return (
     <div className="space-y-6">
@@ -87,6 +100,22 @@ export default function Orders() {
         </div>
       </div>
 
+      {/* ACTION TOAST BANNER */}
+      {actionNotice && (
+        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+            <span className="text-xs sm:text-sm font-semibold">{actionNotice}</span>
+          </div>
+          <button
+            onClick={() => setActionNotice(null)}
+            className="text-xs text-emerald-400 hover:text-emerald-300 font-bold px-2 py-0.5"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {filteredBookings.length === 0 ? (
         <Card className="p-12 text-center space-y-3 border border-border">
           <Clock className="mx-auto h-10 w-10 text-foreground-muted" />
@@ -99,13 +128,23 @@ export default function Orders() {
             <BookingCard
               key={booking.id}
               booking={booking}
-              onCancel={(b) => alert(`Cancelled booking ${b.bookingNumber}`)}
-              onReschedule={(b) => alert(`Rescheduling booking ${b.bookingNumber}`)}
-              onTrack={(b) => alert(`Tracking live position for ${b.bookingNumber}`)}
+              onCancel={handleCancelBooking}
+              onReschedule={handleRescheduleBooking}
+              onTrack={(b) => setTrackingBooking(b)}
             />
           ))}
         </div>
       )}
+
+      {/* LIVE GPS TRACKING MODAL */}
+      <LiveTrackingModal
+        isOpen={!!trackingBooking}
+        onClose={() => setTrackingBooking(null)}
+        bookingRef={trackingBooking?.bookingNumber || "HEF-894102"}
+        serviceName={trackingBooking?.serviceName || "AC Servicing"}
+        technicianName={trackingBooking?.technicianName || "Suresh Reddy"}
+        technicianPhone={trackingBooking?.technicianPhone || "+91 98300 12345"}
+      />
     </div>
   );
 }

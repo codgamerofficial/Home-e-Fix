@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { HOMEPAGE_FAQS, APP_CONFIG } from "@/constants/services";
 
 export default function HelpCenter() {
+  const [chatOpen, setChatOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [ticketSubject, setTicketSubject] = useState("");
   const [ticketDescription, setTicketDescription] = useState("");
@@ -30,6 +31,35 @@ export default function HelpCenter() {
         </p>
       </div>
 
+      {/* LIVE CHAT DRAWER */}
+      {chatOpen && (
+        <div className="p-4 rounded-2xl bg-[#07172E] border border-accent/40 text-white space-y-3 animate-in fade-in shadow-xl">
+          <div className="flex items-center justify-between border-b border-white/10 pb-2">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
+              <span className="font-heading text-sm font-bold text-white">Live Support Agent Connected</span>
+            </div>
+            <button onClick={() => setChatOpen(false)} className="text-xs text-white/70 hover:text-white font-bold">
+              Close
+            </button>
+          </div>
+          <div className="p-3 rounded-xl bg-white/5 text-xs text-white/90 space-y-1">
+            <p className="font-semibold text-accent">Home-e-Fix Agent (Rajesh):</p>
+            <p>Hello! How can I assist you with your booking or payment today?</p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Type your query..."
+              className="flex-1 rounded-xl bg-white/10 border border-white/20 px-3 py-2 text-xs text-white placeholder:text-white/50 focus:outline-hidden"
+            />
+            <Button variant="accent" size="sm" onClick={() => setChatOpen(false)}>
+              Send
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* QUICK CONTACT CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="p-5 text-center space-y-2 border border-border">
@@ -45,7 +75,11 @@ export default function HelpCenter() {
           <MessageSquare className="mx-auto h-6 w-6 text-accent" />
           <h4 className="font-heading text-xs font-bold text-primary">Live Chat Support</h4>
           <p className="text-[11px] text-foreground-secondary">Instant agent response</p>
-          <Button variant="accent" size="sm" onClick={() => alert("Live Chat window opened!")}>
+          <Button
+            variant="accent"
+            size="sm"
+            onClick={() => setChatOpen(true)}
+          >
             Start Chat
           </Button>
         </Card>

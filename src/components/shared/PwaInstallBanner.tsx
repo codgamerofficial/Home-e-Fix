@@ -17,6 +17,8 @@ export function PwaInstallBanner() {
     return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
   }, []);
 
+  const [guideMsg, setGuideMsg] = useState(false);
+
   const handleInstall = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -26,7 +28,8 @@ export function PwaInstallBanner() {
       }
       setDeferredPrompt(null);
     } else {
-      alert("App Installation ready! Tap 'Add to Home Screen' in your browser menu.");
+      setGuideMsg(true);
+      setTimeout(() => setGuideMsg(false), 5000);
     }
   };
 
@@ -53,6 +56,12 @@ export function PwaInstallBanner() {
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      {guideMsg && (
+        <div className="p-2.5 rounded-xl bg-accent/20 border border-accent/40 text-[11px] text-accent font-semibold">
+          💡 Tap 'Add to Home Screen' in your browser options menu!
+        </div>
+      )}
 
       <div className="flex gap-2">
         <Button variant="accent" size="sm" onClick={handleInstall} className="w-full font-bold text-xs shadow-glow">

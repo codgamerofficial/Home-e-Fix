@@ -12,15 +12,19 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  const [statusNotice, setStatusNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword === confirmPassword) {
-      alert("Password updated successfully!");
+      setStatusNotice({ type: "success", text: "✅ Password updated successfully!" });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setTimeout(() => setStatusNotice(null), 5000);
     } else {
-      alert("New passwords do not match!");
+      setStatusNotice({ type: "error", text: "❌ New passwords do not match!" });
+      setTimeout(() => setStatusNotice(null), 5000);
     }
   };
 
@@ -54,9 +58,18 @@ export default function Settings() {
 
       {/* CHANGE PASSWORD */}
       <Card className="p-6 border border-border space-y-4">
-        <h3 className="font-heading text-sm font-bold text-primary pb-2 border-b border-border flex items-center gap-2">
-          <KeyRound className="h-4 w-4 text-accent" /> Change Password
-        </h3>
+        {statusNotice && (
+          <div
+            className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-between ${
+              statusNotice.type === "success"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+            }`}
+          >
+            <span>{statusNotice.text}</span>
+            <button onClick={() => setStatusNotice(null)} className="font-bold text-xs">Dismiss</button>
+          </div>
+        )}
 
         <form onSubmit={handleChangePassword} className="space-y-3">
           <div>

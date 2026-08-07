@@ -60,6 +60,7 @@ export default function JobList() {
   const [jobs, setJobs] = useState<any[]>(MOCK_JOBS);
   const [selectedJob, setSelectedJob] = useState<any | null>(null);
   const [executionStep, setExecutionStep] = useState<"nav" | "arrived" | "in_progress" | "complete">("nav");
+  const [photoUploaded, setPhotoUploaded] = useState(false);
 
   const handleAccept = (jobId: string) => {
     setJobs((prev) =>
@@ -267,14 +268,21 @@ export default function JobList() {
 
                 {executionStep === "in_progress" && (
                   <div className="space-y-3">
+                    <input
+                      id="tech-photo-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={() => setPhotoUploaded(true)}
+                    />
                     <Button
                       variant="outline"
                       size="sm"
                       leftIcon={<Camera className="h-4 w-4" />}
-                      onClick={() => alert("Photo uploader opened!")}
+                      onClick={() => document.getElementById("tech-photo-upload")?.click()}
                       className="w-full"
                     >
-                      Upload Before / After Photos
+                      {photoUploaded ? "✓ Photo Uploaded Successfully" : "Upload Before / After Photos"}
                     </Button>
                     <Button
                       variant="accent"
