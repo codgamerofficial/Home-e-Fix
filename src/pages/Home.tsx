@@ -19,11 +19,14 @@ import {
   Building,
   Wrench,
   Search,
+  MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { SearchBar } from "@/components/ui/search-bar";
 import { ServiceCard } from "@/components/ui/service-card";
 import { MembershipCard } from "@/components/ui/membership-card";
@@ -71,6 +74,8 @@ export default function Home() {
   const { items, addItem, removeItem } = useCartStore();
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [location, setLocation] = useState("Hitech City, Hyderabad");
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [customPincode, setCustomPincode] = useState("");
 
   const searchSuggestions = [
     "AC Deep Cleaning & Service",
@@ -233,10 +238,7 @@ export default function Home() {
               navigate(`${ROUTES.SERVICES}?q=${encodeURIComponent(suggestion)}`);
             }}
             location={location}
-            onLocationClick={() => {
-              const newLoc = prompt("Enter your city or pincode:", location);
-              if (newLoc) setLocation(newLoc);
-            }}
+            onLocationClick={() => setShowLocationModal(true)}
             onFilterClick={() => navigate(ROUTES.SERVICES)}
             className="shadow-2xl"
           />
@@ -727,6 +729,85 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ─── LOCATION SELECTOR DIALOG MODAL ─── */}
+      <Dialog open={showLocationModal} onClose={() => setShowLocationModal(false)} size="md">
+        <DialogHeader onClose={() => setShowLocationModal(false)}>
+          <div className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-accent" />
+            <DialogTitle>Select Your Service Location</DialogTitle>
+          </div>
+        </DialogHeader>
+        <DialogContent className="space-y-4">
+          <p className="text-xs text-foreground-secondary">
+            Select your city or enter a custom area/pincode to view local technicians & availability.
+          </p>
+
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-primary block">Popular Cities & Hubs</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {[
+                "Hitech City, Hyderabad",
+                "Gachibowli, Hyderabad",
+                "Koramangala, Bengaluru",
+                "Indiranagar, Bengaluru",
+                "Bandra, Mumbai",
+                "Cyber City, Gurgaon",
+                "Connaught Place, Delhi",
+                "Viman Nagar, Pune",
+              ].map((loc) => (
+                <button
+                  key={loc}
+                  type="button"
+                  onClick={() => {
+                    setLocation(loc);
+                    setShowLocationModal(false);
+                  }}
+                  className={cn(
+                    "p-2.5 rounded-xl border text-xs font-medium text-left transition-all cursor-pointer flex items-center gap-1.5",
+                    location === loc
+                      ? "border-accent bg-accent/10 text-accent font-bold"
+                      : "border-border bg-surface hover:border-accent/50 text-foreground"
+                  )}
+                >
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-accent" />
+                  <span className="truncate">{loc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-border space-y-2">
+            <label className="text-xs font-semibold text-primary block">Enter Area or Pincode</label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="e.g. 500081 or Jubilee Hills"
+                value={customPincode}
+                onChange={(e) => setCustomPincode(e.target.value)}
+                className="text-xs"
+              />
+              <Button
+                variant="accent"
+                size="sm"
+                onClick={() => {
+                  if (customPincode.trim()) {
+                    setLocation(customPincode.trim());
+                    setCustomPincode("");
+                    setShowLocationModal(false);
+                  }
+                }}
+              >
+                Apply
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => setShowLocationModal(false)}>
+            Close
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

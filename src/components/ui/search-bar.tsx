@@ -131,7 +131,7 @@ export function SearchBar({
           type="submit"
           variant="accent"
           size="sm"
-          className="rounded-xl px-4 shrink-0 hidden sm:inline-flex"
+          className="rounded-xl px-3 sm:px-4 shrink-0 inline-flex font-semibold text-xs sm:text-sm"
         >
           Search
         </Button>
