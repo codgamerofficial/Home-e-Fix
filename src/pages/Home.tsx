@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { SearchBar } from "@/components/ui/search-bar";
+import { LogoBadge } from "@/components/shared/Logo";
 import { ServiceCard } from "@/components/ui/service-card";
 import { MembershipCard } from "@/components/ui/membership-card";
 import { ReviewCard } from "@/components/ui/review-card";
@@ -123,14 +124,8 @@ export default function Home() {
               variants={stagger}
               className="space-y-6"
             >
-              {/* Trust Badge Pill */}
               <motion.div custom={0} variants={fadeUp} className="inline-block">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 backdrop-blur-md">
-                  <Sparkles className="h-4 w-4 text-accent animate-pulse" />
-                  <span className="text-xs sm:text-sm font-medium text-white/90">
-                    ✨ India&apos;s #1 Rated Home Services Platform
-                  </span>
-                </div>
+                <LogoBadge text="✨ Kolkata's #1 Rated Home Services Platform • 30-Min Arrival" />
               </motion.div>
 
               {/* Main Headline */}
