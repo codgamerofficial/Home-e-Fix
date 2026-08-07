@@ -62,7 +62,7 @@ export function Navbar() {
         <nav className="container-app relative flex h-(--navbar-height) items-center justify-between gap-4">
           {/* Left: Logo + Desktop Nav */}
           <div className="flex items-center gap-8">
-            <Logo size={isMobile ? "sm" : "md"} textColor="light" />
+            <Logo size={isMobile ? "sm" : "md"} />
 
             {/* Desktop Nav Links */}
             <div className="hidden items-center gap-1 md:flex">

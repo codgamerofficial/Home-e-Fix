@@ -30,14 +30,14 @@ export function Logo({
       ? "text-white"
       : textColor === "dark"
       ? "text-slate-900"
-      : "text-foreground dark:text-white";
+      : "text-slate-900 dark:text-white";
 
   const taglineColor =
     textColor === "light"
       ? "text-white/80"
       : textColor === "dark"
       ? "text-slate-600"
-      : "text-foreground-secondary dark:text-slate-300";
+      : "text-slate-600 dark:text-slate-300";
 
   const logoContent = (
     <div className={cn("flex items-center gap-2.5 group select-none", className)}>

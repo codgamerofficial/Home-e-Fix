@@ -27,7 +27,18 @@ export class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error("[ErrorBoundary]", error, errorInfo);
-    // Future: Send to error tracking service (Sentry, etc.)
+    
+    // Auto reload on stale chunk import failure after new deployment
+    if (
+      error.message?.includes("Failed to fetch dynamically imported module") ||
+      error.message?.includes("Importing a module script failed")
+    ) {
+      const hasReloaded = sessionStorage.getItem("chunk_reload");
+      if (!hasReloaded) {
+        sessionStorage.setItem("chunk_reload", "true");
+        window.location.reload();
+      }
+    }
   }
 
   handleRetry = () => {
