@@ -30,7 +30,7 @@ export function FloatingCartBar() {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
         transition={{ type: "spring", stiffness: 350, damping: 25 }}
-        className="fixed bottom-18 md:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-2xl"
+        className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-2xl"
       >
         {/* Expanded Items Drawer Popover */}
         {isExpanded && (

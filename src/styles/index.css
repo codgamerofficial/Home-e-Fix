@@ -401,9 +401,6 @@
 
 /* ─── Dark Mode Overrides (Pitch Black + Deep Oceanic Blue + Neon Orange) ─── */
 .dark {
-  --color-primary: #FFFFFF;
-  --color-primary-light: #F0F4FA;
-  --color-primary-lighter: #94A3B8;
   --color-background: #030814;
   --color-surface: #091224;
   --color-surface-elevated: #0E1A33;
