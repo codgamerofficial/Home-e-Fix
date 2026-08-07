@@ -70,14 +70,9 @@ export function Logo({
       {/* Clean Solid Text Branding */}
       {variant === "full" && (
         <div className="flex flex-col leading-none">
-          <span
-            className={cn(
-              "font-heading font-extrabold tracking-tight",
-              config.text,
-              mainTextColor
-            )}
-          >
-            Home-e-<span className="text-accent font-black">Fix</span>
+          <span className={cn("font-heading font-extrabold tracking-tight", config.text)}>
+            <span className={mainTextColor}>Home-e-</span>
+            <span className="text-[#FF5500] font-black" style={{ color: "#FF5500" }}>Fix</span>
           </span>
 
           {size !== "sm" && (
@@ -88,7 +83,7 @@ export function Logo({
                 taglineColor
               )}
             >
-              <span className="text-accent font-extrabold">FIXING</span> HOMES. EARNING TRUST.
+              <span className="text-[#FF5500] font-black" style={{ color: "#FF5500" }}>FIXING</span> HOMES. EARNING TRUST.
             </span>
           )}
         </div>
