@@ -1,8 +1,29 @@
+import { useState } from "react";
 import { MembershipCard } from "@/components/ui/membership-card";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Award, ShieldCheck, Check } from "lucide-react";
+import { displayRazorpayCheckout } from "@/lib/razorpay";
+import { useAuthStore } from "@/store/auth.store";
 
 export default function Membership() {
+  const { user } = useAuthStore();
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
+  const handleSubscribeVIP = async () => {
+    await displayRazorpayCheckout({
+      amount: 299,
+      currency: "INR",
+      name: "Home-e-Fix VIP Pass",
+      description: "6-Month VIP Pass Subscription",
+      customerName: user?.fullName || "Valued Customer",
+      customerEmail: user?.email || "customer@homeefix.com",
+      customerPhone: user?.phone || "+91 98765 43210",
+      onSuccess: () => {
+        setIsSubscribed(true);
+      },
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -14,7 +35,8 @@ export default function Membership() {
 
       {/* MEMBERSHIP CARD PRIMITIVE */}
       <MembershipCard
-        onSubscribe={() => alert("VIP Pass membership renewed for 12 months!")}
+        isSubscribed={isSubscribed}
+        onSubscribe={handleSubscribeVIP}
       />
 
       {/* SAVINGS SUMMARY */}

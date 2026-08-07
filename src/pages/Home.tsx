@@ -546,7 +546,7 @@ export default function Home() {
       <section className="container-app py-16 sm:py-24">
         <div className="mx-auto max-w-4xl">
           <MembershipCard
-            onSubscribe={() => alert("VIP Pass Subscription flow initiated!")}
+            onSubscribe={() => navigate("/dashboard/membership")}
           />
         </div>
       </section>
