@@ -1,11 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
+import { ENV, isServiceConfigured } from "@/config/env";
+import { logger } from "@/lib/observability/logger";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "placeholder-key";
+const supabaseUrl = ENV.VITE_SUPABASE_URL || "https://unconfigured.supabase.co";
+const supabaseAnonKey = ENV.VITE_SUPABASE_ANON_KEY || "unconfigured-anon-key";
+
+if (!isServiceConfigured("supabase")) {
+  logger.warn(
+    "[Supabase Boundary]: Real Supabase credentials are not detected. Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env to connect to production PostgreSQL."
+  );
+}
 
 /**
- * Supabase client instance.
- * Configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env
+ * Authoritative Supabase client instance.
  */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

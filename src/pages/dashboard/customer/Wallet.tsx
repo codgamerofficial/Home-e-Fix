@@ -26,8 +26,10 @@ export default function Wallet() {
     setIsProcessing(true);
     setCancelNotice(null);
 
-    displayRazorpayCheckout({
+    await displayRazorpayCheckout({
       amount: val,
+      purpose: "WALLET_TOPUP",
+      currency: "INR",
       name: "Home-e-Fix Wallet Top-up",
       description: `Add ${formatCurrency(val)} to Home-e-Fix Cash Balance`,
       customerName: user?.fullName || "Kolkata Customer",

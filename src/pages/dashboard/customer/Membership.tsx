@@ -14,6 +14,7 @@ export default function Membership() {
     setNotice(null);
     await displayRazorpayCheckout({
       amount: 299,
+      purpose: "MEMBERSHIP",
       currency: "INR",
       name: "Home-e-Fix VIP Pass",
       description: "6-Month VIP Pass Subscription",

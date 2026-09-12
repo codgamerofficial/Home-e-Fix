@@ -6,6 +6,8 @@ import { Logo } from "@/components/shared/Logo";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useUIStore } from "@/store/ui.store";
+import { useNotificationStore } from "@/store/notification.store";
+import { ROUTES } from "@/constants/routes";
 import type { NavLink } from "@/constants/navigation";
 
 interface SidebarProps {
@@ -16,6 +18,7 @@ interface SidebarProps {
 export function Sidebar({ links, title }: SidebarProps) {
   const location = useLocation();
   const { sidebarCollapsed, toggleSidebarCollapsed } = useUIStore();
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
 
   return (
     <aside
@@ -108,12 +111,21 @@ export function Sidebar({ links, title }: SidebarProps) {
                 )}
               </AnimatePresence>
 
-              {/* Badge */}
-              {link.badge && !sidebarCollapsed && (
-                <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-bold text-white">
-                  {link.badge}
-                </span>
-              )}
+              {/* Dynamic Badge */}
+              {(() => {
+                const badgeContent =
+                  link.href === ROUTES.APP_NOTIFICATIONS
+                    ? unreadCount > 0
+                      ? unreadCount
+                      : undefined
+                    : link.badge;
+                if (!badgeContent || sidebarCollapsed) return null;
+                return (
+                  <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[10px] font-bold text-white">
+                    {badgeContent}
+                  </span>
+                );
+              })()}
             </Link>
           );
 

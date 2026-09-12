@@ -1,34 +1,24 @@
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/auth.store";
-import type { User, LoginRequest, RegisterRequest, ForgotPasswordRequest } from "@/types/auth.types";
+import { logger } from "@/lib/observability/logger";
+import { isServiceConfigured } from "@/config/env";
+import type { User, UserRole, LoginRequest, RegisterRequest, ForgotPasswordRequest } from "@/types/auth.types";
 
 /**
- * Supabase Auth Service handling Sign Up, Sign In, OAuth, OTP, Magic Link, and Session Sync.
+ * Authoritative Supabase Auth Service.
+ * Handles Phone OTP, Email/Password, OAuth, and database profile synchronizations.
+ * Never fakes verification or stores credentials in insecure client-side state.
  */
 export const authService = {
   /**
-   * Listen to Supabase Auth State changes and sync with Zustand auth store.
+   * Listen to Supabase Auth State changes and sync session with Zustand store.
    */
   initAuthListener() {
-    supabase.auth.onAuthStateChange((event, session) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
       const authStore = useAuthStore.getState();
 
       if (session?.user) {
-        const user: User = {
-          id: session.user.id,
-          email: session.user.email || "",
-          phone: session.user.phone || "",
-          firstName: session.user.user_metadata?.full_name?.split(" ")[0] || "User",
-          lastName: session.user.user_metadata?.full_name?.split(" ")[1] || "",
-          fullName: session.user.user_metadata?.full_name || "User",
-          avatar: session.user.user_metadata?.avatar_url || "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&q=80",
-          role: (session.user.user_metadata?.role as any) || "customer",
-          isVerified: true,
-          isActive: true,
-          createdAt: session.user.created_at,
-          updatedAt: session.user.created_at,
-        };
-
+        const user = await this.buildUserFromSession(session);
         authStore.login(user, session.access_token, session.refresh_token);
       } else if (event === "SIGNED_OUT") {
         authStore.logout();
@@ -37,30 +27,68 @@ export const authService = {
   },
 
   /**
-   * Sign up user with Email & Password.
+   * Helper: Resolves database profile & role for a session.
    */
-  async signUp(email: string, password: string, fullName: string, phone: string) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          phone,
-          role: "customer",
-        },
-      },
-    });
+  async buildUserFromSession(session: any): Promise<User> {
+    const suUser = session.user;
 
-    if (error) throw error;
-    return data;
-  },
+    // Default metadata fallback
+    let role: UserRole = (suUser.user_metadata?.role as UserRole) || "customer";
+    let fullName =
+      suUser.user_metadata?.full_name ||
+      suUser.user_metadata?.name ||
+      (suUser.email ? suUser.email.split("@")[0] : "Home-e-Fix User");
+    let avatar =
+      suUser.user_metadata?.avatar_url ||
+      suUser.user_metadata?.picture ||
+      "";
 
-  /**
-   * Alias method for register.
-   */
-  async register(req: RegisterRequest) {
-    return this.signUp(req.email, req.password, `${req.firstName} ${req.lastName}`, req.phone);
+    // Attempt to retrieve authoritative profile & role from PostgreSQL
+    if (isServiceConfigured("supabase")) {
+      try {
+        const { data: dbUser } = await supabase
+          .from("users")
+          .select("role, is_active")
+          .eq("id", suUser.id)
+          .maybeSingle();
+
+        if (dbUser?.role) {
+          role = dbUser.role.toLowerCase() as UserRole;
+        }
+
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("first_name, last_name, avatar_url")
+          .eq("user_id", suUser.id)
+          .maybeSingle();
+
+        if (profile) {
+          fullName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || fullName;
+          if (profile.avatar_url) avatar = profile.avatar_url;
+        }
+      } catch (err) {
+        logger.warn("Could not retrieve extended profile from database, using session claims", { err });
+      }
+    }
+
+    const nameParts = fullName.split(" ");
+    const firstName = nameParts[0] || "User";
+    const lastName = nameParts.slice(1).join(" ") || "";
+
+    return {
+      id: suUser.id,
+      email: suUser.email || "",
+      phone: suUser.phone || suUser.user_metadata?.phone || "",
+      firstName,
+      lastName,
+      fullName,
+      avatar,
+      role,
+      isVerified: Boolean(suUser.email_confirmed_at || suUser.phone_confirmed_at),
+      isActive: true,
+      createdAt: suUser.created_at || new Date().toISOString(),
+      updatedAt: suUser.updated_at || new Date().toISOString(),
+    };
   },
 
   /**
@@ -72,7 +100,16 @@ export const authService = {
       password,
     });
 
-    if (error) throw error;
+    if (error) {
+      logger.warn("Email sign-in failed", { email });
+      throw error;
+    }
+
+    if (data.session) {
+      const user = await this.buildUserFromSession(data.session);
+      useAuthStore.getState().login(user, data.session.access_token, data.session.refresh_token);
+    }
+
     return data;
   },
 
@@ -84,29 +121,69 @@ export const authService = {
   },
 
   /**
-   * Sign in / Sign up with Passwordless Magic Link email.
+   * Send Phone SMS OTP via Supabase Auth.
    */
-  async signInWithMagicLink(email: string) {
+  async sendPhoneOtp(phone: string) {
+    // Standardize to E.164 phone format (+91 for India)
+    const formattedPhone = phone.startsWith("+") ? phone : `+91${phone.replace(/\D/g, "")}`;
+
     const { data, error } = await supabase.auth.signInWithOtp({
-      email,
+      phone: formattedPhone,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/profile-setup`,
+        channel: "sms",
       },
     });
 
-    if (error) throw error;
+    if (error) {
+      logger.warn("Send phone OTP failed", { phone: formattedPhone });
+      throw error;
+    }
+
     return data;
   },
 
   /**
-   * Trigger Mobile SMS OTP.
+   * Verify Phone SMS OTP via Supabase Auth.
    */
-  async signInWithOtp(phone: string) {
-    const { data, error } = await supabase.auth.signInWithOtp({
-      phone,
+  async verifyPhoneOtp(phone: string, token: string) {
+    const formattedPhone = phone.startsWith("+") ? phone : `+91${phone.replace(/\D/g, "")}`;
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone: formattedPhone,
+      token,
+      type: "sms",
     });
 
-    if (error) throw error;
+    if (error) {
+      logger.warn("Verify phone OTP failed", { phone: formattedPhone });
+      throw error;
+    }
+
+    if (data.session) {
+      const user = await this.buildUserFromSession(data.session);
+      useAuthStore.getState().login(user, data.session.access_token, data.session.refresh_token);
+    }
+
+    return data;
+  },
+
+  /**
+   * Sign in / Sign up with Passwordless Magic Link email.
+   */
+  async signInWithMagicLink(email: string) {
+    const redirectUrl = `${window.location.origin}/auth/profile-setup`;
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: redirectUrl,
+      },
+    });
+
+    if (error) {
+      logger.warn("Magic link dispatch failed", { email });
+      throw error;
+    }
+
     return data;
   },
 
@@ -122,6 +199,30 @@ export const authService = {
         queryParams: {
           access_type: "offline",
           prompt: "consent",
+        },
+      },
+    });
+
+    if (error) {
+      logger.warn("Google OAuth initialization failed");
+      throw error;
+    }
+
+    return data;
+  },
+
+  /**
+   * Register with Email & Password.
+   */
+  async register(req: RegisterRequest) {
+    const { data, error } = await supabase.auth.signUp({
+      email: req.email,
+      password: req.password,
+      options: {
+        data: {
+          full_name: `${req.firstName} ${req.lastName}`.trim(),
+          phone: req.phone,
+          role: req.role || "customer",
         },
       },
     });
@@ -142,35 +243,37 @@ export const authService = {
     return data;
   },
 
-  /**
-   * Alias method for forgotPassword.
-   */
   async forgotPassword(req: ForgotPasswordRequest) {
     return this.resetPassword(req.email);
   },
 
   /**
-   * Sign out user.
+   * Sign out user completely and invalidate session.
    */
   async signOut() {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    useAuthStore.getState().logout();
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      logger.error("Error during Supabase sign out", err);
+    } finally {
+      useAuthStore.getState().logout();
+    }
   },
 
-  /**
-   * Alias method for logout.
-   */
   async logout() {
     return this.signOut();
   },
 
   /**
-   * Refresh session method.
+   * Refresh current active session.
    */
   async refreshSession() {
     const { data, error } = await supabase.auth.refreshSession();
     if (error) throw error;
+    if (data.session) {
+      const user = await this.buildUserFromSession(data.session);
+      useAuthStore.getState().login(user, data.session.access_token, data.session.refresh_token);
+    }
     return data;
   },
 };

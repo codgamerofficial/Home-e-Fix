@@ -64,26 +64,36 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       rightIcon,
       disabled,
       children,
+      asChild = false,
       ...props
     },
     ref
   ) => {
+    const classes = cn(
+      // Base styles
+      "inline-flex items-center justify-center whitespace-nowrap font-medium",
+      "transition-all duration-200 ease-smooth",
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      "disabled:pointer-events-none disabled:opacity-50",
+      "cursor-pointer",
+      // Variant & size
+      variantClasses[variant],
+      sizeClasses[size],
+      className
+    );
+
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children as React.ReactElement<any>, {
+        className: cn(classes, (children as React.ReactElement<any>).props?.className),
+        ...props,
+      });
+    }
+
     return (
       <button
         ref={ref}
         disabled={disabled || isLoading}
-        className={cn(
-          // Base styles
-          "inline-flex items-center justify-center whitespace-nowrap font-medium",
-          "transition-all duration-200 ease-smooth",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-          "disabled:pointer-events-none disabled:opacity-50",
-          "cursor-pointer",
-          // Variant & size
-          variantClasses[variant],
-          sizeClasses[size],
-          className
-        )}
+        className={classes}
         {...props}
       >
         {isLoading ? (

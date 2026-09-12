@@ -4,29 +4,49 @@ import { RootLayout } from "../layouts/RootLayout";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { DashboardLayout } from "../layouts/DashboardLayout";
 import { ROUTES } from "../constants/routes";
-import { CUSTOMER_SIDEBAR_LINKS, TECHNICIAN_SIDEBAR_LINKS, ADMIN_SIDEBAR_LINKS } from "../constants/navigation";
+import {
+  CUSTOMER_SIDEBAR_LINKS,
+  PROFESSIONAL_SIDEBAR_LINKS,
+  ADMIN_SIDEBAR_LINKS,
+} from "../constants/navigation";
 import { PageSkeleton } from "../components/shared/LoadingSkeleton";
+import { ProtectedRoute, RoleProtectedRoute, PublicOnlyRoute } from "../components/shared/ProtectedRoute";
 
-/* ─── Lazy-loaded Pages ─── */
+/* ─── Suspense Wrapper ─── */
+function LazyPage({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageSkeleton />}>{children}</Suspense>;
+}
 
+/* ─── Lazy-loaded Public Pages (Section 43) ─── */
 const Home = lazy(() => import("../pages/Home"));
-const About = lazy(() => import("../pages/static/About"));
-const Contact = lazy(() => import("../pages/static/Contact"));
-const Terms = lazy(() => import("../pages/static/Terms"));
-const Privacy = lazy(() => import("../pages/static/Privacy"));
 const ServiceCatalog = lazy(() => import("../pages/services/ServiceCatalog"));
 const CategoryDetail = lazy(() => import("../pages/services/CategoryDetail"));
-const BookingWizard = lazy(() => import("../pages/booking/BookingWizard"));
-const BookingConfirmed = lazy(() => import("../pages/booking/BookingConfirmed"));
+const ServiceDetail = lazy(() => import("../pages/services/ServiceDetail"));
+const HowItWorks = lazy(() => import("../pages/static/HowItWorks"));
+const MembershipPublic = lazy(() => import("../pages/static/Membership"));
+const About = lazy(() => import("../pages/static/About"));
+const BecomeProfessional = lazy(() => import("../pages/static/BecomeProfessional"));
+const Support = lazy(() => import("../pages/static/Support"));
+const Contact = lazy(() => import("../pages/static/Contact"));
+const Blog = lazy(() => import("../pages/static/Blog"));
+const Privacy = lazy(() => import("../pages/static/Privacy"));
+const Terms = lazy(() => import("../pages/static/Terms"));
+const DesignSystemShowcase = lazy(() => import("../pages/DesignSystemShowcase"));
 const NotFound = lazy(() => import("../pages/NotFound"));
+
+/* ─── Lazy-loaded Auth Pages ─── */
 const Login = lazy(() => import("../pages/auth/Login"));
 const Register = lazy(() => import("../pages/auth/Register"));
 const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword"));
 const OtpVerification = lazy(() => import("../pages/auth/OtpVerification"));
 const ProfileSetup = lazy(() => import("../pages/auth/ProfileSetup"));
 
-/* ─── Customer Dashboard Pages ─── */
+/* ─── Lazy-loaded Customer App Pages (/app/* - Section 44) ─── */
+const BookingWizard = lazy(() => import("../pages/booking/BookingWizard"));
+const BookingConfirmed = lazy(() => import("../pages/booking/BookingConfirmed"));
+const BookingDetail = lazy(() => import("../pages/booking/BookingDetail"));
 const Orders = lazy(() => import("../pages/dashboard/customer/Orders"));
+const Invoices = lazy(() => import("../pages/dashboard/customer/Invoices"));
 const Wallet = lazy(() => import("../pages/dashboard/customer/Wallet"));
 const Membership = lazy(() => import("../pages/dashboard/customer/Membership"));
 const Coupons = lazy(() => import("../pages/dashboard/customer/Coupons"));
@@ -37,37 +57,45 @@ const Profile = lazy(() => import("../pages/dashboard/customer/Profile"));
 const Settings = lazy(() => import("../pages/dashboard/customer/Settings"));
 const HelpCenter = lazy(() => import("../pages/dashboard/customer/HelpCenter"));
 
-/* ─── Technician App Pages ─── */
+/* ─── Lazy-loaded Professional App Pages (/professional/* - Section 45) ─── */
 const TechJobList = lazy(() => import("../pages/dashboard/technician/JobList"));
+const TechJobDetail = lazy(() => import("../pages/dashboard/technician/JobDetail"));
+const TechCalendar = lazy(() => import("../pages/dashboard/technician/Calendar"));
 const TechEarnings = lazy(() => import("../pages/dashboard/technician/Earnings"));
 const TechWallet = lazy(() => import("../pages/dashboard/technician/Wallet"));
 const TechRatings = lazy(() => import("../pages/dashboard/technician/Ratings"));
-const TechAvailability = lazy(() => import("../pages/dashboard/technician/Availability"));
+const TechProfile = lazy(() => import("../pages/dashboard/technician/Profile"));
+const TechKYC = lazy(() => import("../pages/dashboard/technician/KYC"));
+const TechDocuments = lazy(() => import("../pages/dashboard/technician/Documents"));
+const TechSupport = lazy(() => import("../pages/dashboard/technician/Support"));
+const TechSettings = lazy(() => import("../pages/dashboard/technician/Settings"));
 const TechInventory = lazy(() => import("../pages/dashboard/technician/Inventory"));
 const TechAttendance = lazy(() => import("../pages/dashboard/technician/Attendance"));
 
-/* ─── Admin Dashboard Pages ─── */
+/* ─── Lazy-loaded Admin Center Pages (/admin/* - Section 46) ─── */
 const AdminAnalytics = lazy(() => import("../pages/dashboard/admin/Analytics"));
+const AdminBookings = lazy(() => import("../pages/dashboard/admin/Bookings"));
 const AdminCustomers = lazy(() => import("../pages/dashboard/admin/Customers"));
 const AdminTechnicians = lazy(() => import("../pages/dashboard/admin/Technicians"));
-const AdminBookings = lazy(() => import("../pages/dashboard/admin/Bookings"));
-const AdminPayments = lazy(() => import("../pages/dashboard/admin/Payments"));
-const AdminCouponsCMS = lazy(() => import("../pages/dashboard/admin/CouponsCMS"));
-const AdminMembershipCMS = lazy(() => import("../pages/dashboard/admin/MembershipCMS"));
 const AdminServicesCMS = lazy(() => import("../pages/dashboard/admin/ServicesCMS"));
+const AdminCategoriesCMS = lazy(() => import("../pages/dashboard/admin/CategoriesCMS"));
+const AdminPricingCMS = lazy(() => import("../pages/dashboard/admin/PricingCMS"));
+const AdminPayments = lazy(() => import("../pages/dashboard/admin/Payments"));
+const AdminRefundsCMS = lazy(() => import("../pages/dashboard/admin/RefundsCMS"));
+const AdminMembershipCMS = lazy(() => import("../pages/dashboard/admin/MembershipCMS"));
+const AdminCouponsCMS = lazy(() => import("../pages/dashboard/admin/CouponsCMS"));
+const AdminReviewsCMS = lazy(() => import("../pages/dashboard/admin/ReviewsCMS"));
+const AdminSupportCMS = lazy(() => import("../pages/dashboard/admin/SupportTicketsCMS"));
+const AdminNotificationsCMS = lazy(() => import("../pages/dashboard/admin/NotificationsCMS"));
+const AdminContentCMS = lazy(() => import("../pages/dashboard/admin/ContentCMS"));
 const AdminReports = lazy(() => import("../pages/dashboard/admin/Reports"));
-
-/* ─── Suspense Wrapper ─── */
-
-function LazyPage({ children }: { children: React.ReactNode }) {
-  return <Suspense fallback={<PageSkeleton />}>{children}</Suspense>;
-}
+const AdminAuditLogsCMS = lazy(() => import("../pages/dashboard/admin/AuditLogsCMS"));
+const AdminSettingsCMS = lazy(() => import("../pages/dashboard/admin/SettingsCMS"));
 
 /* ─── Router Configuration ─── */
-
 export const router = createBrowserRouter([
   {
-    // Public routes with RootLayout
+    // Public routes wrapped in RootLayout
     element: <RootLayout />,
     children: [
       {
@@ -75,38 +103,6 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <Home />
-          </LazyPage>
-        ),
-      },
-      {
-        path: ROUTES.ABOUT,
-        element: (
-          <LazyPage>
-            <About />
-          </LazyPage>
-        ),
-      },
-      {
-        path: ROUTES.CONTACT,
-        element: (
-          <LazyPage>
-            <Contact />
-          </LazyPage>
-        ),
-      },
-      {
-        path: ROUTES.TERMS,
-        element: (
-          <LazyPage>
-            <Terms />
-          </LazyPage>
-        ),
-      },
-      {
-        path: ROUTES.PRIVACY,
-        element: (
-          <LazyPage>
-            <Privacy />
           </LazyPage>
         ),
       },
@@ -119,10 +115,18 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: `${ROUTES.SERVICES}/:categorySlug`,
+        path: "/services/:category",
         element: (
           <LazyPage>
             <CategoryDetail />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "/services/:category/:service",
+        element: (
+          <LazyPage>
+            <ServiceDetail />
           </LazyPage>
         ),
       },
@@ -135,7 +139,89 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: ROUTES.BOOKING,
+        path: ROUTES.HOW_IT_WORKS,
+        element: (
+          <LazyPage>
+            <HowItWorks />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.MEMBERSHIP,
+        element: (
+          <LazyPage>
+            <MembershipPublic />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.ABOUT,
+        element: (
+          <LazyPage>
+            <About />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.BECOME_A_PROFESSIONAL,
+        element: (
+          <LazyPage>
+            <BecomeProfessional />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.SUPPORT,
+        element: (
+          <LazyPage>
+            <Support />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.CONTACT,
+        element: (
+          <LazyPage>
+            <Contact />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.BLOG,
+        element: (
+          <LazyPage>
+            <Blog />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.PRIVACY,
+        element: (
+          <LazyPage>
+            <Privacy />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.TERMS,
+        element: (
+          <LazyPage>
+            <Terms />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.DESIGN_SYSTEM,
+        element: (
+          <LazyPage>
+            <DesignSystemShowcase />
+          </LazyPage>
+        ),
+      },
+
+      // Legacy direct booking paths
+      {
+        path: "/booking",
         element: (
           <LazyPage>
             <BookingWizard />
@@ -150,6 +236,8 @@ export const router = createBrowserRouter([
           </LazyPage>
         ),
       },
+
+      // 404 Catch-all
       {
         path: ROUTES.NOT_FOUND,
         element: (
@@ -160,17 +248,20 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // Auth Routes wrapped in AuthLayout
   {
-    // Auth routes with AuthLayout
     path: "/auth",
     element: <AuthLayout />,
     children: [
       {
         path: "login",
         element: (
-          <LazyPage>
-            <Login />
-          </LazyPage>
+          <PublicOnlyRoute>
+            <LazyPage>
+              <Login />
+            </LazyPage>
+          </PublicOnlyRoute>
         ),
       },
       {
@@ -207,17 +298,40 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // ─── Customer Platform Routes (/app/* - Section 44) ───
   {
-    // Customer Dashboard routes with DashboardLayout
-    path: "/dashboard",
-    element: <DashboardLayout links={CUSTOMER_SIDEBAR_LINKS} title="Customer Account" />,
+    path: "/app",
+    element: (
+      <ProtectedRoute>
+        <RoleProtectedRoute allowedRoles={["CUSTOMER", "ADMIN", "SUPER_ADMIN"]}>
+          <DashboardLayout links={CUSTOMER_SIDEBAR_LINKS} title="Customer Account" />
+        </RoleProtectedRoute>
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
-        element: <Navigate to="/dashboard/orders" replace />,
+        element: <Navigate to="/app/bookings" replace />,
       },
       {
-        path: "orders",
+        path: "book",
+        element: (
+          <LazyPage>
+            <BookingWizard />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "book/:service",
+        element: (
+          <LazyPage>
+            <BookingWizard />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "bookings",
         element: (
           <LazyPage>
             <Orders />
@@ -225,10 +339,18 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "wallet",
+        path: "bookings/:id",
         element: (
           <LazyPage>
-            <Wallet />
+            <BookingDetail />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "invoices",
+        element: (
+          <LazyPage>
+            <Invoices />
           </LazyPage>
         ),
       },
@@ -237,6 +359,14 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <Membership />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "wallet",
+        element: (
+          <LazyPage>
+            <Wallet />
           </LazyPage>
         ),
       },
@@ -273,6 +403,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "support",
+        element: (
+          <LazyPage>
+            <HelpCenter />
+          </LazyPage>
+        ),
+      },
+      {
         path: "profile",
         element: (
           <LazyPage>
@@ -288,30 +426,58 @@ export const router = createBrowserRouter([
           </LazyPage>
         ),
       },
-      {
-        path: "help",
-        element: (
-          <LazyPage>
-            <HelpCenter />
-          </LazyPage>
-        ),
-      },
     ],
   },
+
+  // Customer Dashboard Backwards-compatibility alias (/dashboard/* -> /app/*)
   {
-    // Technician App routes with DashboardLayout
-    path: "/technician",
-    element: <DashboardLayout links={TECHNICIAN_SIDEBAR_LINKS} title="Technician Portal" />,
+    path: "/dashboard",
+    element: <Navigate to="/app/bookings" replace />,
+  },
+  {
+    path: "/dashboard/:subpage",
+    element: <Navigate to="/app/bookings" replace />,
+  },
+
+  // ─── Professional Platform Routes (/professional/* - Section 45) ───
+  {
+    path: "/professional",
+    element: (
+      <ProtectedRoute>
+        <RoleProtectedRoute allowedRoles={["PROFESSIONAL", "TECHNICIAN", "ADMIN", "SUPER_ADMIN"]}>
+          <DashboardLayout
+            links={PROFESSIONAL_SIDEBAR_LINKS}
+            title="Professional Portal"
+          />
+        </RoleProtectedRoute>
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
-        element: <Navigate to="/technician/jobs" replace />,
+        element: <Navigate to="/professional/jobs" replace />,
       },
       {
         path: "jobs",
         element: (
           <LazyPage>
             <TechJobList />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "jobs/:id",
+        element: (
+          <LazyPage>
+            <TechJobDetail />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "calendar",
+        element: (
+          <LazyPage>
+            <TechCalendar />
           </LazyPage>
         ),
       },
@@ -340,10 +506,50 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "profile",
+        element: (
+          <LazyPage>
+            <TechProfile />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "kyc",
+        element: (
+          <LazyPage>
+            <TechKYC />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "documents",
+        element: (
+          <LazyPage>
+            <TechDocuments />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "support",
+        element: (
+          <LazyPage>
+            <TechSupport />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "settings",
+        element: (
+          <LazyPage>
+            <TechSettings />
+          </LazyPage>
+        ),
+      },
+      {
         path: "availability",
         element: (
           <LazyPage>
-            <TechAvailability />
+            <TechCalendar />
           </LazyPage>
         ),
       },
@@ -365,10 +571,27 @@ export const router = createBrowserRouter([
       },
     ],
   },
+
+  // Technician Backwards-compatibility alias (/technician/* -> /professional/*)
   {
-    // Admin Dashboard routes with DashboardLayout
+    path: "/technician",
+    element: <Navigate to="/professional/jobs" replace />,
+  },
+  {
+    path: "/technician/:subpage",
+    element: <Navigate to="/professional/jobs" replace />,
+  },
+
+  // ─── Admin Platform Routes (/admin/* - Section 46) ───
+  {
     path: "/admin",
-    element: <DashboardLayout links={ADMIN_SIDEBAR_LINKS} title="Admin Center" />,
+    element: (
+      <ProtectedRoute>
+        <RoleProtectedRoute allowedRoles={["ADMIN", "SUPER_ADMIN", "FINANCE_ADMIN", "OPERATIONS_MANAGER", "SUPPORT_AGENT"]}>
+          <DashboardLayout links={ADMIN_SIDEBAR_LINKS} title="Admin Center" />
+        </RoleProtectedRoute>
+      </ProtectedRoute>
+    ),
     children: [
       {
         index: true,
@@ -383,10 +606,26 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "bookings",
+        element: (
+          <LazyPage>
+            <AdminBookings />
+          </LazyPage>
+        ),
+      },
+      {
         path: "customers",
         element: (
           <LazyPage>
             <AdminCustomers />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "professionals",
+        element: (
+          <LazyPage>
+            <AdminTechnicians />
           </LazyPage>
         ),
       },
@@ -399,10 +638,26 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "bookings",
+        path: "services",
         element: (
           <LazyPage>
-            <AdminBookings />
+            <AdminServicesCMS />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "categories",
+        element: (
+          <LazyPage>
+            <AdminCategoriesCMS />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "pricing",
+        element: (
+          <LazyPage>
+            <AdminPricingCMS />
           </LazyPage>
         ),
       },
@@ -415,10 +670,10 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "coupons",
+        path: "refunds",
         element: (
           <LazyPage>
-            <AdminCouponsCMS />
+            <AdminRefundsCMS />
           </LazyPage>
         ),
       },
@@ -431,10 +686,42 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: "services",
+        path: "coupons",
         element: (
           <LazyPage>
-            <AdminServicesCMS />
+            <AdminCouponsCMS />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "reviews",
+        element: (
+          <LazyPage>
+            <AdminReviewsCMS />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "support",
+        element: (
+          <LazyPage>
+            <AdminSupportCMS />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "notifications",
+        element: (
+          <LazyPage>
+            <AdminNotificationsCMS />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "cms",
+        element: (
+          <LazyPage>
+            <AdminContentCMS />
           </LazyPage>
         ),
       },
@@ -443,6 +730,22 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <AdminReports />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "audit-logs",
+        element: (
+          <LazyPage>
+            <AdminAuditLogsCMS />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "settings",
+        element: (
+          <LazyPage>
+            <AdminSettingsCMS />
           </LazyPage>
         ),
       },

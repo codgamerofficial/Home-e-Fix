@@ -48,7 +48,7 @@ export function Logo({
       <div
         className={cn(
           "relative flex items-center justify-center rounded-full shrink-0",
-          "bg-[#FF5500] shadow-md shadow-orange-500/20",
+          "bg-[#FF6A00] shadow-md shadow-orange-500/20",
           "group-hover:scale-105 transition-transform duration-200",
           config.icon
         )}
@@ -72,7 +72,7 @@ export function Logo({
         <div className="flex flex-col leading-none">
           <span className={cn("font-heading font-extrabold tracking-tight", config.text)}>
             <span className={mainTextColor}>Home-e-</span>
-            <span className="text-[#FF5500] font-black" style={{ color: "#FF5500" }}>Fix</span>
+            <span className="text-[#FF6A00] font-black" style={{ color: "#FF6A00" }}>Fix</span>
           </span>
 
           {size !== "sm" && (
@@ -83,7 +83,7 @@ export function Logo({
                 taglineColor
               )}
             >
-              <span className="text-[#FF5500] font-black" style={{ color: "#FF5500" }}>FIXING</span> HOMES. EARNING TRUST.
+              <span className="text-[#FF6A00] font-black" style={{ color: "#FF6A00" }}>FIXING</span> HOMES. EARNING TRUST.
             </span>
           )}
         </div>

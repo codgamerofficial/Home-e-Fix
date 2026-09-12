@@ -5,18 +5,67 @@ export type { ButtonProps, ButtonVariant, ButtonSize } from "./button";
 export { Input } from "./input";
 export type { InputProps } from "./input";
 
+export { Textarea } from "./textarea";
+export type { TextareaProps } from "./textarea";
+
+export { Select } from "./select";
+export type { SelectProps, SelectOption } from "./select";
+
+export { Checkbox } from "./checkbox";
+export type { CheckboxProps } from "./checkbox";
+
+export { Switch } from "./switch";
+export type { SwitchProps } from "./switch";
+
+export { RadioGroup, RadioGroupItem } from "./radio-group";
+export type { RadioGroupProps, RadioGroupItemProps } from "./radio-group";
+
+export { MediaUploadDropzone } from "./media-upload";
+export type { MediaUploadDropzoneProps, UploadedFile } from "./media-upload";
+
 export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./card";
+export type { CardProps } from "./card";
 
 export { Badge } from "./badge";
 export type { BadgeVariant, BadgeProps } from "./badge";
 
-export { Skeleton } from "./skeleton";
+export {
+  Skeleton,
+  CardSkeleton,
+  AvatarSkeleton,
+  TextSkeleton,
+  TableRowSkeleton,
+} from "./skeleton";
 
 export { Avatar, AvatarImage, AvatarFallback } from "./avatar";
 export type { AvatarProps, AvatarImageProps, AvatarFallbackProps } from "./avatar";
 
 export { Separator } from "./separator";
 
+// Navigation
+export { Tabs, TabsList, TabsTrigger, TabsContent } from "./tabs";
+export type { TabsProps } from "./tabs";
+
+export { Breadcrumbs } from "./breadcrumbs";
+export type { BreadcrumbsProps, BreadcrumbItem } from "./breadcrumbs";
+
+export { Pagination } from "./pagination";
+export type { PaginationProps } from "./pagination";
+
+// Data Tables
+export {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableCaption,
+  TableEmpty,
+} from "./table";
+
+// Modals & Panels
 export { Sheet, SheetHeader, SheetContent } from "./sheet";
 
 export { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogContent, DialogFooter } from "./dialog";

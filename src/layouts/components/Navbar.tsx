@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
@@ -22,6 +22,8 @@ import {
   FileText,
   ShieldCheck,
   Phone,
+  Search,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/shared/Logo";
@@ -49,6 +51,7 @@ export function Navbar() {
   const location = useLocation();
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuthStore();
   const { theme, toggleTheme, setSearchOpen } = useUIStore();
@@ -56,19 +59,44 @@ export function Navbar() {
   const { getItemCount } = useCartStore();
   const cartCount = getItemCount();
 
+  // Detect scroll to transition header to clean glass surface with subtle shadow
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
   return (
     <>
-      <header className="sticky top-0 z-(--z-sticky) w-full border-b border-border/50">
-        {/* Glass background */}
-        <div className="absolute inset-0 bg-surface/80 backdrop-blur-xl" />
-
+      <header
+        className={cn(
+          "sticky top-0 z-(--z-sticky) w-full transition-all duration-300",
+          scrolled
+            ? "bg-white/95 dark:bg-[#07172E]/95 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 shadow-sm shadow-slate-900/5"
+            : "bg-white/80 dark:bg-[#07172E]/80 backdrop-blur-md border-b border-slate-200/40 dark:border-white/10"
+        )}
+      >
         <nav className="container-app relative flex h-(--navbar-height) items-center justify-between gap-4">
-          {/* Left: Logo + Desktop Nav */}
-          <div className="flex items-center gap-8">
-            <Logo size={isMobile ? "sm" : "md"} />
+          {/* Left: Logo + Location (Desktop) + Desktop Nav */}
+          <div className="flex items-center gap-6 lg:gap-8">
+            <Logo size={isMobile ? "sm" : "md"} textColor="auto" />
+
+            {/* Desktop Location Selector Indicator */}
+            <button
+              type="button"
+              onClick={() => navigate(ROUTES.SERVICES)}
+              className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200/60 dark:border-slate-700/60"
+              title="Operational Hub: Kolkata"
+            >
+              <MapPin className="w-3.5 h-3.5 text-[#FF6A00] shrink-0" />
+              <span className="truncate max-w-27.5">Kolkata, WB</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
 
             {/* Desktop Nav Links */}
-            <div className="hidden items-center gap-1 md:flex">
+            <div className="hidden lg:flex items-center gap-1">
               {MAIN_NAV_LINKS.map((link) => {
                 const isActive =
                   link.href === "/"
@@ -80,17 +108,17 @@ export function Navbar() {
                     key={link.href}
                     to={link.href}
                     className={cn(
-                      "relative rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      "relative rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
                       isActive
-                        ? "text-accent font-semibold"
-                        : "text-foreground-secondary hover:text-foreground"
+                        ? "text-[#FF6A00] font-bold"
+                        : "text-slate-700 dark:text-slate-200 hover:text-primary dark:hover:text-white"
                     )}
                   >
                     {link.label}
                     {isActive && (
                       <motion.div
                         layoutId="navbar-active"
-                        className="absolute bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-accent"
+                        className="absolute bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 rounded-full bg-[#FF6A00]"
                         transition={{
                           type: "spring",
                           stiffness: 400,
@@ -104,22 +132,56 @@ export function Navbar() {
             </div>
           </div>
 
-          {/* Right: Actions */}
-          <div className="flex items-center gap-3">
+          {/* Right: Search + Actions */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Mobile Location Quick Badge */}
+            <button
+              type="button"
+              onClick={() => navigate(ROUTES.SERVICES)}
+              className="flex xl:hidden items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60"
+            >
+              <MapPin className="w-3 h-3 text-[#FF6A00]" />
+              <span className="truncate max-w-17.5 sm:max-w-none">Kolkata</span>
+            </button>
 
+            {/* Global Search Trigger */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSearchOpen(true)}
+              className="hidden sm:flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100/70 dark:bg-slate-800/70 px-3 py-1.5 rounded-full border border-slate-200/60 dark:border-slate-700/60"
+              aria-label="Search services"
+            >
+              <Search className="w-3.5 h-3.5 text-slate-400" />
+              <span>Search services...</span>
+              <kbd className="text-[10px] bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-mono">
+                ⌘K
+              </kbd>
+            </Button>
+
+            {/* Mobile Search Icon */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSearchOpen(true)}
+              className="sm:hidden text-slate-600 dark:text-slate-300"
+              aria-label="Search services"
+            >
+              <Search className="h-5 w-5" />
+            </Button>
 
             {/* Theme Toggle */}
             <Button
               variant="ghost"
               size="icon"
               onClick={toggleTheme}
-              className="text-foreground-secondary"
+              className="text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
               aria-label="Toggle theme"
             >
               {theme === "dark" ? (
-                <Sun className="h-5 w-5" />
+                <Sun className="h-4.5 w-4.5" />
               ) : (
-                <Moon className="h-5 w-5" />
+                <Moon className="h-4.5 w-4.5" />
               )}
             </Button>
 
@@ -129,13 +191,13 @@ export function Navbar() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-foreground-secondary"
+                  className="text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                   aria-label="Notifications"
                 >
-                  <Bell className="h-5 w-5" />
+                  <Bell className="h-4.5 w-4.5" />
                 </Button>
                 {unreadCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-white">
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#FF6A00] px-1 text-[10px] font-bold text-white">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
@@ -186,15 +248,20 @@ export function Navbar() {
                 </DropdownMenuItem>
               </DropdownMenu>
             ) : (
-              <div className="hidden items-center gap-2 sm:flex">
-                <Button variant="ghost" size="sm" asChild>
+              <div className="hidden sm:flex items-center gap-2">
+                <Button variant="ghost" size="sm" asChild className="font-semibold text-slate-700 dark:text-slate-200">
                   <Link to={ROUTES.LOGIN}>
                     <LogIn className="mr-1.5 h-4 w-4" />
                     Login
                   </Link>
                 </Button>
-                <Button variant="accent" size="sm" asChild>
-                  <Link to={ROUTES.REGISTER}>Sign Up</Link>
+                <Button
+                  variant="accent"
+                  size="sm"
+                  className="font-bold shadow-md shadow-orange-500/20 hover:shadow-orange-500/30 bg-[#FF6A00] hover:bg-[#E55F00] text-white cursor-pointer"
+                  asChild
+                >
+                  <Link to={ROUTES.APP_BOOK}>Book a Service</Link>
                 </Button>
               </div>
             )}
@@ -203,7 +270,7 @@ export function Navbar() {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden text-foreground-secondary"
+              className="lg:hidden text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Open menu"
             >

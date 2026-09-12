@@ -1,27 +1,60 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-/* ─── Card ─── */
+/* ─── Card Props ─── */
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  variant?: "default" | "glass" | "outline" | "elevated" | "accent";
+  radius?: "sm" | "md" | "lg" | "xl" | "2xl" | "full";
+  hover?: boolean;
+  interactive?: boolean;
+}
 
-const Card = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement> & { hover?: boolean }
->(({ className, hover = false, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "rounded-xl border border-border bg-surface shadow-card",
-      "transition-all duration-300 ease-smooth",
-      hover && "hover:shadow-card-hover hover:-translate-y-0.5 cursor-pointer",
-      className
-    )}
-    {...props}
-  />
-));
+const variantStyles: Record<NonNullable<CardProps["variant"]>, string> = {
+  default: "border border-border bg-surface shadow-card",
+  glass: "liquid-glass shadow-lg border border-white/20 dark:border-white/10 text-foreground",
+  outline: "border-2 border-border bg-transparent shadow-none",
+  elevated: "border border-border/80 bg-surface shadow-md hover:shadow-lg",
+  accent: "border border-accent/30 bg-accent/5 text-foreground shadow-sm",
+};
+
+const radiusStyles: Record<NonNullable<CardProps["radius"]>, string> = {
+  sm: "rounded-lg",
+  md: "rounded-xl",
+  lg: "rounded-2xl",
+  xl: "rounded-3xl",
+  "2xl": "rounded-[28px]",
+  full: "rounded-full",
+};
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  (
+    {
+      className,
+      variant = "default",
+      radius = "lg",
+      hover = false,
+      interactive = false,
+      ...props
+    },
+    ref
+  ) => (
+    <div
+      ref={ref}
+      className={cn(
+        "relative text-foreground transition-all duration-300 ease-smooth",
+        variantStyles[variant],
+        radiusStyles[radius],
+        (hover || interactive) &&
+          "hover:shadow-card-hover hover:-translate-y-1 cursor-pointer active:scale-[0.99]",
+        className
+      )}
+      {...props}
+    />
+  )
+);
 Card.displayName = "Card";
 
 /* ─── CardHeader ─── */
-
 const CardHeader = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -35,7 +68,6 @@ const CardHeader = React.forwardRef<
 CardHeader.displayName = "CardHeader";
 
 /* ─── CardTitle ─── */
-
 const CardTitle = React.forwardRef<
   HTMLHeadingElement,
   React.HTMLAttributes<HTMLHeadingElement>
@@ -43,7 +75,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      "font-heading text-lg font-semibold leading-none tracking-tight text-foreground",
+      "font-heading text-lg md:text-xl font-bold leading-snug tracking-tight text-primary",
       className
     )}
     {...props}
@@ -52,21 +84,19 @@ const CardTitle = React.forwardRef<
 CardTitle.displayName = "CardTitle";
 
 /* ─── CardDescription ─── */
-
 const CardDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn("text-sm text-foreground-secondary", className)}
+    className={cn("text-sm text-foreground-secondary leading-relaxed", className)}
     {...props}
   />
 ));
 CardDescription.displayName = "CardDescription";
 
 /* ─── CardContent ─── */
-
 const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
@@ -76,14 +106,13 @@ const CardContent = React.forwardRef<
 CardContent.displayName = "CardContent";
 
 /* ─── CardFooter ─── */
-
 const CardFooter = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex items-center p-6 pt-0", className)}
+    className={cn("flex items-center p-6 pt-0 border-t border-border/50 mt-4", className)}
     {...props}
   />
 ));

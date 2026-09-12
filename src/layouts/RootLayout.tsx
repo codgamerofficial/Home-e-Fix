@@ -6,6 +6,7 @@ import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { FloatingCartBar } from "@/components/shared/FloatingCartBar";
 import { PwaInstallBanner } from "@/components/shared/PwaInstallBanner";
 import { RoleSwitcherWidget } from "@/components/shared/RoleSwitcherWidget";
+import { NetworkStatusBanner } from "@/components/shared/NetworkStatusBanner";
 import { useAuthListener } from "@/hooks/useAuthListener";
 
 /**
@@ -15,14 +16,17 @@ export function RootLayout() {
   const location = useLocation();
   useAuthListener();
 
-  // Don't show footer/mobile nav on dashboard routes
+  // Don't show footer/mobile nav on dashboard/app routes
   const isDashboard =
+    location.pathname.startsWith("/app") ||
     location.pathname.startsWith("/dashboard") ||
+    location.pathname.startsWith("/professional") ||
     location.pathname.startsWith("/technician") ||
     location.pathname.startsWith("/admin");
 
   return (
     <div className="flex min-h-dvh flex-col">
+      <NetworkStatusBanner />
       <Navbar />
 
       <main className="flex-1 pb-(--bottom-nav-height) md:pb-0">

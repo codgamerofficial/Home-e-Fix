@@ -33,6 +33,7 @@ import { useCartStore } from "@/store/cart.store";
 import { useAuthStore } from "@/store/auth.store";
 import { displayRazorpayCheckout } from "@/lib/razorpay";
 import { formatCurrency } from "@/lib/utils";
+import { dbRepository } from "@/services/db/repository";
 
 /* ─── Mock User Addresses ─── */
 
@@ -190,33 +191,66 @@ export default function BookingWizard() {
   const [paymentErrorNotice, setPaymentErrorNotice] = useState<string | null>(null);
 
   const handleConfirmBooking = async () => {
-    const bookingId = `HEF-${Math.floor(100000 + Math.random() * 900000)}`;
     setPaymentErrorNotice(null);
+    const primaryService = selectedServices[0] || { id: "s-1", name: "Home Service", category: "ac" };
+    const selectedAddr = addresses.find((a) => a.id === selectedAddressId) || addresses[0];
+
+    const saveBookingRecord = () => {
+      return dbRepository.createBooking({
+        serviceId: primaryService.id,
+        serviceName: primaryService.name,
+        categorySlug: typeof primaryService.category === "string" ? primaryService.category : (primaryService.category as any)?.slug || "ac",
+        customerName: user?.fullName || "Valued Homeowner",
+        customerPhone: user?.phone || "+91 98301 23456",
+        scheduledDate: selectedDate ? selectedDate.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+        scheduledTimeSlot: "10:00 AM - 11:00 AM",
+        address: selectedAddr,
+        subtotal: itemsSubtotal,
+        safetyFee: safetyHygieneFee,
+        taxGst: taxGst,
+        discount: appliedDiscount,
+        totalAmount: totalAmount,
+        paymentMethod: paymentMethod.toUpperCase(),
+        customerNotes: problemDescription || "",
+      });
+    };
 
     // Cash / Pay after service
     if (paymentMethod === "cash") {
+      const newBooking = saveBookingRecord();
       clearCart();
-      navigate(`/booking/confirmation/${bookingId}`);
+      navigate(`/app/bookings/${newBooking.id}`);
       return;
     }
 
-    // Razorpay Online Gateway Checkout (UPI, Card, Wallet)
+    // Razorpay Online Gateway Checkout (UPI, Card, Netbanking)
+    // 1. Create booking in PENDING_PAYMENT state first
+    const pendingBooking = saveBookingRecord();
+    dbRepository.updateBookingPayment(pendingBooking.id, "PROCESSING", paymentMethod.toUpperCase());
+
+    // 2. Initiate server-verified Razorpay payment flow
     await displayRazorpayCheckout({
+      bookingId: pendingBooking.id,
       amount: totalAmount,
+      purpose: "BOOKING",
       currency: "INR",
       name: "Home-e-Fix",
-      description: `Home Service Booking #${bookingId}`,
+      description: `Payment for ${primaryService.name}`,
       customerName: user?.fullName || "Valued Customer",
       customerEmail: user?.email || "customer@homeefix.com",
-      customerPhone: user?.phone || "+91 98765 43210",
+      customerPhone: user?.phone || "+91 98301 23456",
       onSuccess: (paymentId) => {
+        dbRepository.updateBookingPayment(pendingBooking.id, "SUCCESS", paymentMethod.toUpperCase(), paymentId);
+        dbRepository.updateBookingStatus(pendingBooking.id, "CONFIRMED");
         clearCart();
-        navigate(`/booking/confirmation/${bookingId}?payment_id=${paymentId}`);
+        navigate(`/app/bookings/${pendingBooking.id}`);
       },
       onCancel: (reason) => {
+        dbRepository.updateBookingPayment(pendingBooking.id, "CANCELLED");
         setPaymentErrorNotice(`❌ Payment Cancelled: ${reason}`);
       },
       onFailure: (err) => {
+        dbRepository.updateBookingPayment(pendingBooking.id, "FAILED");
         setPaymentErrorNotice(`❌ Payment Failed: ${err}`);
       },
     });

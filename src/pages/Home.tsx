@@ -1,61 +1,62 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   Shield,
   Clock,
-  Star,
-  CheckCircle,
+  CheckCircle2,
   Phone,
   Sparkles,
   ChevronDown,
-  Smartphone,
-  QrCode,
-  Award,
   Zap,
-  Users,
   Check,
-  Building,
-  Wrench,
   Search,
   MapPin,
+  FileText,
+  CreditCard,
+  Headphones,
+  Wrench,
+  Calendar,
+  AlertTriangle,
+  ArrowUpRight,
+  Star,
+  Award,
+  Crown,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "@/components/ui/dialog";
-import { SearchBar } from "@/components/ui/search-bar";
-import { LogoBadge } from "@/components/shared/Logo";
 import { ServiceCard } from "@/components/ui/service-card";
-import { MembershipCard } from "@/components/ui/membership-card";
-import { ReviewCard } from "@/components/ui/review-card";
 import { useCartStore } from "@/store/cart.store";
+import { useAuthStore } from "@/store/auth.store";
 import { ROUTES } from "@/constants/routes";
 import {
   SERVICE_CATEGORIES,
   POPULAR_SERVICES,
   EMERGENCY_SERVICES,
   WHY_HOMEEFIX,
-  HOMEEFIX_PROMISE,
+  OPERATIONAL_PILLARS,
+  HOMEEFIX_GUARANTEE_PILLARS,
   TESTIMONIALS,
   BLOG_ARTICLES,
   HOMEPAGE_FAQS,
   APP_CONFIG,
+  OPERATIONAL_CITIES,
 } from "@/constants/services";
 
-/* ─── Framer Motion Animation Variants ─── */
-
+/* ─── Motion Variants ─── */
 const fadeUp = {
-  hidden: { opacity: 0, y: 24 },
+  hidden: { opacity: 0, y: 20 },
   visible: (i: number = 0) => ({
     opacity: 1,
     y: 0,
     transition: {
-      duration: 0.5,
-      delay: i * 0.08,
+      duration: 0.45,
+      delay: i * 0.06,
       ease: "easeOut" as const,
     },
   }),
@@ -64,16 +65,19 @@ const fadeUp = {
 const stagger = {
   visible: {
     transition: {
-      staggerChildren: 0.06,
+      staggerChildren: 0.05,
     },
   },
 };
 
 export default function Home() {
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
   const { items, addItem, removeItem } = useCartStore();
-  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+  const { user, isAuthenticated } = useAuthStore();
+
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [location, setLocation] = useState("Salt Lake, Kolkata");
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [customPincode, setCustomPincode] = useState("");
@@ -81,14 +85,35 @@ export default function Home() {
   const [notifyInput, setNotifyInput] = useState("");
   const [notifySuccess, setNotifySuccess] = useState<string | null>(null);
 
-  const searchSuggestions = [
-    "AC Deep Cleaning & Service",
-    "Bathroom Plumbing Repair",
-    "Switch & MCB Installation",
-    "Sofa Shampoo Cleaning",
-    "Cockroach Pest Control",
-    "Door Lock Repair",
-  ];
+  // FAQ Accordion State
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  // Interactive Booking Preview State
+  const [previewServiceSlug, setPreviewServiceSlug] = useState("ceiling-fan-installation");
+  const [previewSlot, setPreviewSlot] = useState("Morning (09:00 AM - 12:00 PM)");
+
+  // Mobile Sticky CTA trigger
+  const [showMobileSticky, setShowMobileSticky] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowMobileSticky(window.scrollY > 480);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Filtered catalogue for live search dropdown
+  const filteredServices = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase();
+    return POPULAR_SERVICES.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.shortDescription.toLowerCase().includes(q) ||
+        s.category.name.toLowerCase().includes(q)
+    );
+  }, [searchQuery]);
 
   const handleToggleAddService = (service: any) => {
     const isAlreadyAdded = items.some((i) => i.id === service.id);
@@ -99,251 +124,438 @@ export default function Home() {
     }
   };
 
-  const handleSearchSubmit = (query: string) => {
-    if (query.trim()) {
-      navigate(`${ROUTES.SERVICES}?q=${encodeURIComponent(query)}`);
+  const handleDirectBook = (service: any) => {
+    if (!items.some((i) => i.id === service.id)) {
+      addItem(service);
+    }
+    navigate(ROUTES.APP_BOOK);
+  };
+
+  const handleSearchSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`${ROUTES.SERVICES}?q=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
+      navigate(ROUTES.SERVICES);
     }
   };
 
-  return (
-    <div className="overflow-hidden bg-background">
-      {/* ─── 1. HERO SECTION ─── */}
-      <section className="relative gradient-hero text-white overflow-hidden">
-        {/* Background Ambient Glows */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-accent/20 blur-3xl" />
-          <div className="absolute -bottom-32 -left-32 h-96 w-96 rounded-full bg-accent/10 blur-3xl" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-150 w-150 rounded-full bg-white/2 blur-3xl" />
-        </div>
+  // Selected preview service item
+  const activePreviewService = useMemo(() => {
+    return (
+      POPULAR_SERVICES.find((s) => s.slug === previewServiceSlug) ||
+      POPULAR_SERVICES[0]
+    );
+  }, [previewServiceSlug]);
 
-        <div className="container-app relative py-12 sm:py-20 lg:py-24">
-          <div className="mx-auto max-w-4xl text-center">
+  return (
+    <div className="overflow-hidden bg-background text-foreground font-sans">
+      {/* ─────────────────────────────────────────────────────────────
+          1. HERO SECTION (Cinematic Video, Height 680-780px Desktop)
+         ───────────────────────────────────────────────────────────── */}
+      <section className="relative min-h-160 md:min-h-180 lg:h-185 flex items-center bg-primary text-white overflow-hidden">
+        {/* Background Cinematic Video */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none opacity-40 mix-blend-screen scale-105 transition-opacity duration-1000"
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4"
+        />
+
+        {/* Localized High-Contrast Lighting (No opaque dark overlay) */}
+        <div className="absolute inset-0 bg-linear-to-r from-primary/95 via-primary/85 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-linear-to-t from-primary via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-[#FF6A00]/15 blur-3xl pointer-events-none" />
+
+        <div className="container-app relative z-10 py-12 md:py-16 lg:py-20">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+            {/* Left Column: Commercial Value Proposition */}
             <motion.div
               initial="hidden"
               animate="visible"
               variants={stagger}
-              className="space-y-6"
+              className="lg:col-span-7 space-y-6 text-left"
             >
-              <motion.div custom={0} variants={fadeUp} className="inline-block">
-                <LogoBadge text="✨ Kolkata's #1 Rated Home Services Platform • 30-Min Arrival" />
+              {/* Eyebrow */}
+              <motion.div variants={fadeUp} custom={0} className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-xs font-bold tracking-wider uppercase text-orange-400">
+                <Shield className="w-3.5 h-3.5 text-[#FF6A00]" />
+                <span>HOME SERVICES, DONE RIGHT.</span>
               </motion.div>
 
               {/* Main Headline */}
               <motion.h1
-                custom={1}
                 variants={fadeUp}
-                className="font-heading text-4xl font-extrabold leading-tight tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl"
+                custom={1}
+                className="font-heading text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] text-white"
               >
-                Expert Home Services
+                Your Home.
                 <br />
-                <span className="text-accent drop-shadow-sm">
-                  At Your Doorstep
-                </span>
+                <span className="text-[#FF6A00]">Fixed Right.</span>
               </motion.h1>
 
-              {/* Subtitle */}
+              {/* Supporting Text */}
               <motion.p
-                custom={2}
                 variants={fadeUp}
-                className="text-base sm:text-lg md:text-xl text-white/80 max-w-2xl mx-auto font-body leading-relaxed"
+                custom={2}
+                className="text-base sm:text-lg text-slate-200 font-normal leading-relaxed max-w-xl"
               >
-                Book top-rated, background-verified professionals for electrical, plumbing, AC servicing, cleaning, painting & more in under 60 seconds.
+                Book verified professionals for repairs, maintenance, cleaning and more—with transparent pricing, digital invoices and dependable service.
               </motion.p>
 
               {/* CTA Buttons */}
               <motion.div
-                custom={3}
                 variants={fadeUp}
-                className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4"
+                custom={3}
+                className="pt-2 flex flex-wrap items-center gap-3 sm:gap-4"
               >
                 <Button
-                  variant="accent"
                   size="lg"
-                  rightIcon={<ArrowRight className="h-5 w-5" />}
-                  className="w-full sm:w-auto px-8 py-3.5 text-base shadow-glow font-semibold"
-                  asChild
+                  className="bg-[#FF6A00] hover:bg-[#E55F00] text-white font-bold text-base px-8 py-3.5 rounded-xl shadow-lg shadow-orange-500/25 active:scale-98 transition-all cursor-pointer"
+                  onClick={() => navigate(ROUTES.APP_BOOK)}
                 >
-                  <Link to={ROUTES.SERVICES}>Book a Service Now</Link>
+                  <span>Book a Service</span>
+                  <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
+
                 <Button
-                  variant="outline"
                   size="lg"
-                  leftIcon={<Phone className="h-5 w-5 text-accent" />}
-                  className="w-full sm:w-auto border border-white/30 bg-white/10 text-white hover:bg-white/20 text-base py-3.5"
-                  onClick={() => window.open(`tel:${APP_CONFIG.supportPhone}`)}
+                  variant="outline"
+                  className="border-white/20 bg-white/5 hover:bg-white/15 text-white font-semibold text-base px-6 py-3.5 rounded-xl backdrop-blur-md cursor-pointer"
+                  onClick={() => {
+                    const el = document.getElementById("categories-section");
+                    el ? el.scrollIntoView({ behavior: "smooth" }) : navigate(ROUTES.SERVICES);
+                  }}
                 >
-                  24/7 Helpline: 1800-123-4567
+                  Explore Services
                 </Button>
+
+                <a
+                  href="#emergency-section"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-300 hover:text-white px-3 py-2 rounded-lg transition-colors"
+                >
+                  <Zap className="w-3.5 h-3.5 text-[#FF6A00]" />
+                  Emergency Service &rarr;
+                </a>
+              </motion.div>
+
+              {/* Compact Trust Indicators (Icons with concise labels) */}
+              <motion.div
+                variants={fadeUp}
+                custom={4}
+                className="pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-white/10"
+              >
+                {[
+                  { label: "Verified Professionals", icon: Shield },
+                  { label: "Transparent Pricing", icon: FileText },
+                  { label: "Service Warranty", icon: Sparkles },
+                  { label: "Digital Invoice", icon: CheckCircle2 },
+                ].map((pill, idx) => {
+                  const Icon = pill.icon;
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm"
+                    >
+                      <Icon className="w-4 h-4 text-[#FF6A00] shrink-0" />
+                      <span className="text-xs font-semibold text-slate-200 leading-tight">
+                        {pill.label}
+                      </span>
+                    </div>
+                  );
+                })}
               </motion.div>
             </motion.div>
 
-            {/* Live Metrics Ribbon */}
+            {/* Right Column: Interactive Quick-Booking Preview Card (Desktop) */}
             <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.6 }}
-              className="mt-14 grid grid-cols-2 gap-4 sm:grid-cols-4 rounded-2xl border border-white/15 bg-white/10 p-4 sm:p-6 backdrop-blur-xl"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+              className="hidden lg:block lg:col-span-5"
             >
-              {[
-                { icon: Users, value: "100,000+", label: "Happy Homes Served" },
-                { icon: Star, value: "4.9 ★", label: "Average Service Rating" },
-                { icon: Shield, value: "500+", label: "Verified Tradesmen" },
-                { icon: Clock, value: "30 Mins", label: "Emergency Arrival" },
-              ].map((stat, i) => {
-                const Icon = stat.icon;
-                return (
-                  <div key={i} className="text-center space-y-1">
-                    <Icon className="mx-auto h-5 w-5 text-accent mb-1" />
-                    <div className="font-heading text-xl sm:text-2xl font-bold text-white">
-                      {stat.value}
-                    </div>
-                    <div className="text-[11px] sm:text-xs text-white/60">
-                      {stat.label}
+              <Card className="p-6 bg-white/10 backdrop-blur-2xl border border-white/20 rounded-3xl shadow-2xl text-white space-y-5">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                      Live Booking Preview
+                    </span>
+                  </div>
+                  <Badge variant="outline" className="border-white/30 text-[11px] text-orange-300">
+                    Kolkata Hub
+                  </Badge>
+                </div>
+
+                {/* Service Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300 block">
+                    Choose Service
+                  </label>
+                  <select
+                    value={previewServiceSlug}
+                    onChange={(e) => setPreviewServiceSlug(e.target.value)}
+                    className="w-full h-11 px-3.5 bg-slate-900/80 border border-white/20 rounded-xl text-sm font-semibold text-white focus:outline-none focus:border-[#FF6A00] cursor-pointer"
+                  >
+                    {POPULAR_SERVICES.map((s) => (
+                      <option key={s.slug} value={s.slug} className="bg-primary text-white">
+                        {s.name} — {s.pricingLabel || formatCurrency(s.discountedPrice || s.basePrice)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Professional Assignment Status */}
+                <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-emerald-400" />
+                    <div>
+                      <span className="font-semibold block text-slate-200">Verified Professional</span>
+                      <span className="text-[11px] text-slate-400">Assigned automatically on booking</span>
                     </div>
                   </div>
-                );
-              })}
+                  <span className="text-emerald-400 font-bold text-[11px]">Ready</span>
+                </div>
+
+                {/* Slot Selector */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300 block">
+                    Available Time Slot
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {[
+                      "Morning (09:00 - 12:00)",
+                      "Afternoon (12:00 - 16:00)",
+                      "Evening (16:00 - 20:00)",
+                      "Emergency Slot (ASAP)",
+                    ].map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        onClick={() => setPreviewSlot(slot)}
+                        className={cn(
+                          "p-2 rounded-xl text-left border text-[11px] font-medium transition-all cursor-pointer truncate",
+                          previewSlot.startsWith(slot.split(" ")[0])
+                            ? "bg-[#FF6A00] border-[#FF6A00] text-white font-bold shadow-sm"
+                            : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"
+                        )}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Price Breakdown Preview */}
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] text-slate-400 block">Upfront Estimate</span>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-white/80 font-medium">Auto-dispatch SLA</span>
+                  </div>
+                  <span className="font-bold text-emerald-400">&lt; 15 mins</span>
+                </div>
+
+                {/* Direct CTA */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const found = POPULAR_SERVICES.find((s) => s.slug === previewServiceSlug) || POPULAR_SERVICES[0];
+                    handleDirectBook(found);
+                  }}
+                  className="w-full h-12 rounded-xl bg-[#FF6A00] hover:bg-[#E55F00] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#FF6A00]/25 transition-all cursor-pointer active:scale-[0.99]"
+                >
+                  Confirm &amp; Proceed to Slot Selection
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </Card>
             </motion.div>
           </div>
         </div>
+      </section>
 
-        {/* Bottom Curved Wave Divider */}
-        <div className="relative bottom-0 left-0 right-0">
-          <svg
-            viewBox="0 0 1440 80"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-full h-auto block"
-            preserveAspectRatio="none"
-          >
-            <path
-              d="M0,32 C320,80 960,0 1440,48 L1440,80 L0,80 Z"
-              fill="var(--color-background)"
-            />
-          </svg>
+      {/* ─────────────────────────────────────────────────────────────
+          2. LOCATION SELECTOR & LIVE SEARCH
+         ───────────────────────────────────────────────────────────── */}
+      <section className="relative -mt-6 z-20 container-app">
+        <div className="bg-surface border border-border/80 rounded-3xl shadow-xl p-4 sm:p-5">
+          <div className="flex items-center justify-between gap-4 mb-3">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-[#FF6A00]">
+              What do you need help with today?
+            </h2>
+          </div>
+
+          <form onSubmit={handleSearchSubmit} className="relative flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
+            {/* Location Selector Button */}
+            <button
+              type="button"
+              onClick={() => setShowLocationModal(true)}
+              className="w-full sm:w-auto flex items-center justify-between gap-2 px-3.5 py-3 rounded-2xl bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-semibold shrink-0 cursor-pointer border border-slate-200/60 dark:border-slate-700/60"
+            >
+              <div className="flex items-center gap-1.5">
+                <MapPin className="w-4 h-4 text-[#FF6A00] shrink-0" />
+                <span className="truncate max-w-32.5">{location}</span>
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            {/* Live Search Input */}
+            <div className="relative flex-1 w-full">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 200)}
+                placeholder="Search for a service, e.g. fan installation, AC repair, leakage..."
+                className="pl-10 pr-4 h-12 text-sm rounded-2xl border-slate-200 dark:border-slate-700 w-full"
+              />
+
+              {/* Autocomplete Dropdown */}
+              <AnimatePresence>
+                {searchFocused && filteredServices.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-primary border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-50 divide-y divide-slate-100 dark:divide-slate-800"
+                  >
+                    {filteredServices.map((service) => (
+                      <div
+                        key={service.id}
+                        className="p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 flex items-center justify-between gap-3 transition-colors"
+                      >
+                        <div className="space-y-0.5">
+                          <Link
+                            to={`/services/${service.category.slug}/${service.slug}`}
+                            className="text-sm font-bold text-slate-900 dark:text-white hover:text-[#FF6A00] block"
+                          >
+                            {service.name}
+                          </Link>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                            {service.category.name} • {service.duration} mins • {service.pricingLabel || formatCurrency(service.discountedPrice || service.basePrice)}
+                          </span>
+                        </div>
+
+                        <Button
+                          size="sm"
+                          className="bg-[#FF6A00] hover:bg-[#E55F00] text-white text-xs font-bold rounded-xl"
+                          onClick={() => handleDirectBook(service)}
+                        >
+                          Book
+                        </Button>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Search Submit Button */}
+            <Button
+              type="submit"
+              className="w-full sm:w-auto h-12 px-6 bg-primary hover:bg-[#143560] text-white font-bold rounded-2xl text-sm shrink-0 cursor-pointer"
+            >
+              Search
+            </Button>
+          </form>
         </div>
       </section>
 
-      {/* ─── 2. LIVE SEARCH BAR SECTION ─── */}
-      <section className="-mt-8 relative z-20 container-app">
-        <div className="mx-auto max-w-3xl">
-          <SearchBar
-            value={searchQuery}
-            onChange={setSearchQuery}
-            onSearch={handleSearchSubmit}
-            suggestions={searchSuggestions}
-            onSelectSuggestion={(suggestion) => {
-              navigate(`${ROUTES.SERVICES}?q=${encodeURIComponent(suggestion)}`);
-            }}
-            location={location}
-            onLocationClick={() => setShowLocationModal(true)}
-            onFilterClick={() => navigate(ROUTES.SERVICES)}
-            className="shadow-2xl"
-          />
+      {/* ─────────────────────────────────────────────────────────────
+          3. SERVICE CATEGORIES (All 17 Categories, Larger Cards)
+         ───────────────────────────────────────────────────────────── */}
+      <section id="categories-section" className="container-app py-16 sm:py-24">
+        <div className="text-center space-y-3 mb-12">
+          <Badge variant="accent" className="px-3 py-1 text-xs uppercase font-bold tracking-wider">
+            Explore Home Services
+          </Badge>
+          <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-primary dark:text-white">
+            Professional Help for Every Corner of Your Home
+          </h2>
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
+            17 specialized trade categories with standard rate cards, vetted technicians, and transparent digital billing.
+          </p>
         </div>
-      </section>
 
-      {/* ─── 3. CATEGORIES GRID (15 CATEGORIES) ─── */}
-      <section className="container-app py-16 sm:py-24">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-100px" }}
-          variants={stagger}
-          className="text-center mb-12"
-        >
-          <motion.div custom={0} variants={fadeUp}>
-            <Badge variant="accent" className="mb-3 px-3 py-1">
-              Explore Services
-            </Badge>
-          </motion.div>
-          <motion.h2
-            custom={1}
-            variants={fadeUp}
-            className="font-heading text-3xl font-bold text-primary sm:text-4xl"
-          >
-            What do you need help with today?
-          </motion.h2>
-          <motion.p
-            custom={2}
-            variants={fadeUp}
-            className="mt-3 text-foreground-secondary max-w-2xl mx-auto text-sm sm:text-base"
-          >
-            Select from 15 specialized home service categories. Every job is backed by fixed pricing and our 30-day warranty.
-          </motion.p>
-        </motion.div>
-
-        {/* 15 Categories Grid */}
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-50px" }}
-          variants={stagger}
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 sm:gap-4 lg:gap-5"
-        >
-          {SERVICE_CATEGORIES.map((category, i) => (
-            <motion.div key={category.id} custom={i} variants={fadeUp}>
-              <Link to={`${ROUTES.SERVICES}/${category.slug}`}>
-                <Card
-                  hover
-                  className="group text-center p-5 h-full flex flex-col items-center justify-between border border-border/80 hover:border-accent transition-all duration-300 hover:shadow-card-hover"
-                >
-                  <div className="space-y-3 flex flex-col items-center">
-                    <div
-                      className="flex h-14 w-14 items-center justify-center rounded-2xl text-2xl transition-transform duration-300 group-hover:scale-110 shadow-xs"
-                      style={{
-                        backgroundColor: `${category.color}15`,
-                      }}
-                    >
-                      {category.icon}
-                    </div>
-                    <div>
-                      <h3 className="font-heading text-sm font-semibold text-primary group-hover:text-accent transition-colors">
-                        {category.name}
-                      </h3>
-                      <p className="mt-1 text-[11px] text-foreground-muted line-clamp-2 leading-relaxed hidden sm:block">
-                        {category.description}
-                      </p>
-                    </div>
+        {/* 17 Categories Grid (Desktop Grid, Mobile Horizontal Carousel) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-4 lg:gap-5">
+          {SERVICE_CATEGORIES.map((category) => (
+            <Link
+              key={category.id}
+              to={`${ROUTES.SERVICES}/${category.slug}`}
+              className="group block"
+            >
+              <Card
+                hover
+                className="p-5 h-full flex flex-col items-center justify-between text-center border-slate-200/80 dark:border-slate-800 hover:border-[#FF6A00] rounded-3xl transition-all duration-300 hover:shadow-lg bg-white dark:bg-slate-900/60"
+              >
+                <div className="space-y-3 flex flex-col items-center w-full">
+                  <div
+                    className="flex h-16 w-16 items-center justify-center rounded-2xl text-3xl transition-transform duration-300 group-hover:scale-110 shadow-xs"
+                    style={{ backgroundColor: `${category.color}15` }}
+                  >
+                    {category.icon}
                   </div>
 
-                  <span className="mt-3 text-[10px] font-semibold text-foreground-muted bg-muted px-2 py-0.5 rounded-full group-hover:bg-accent/10 group-hover:text-accent transition-colors">
-                    {category.count} services
-                  </span>
-                </Card>
-              </Link>
-            </motion.div>
+                  <div>
+                    <h3 className="font-heading text-sm sm:text-base font-bold text-slate-900 dark:text-white group-hover:text-[#FF6A00] transition-colors leading-tight">
+                      {category.name}
+                    </h3>
+                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">
+                      {category.description}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 w-full flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  <span>{category.count} services</span>
+                  <span className="text-[#FF6A00]">From ₹{category.startingPrice}</span>
+                </div>
+              </Card>
+            </Link>
           ))}
-        </motion.div>
+        </div>
       </section>
 
-      {/* ─── 4. POPULAR SERVICES SECTION ─── */}
-      <section className="bg-surface py-16 sm:py-24 border-y border-border">
+      {/* ─────────────────────────────────────────────────────────────
+          4. POPULAR SERVICES NEAR YOU (High Visual Hierarchy)
+         ───────────────────────────────────────────────────────────── */}
+      <section className="bg-slate-50 dark:bg-slate-900/40 py-16 sm:py-24 border-y border-slate-200/60 dark:border-slate-800">
         <div className="container-app">
-          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-10">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
             <div>
-              <Badge variant="accent" className="mb-2">
-                Most Booked
-              </Badge>
-              <h2 className="font-heading text-2xl sm:text-3xl font-bold text-primary">
-                Popular Services in Your Area
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 text-[#FF6A00] text-xs font-bold uppercase tracking-wider mb-2">
+                <span>Most Requested</span>
+              </div>
+              <h2 className="font-heading text-2xl sm:text-3xl lg:text-4xl font-extrabold text-primary dark:text-white">
+                Popular Services Near You
               </h2>
-              <p className="text-xs sm:text-sm text-foreground-secondary mt-1">
-                Highest rated services booked by homeowners this week
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1">
+                Transparent rates with guaranteed service warranty and background-checked technicians.
               </p>
             </div>
 
             <Button
               variant="outline"
               size="sm"
-              rightIcon={<ArrowRight className="h-4 w-4" />}
+              className="border-slate-300 dark:border-slate-700 text-xs sm:text-sm font-semibold self-start sm:self-auto"
               asChild
             >
-              <Link to={ROUTES.SERVICES}>Browse All Services</Link>
+              <Link to={ROUTES.SERVICES}>
+                <span>Browse All Services</span>
+                <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+              </Link>
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Cards Grid (3 or 4 per row desktop) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {POPULAR_SERVICES.map((service) => (
               <ServiceCard
                 key={service.id}
@@ -351,65 +563,75 @@ export default function Home() {
                 isAdded={items.some((i) => i.id === service.id)}
                 onAdd={handleToggleAddService}
                 onRemove={handleToggleAddService}
+                onBookNow={handleDirectBook}
               />
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── 5. EMERGENCY 24/7 SERVICES BANNER ─── */}
-      <section className="container-app py-16">
-        <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-red-600 via-rose-600 to-orange-600 text-white p-8 sm:p-12 shadow-2xl">
-          {/* Background Ambient Circle */}
-          <div className="absolute -top-24 -right-24 h-80 w-80 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+      {/* ─────────────────────────────────────────────────────────────
+          5. EMERGENCY SECTION (Restrained Navy + Orange Palette)
+         ───────────────────────────────────────────────────────────── */}
+      <section id="emergency-section" className="container-app py-16">
+        <div className="relative overflow-hidden rounded-3xl bg-primary border border-orange-500/30 text-white p-8 sm:p-12 shadow-xl">
+          {/* Subtle warm accent lighting */}
+          <div className="absolute -top-24 -right-24 h-80 w-80 rounded-full bg-[#FF6A00]/15 blur-3xl pointer-events-none" />
 
-          <div className="relative z-10 grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-center">
-            {/* Left Info */}
+          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Left Emergency Information */}
             <div className="lg:col-span-7 space-y-4">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/20 px-3.5 py-1 text-xs font-bold uppercase tracking-wider text-white backdrop-blur-md">
-                <Zap className="h-4 w-4 text-yellow-300 fill-yellow-300 animate-bounce" />
-                24/7 Immediate Dispatch
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-bold uppercase tracking-wider">
+                <AlertTriangle className="w-3.5 h-3.5 text-[#FF6A00]" />
+                <span>Priority Emergency Dispatch</span>
               </div>
 
               <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-white leading-tight">
-                Emergency Home Breakdown?
+                Home Emergency?
                 <br />
-                <span className="text-yellow-300">30-Minute Arrival Guaranteed!</span>
+                <span className="text-[#FF6A00]">Get help when you need it.</span>
               </h2>
 
-              <p className="text-sm sm:text-base text-white/90 max-w-xl leading-relaxed">
-                Water pipe burst, sudden power outage, locked out of house, or gas smells? Our fast-response emergency mechanics are on standby 24/7.
+              <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl">
+                Emergency service is available for eligible categories (pipe bursts, total blackouts, lockouts) across Kolkata operational hubs. Starting inspection fee: ₹499.
               </p>
 
-              <div className="flex flex-wrap gap-3 pt-2">
+              <div className="flex flex-wrap items-center gap-3 pt-2">
                 <Button
-                  variant="accent"
                   size="lg"
-                  className="bg-yellow-400 text-primary hover:bg-yellow-300 font-bold shadow-lg text-sm sm:text-base"
-                  onClick={() => window.open(`tel:${APP_CONFIG.supportPhone}`)}
-                  leftIcon={<Phone className="h-5 w-5 fill-primary" />}
+                  className="bg-[#FF6A00] hover:bg-[#E55F00] text-white font-bold text-sm sm:text-base px-6 py-3.5 rounded-xl shadow-lg shadow-orange-500/25 cursor-pointer"
+                  onClick={() => navigate(`${ROUTES.APP_BOOK}?emergency=true`)}
                 >
-                  Call Emergency Hotline
+                  Request Emergency Service
+                </Button>
+
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="border-white/20 bg-white/5 hover:bg-white/10 text-white text-sm sm:text-base px-5 py-3.5 rounded-xl"
+                  onClick={() => window.open(`tel:${APP_CONFIG.supportPhone}`)}
+                >
+                  <Phone className="w-4 h-4 mr-2 text-[#FF6A00]" />
+                  Call Hotline: 1800-123-4567
                 </Button>
               </div>
             </div>
 
-            {/* Right Emergency Grid Tiles */}
-            <div className="lg:col-span-5 grid grid-cols-2 gap-3">
+            {/* Right Emergency Category Tiles */}
+            <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
               {EMERGENCY_SERVICES.map((emg) => (
                 <div
                   key={emg.id}
-                  className="rounded-2xl bg-white/15 p-4 backdrop-blur-md border border-white/20 space-y-2 text-left"
+                  className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-start gap-3 hover:bg-white/10 transition-colors"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl">{emg.icon}</span>
-                    <span className="text-[10px] font-bold text-yellow-300 bg-black/30 px-2 py-0.5 rounded-full">
-                      {emg.arrival}
+                  <span className="text-2xl p-2 rounded-xl bg-white/5 shrink-0">{emg.icon}</span>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-white">{emg.title}</h4>
+                    <p className="text-[11px] text-slate-300 leading-tight mt-0.5">{emg.description}</p>
+                    <span className="inline-block mt-1 text-[10px] font-semibold text-orange-300">
+                      Standard Inspection: ₹{emg.baseInspectionFee}
                     </span>
                   </div>
-                  <h4 className="font-heading text-xs font-bold text-white line-clamp-2">
-                    {emg.title}
-                  </h4>
                 </div>
               ))}
             </div>
@@ -417,123 +639,57 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── 6. WHY HOME-E-FIX (4 PILLARS) ─── */}
-      <section className="bg-surface py-16 sm:py-24 border-y border-border">
+      {/* ─────────────────────────────────────────────────────────────
+          6. WHY HOME-E-FIX? (4 Core Pillars + 4 Operational Points)
+         ───────────────────────────────────────────────────────────── */}
+      <section className="bg-slate-50 dark:bg-slate-900/40 py-16 sm:py-24 border-y border-slate-200/60 dark:border-slate-800">
         <div className="container-app text-center">
-          <Badge variant="accent" className="mb-3">
-            Why Choose Us
+          <Badge variant="accent" className="mb-3 px-3 py-1 uppercase font-bold text-xs">
+            Why Home-e-Fix?
           </Badge>
-          <h2 className="font-heading text-3xl sm:text-4xl font-bold text-primary">
-            The Home-e-Fix Standard
+          <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-primary dark:text-white">
+            Built on Standards. Backed by Trust.
           </h2>
-          <p className="mt-3 text-sm sm:text-base text-foreground-secondary max-w-2xl mx-auto">
-            We built Home-e-Fix to remove stress, unreliability, and hidden costs from home repairs.
+          <p className="mt-3 text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
+            We built Home-e-Fix to remove stress, guesswork, and unreliability from Indian home maintenance.
           </p>
 
-          <div className="mt-14 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {/* 4 Main Pillars */}
+          <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {WHY_HOMEEFIX.map((pillar) => (
               <Card
                 key={pillar.id}
                 hover
-                className="p-6 text-center space-y-4 border border-border/80"
+                className="p-6 text-left space-y-3.5 border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 rounded-3xl"
               >
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-3xl">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/10 text-2xl text-[#FF6A00]">
                   {pillar.icon}
                 </div>
-                <h3 className="font-heading text-base font-semibold text-primary">
+                <h3 className="font-heading text-base font-bold text-primary dark:text-white">
                   {pillar.title}
                 </h3>
-                <p className="text-xs text-foreground-secondary leading-relaxed">
+                <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                   {pillar.description}
                 </p>
-                <Badge variant="secondary" className="text-[10px] font-bold text-accent">
+                <div className="inline-block text-[11px] font-bold text-[#FF6A00] bg-orange-500/10 px-2.5 py-1 rounded-full">
                   {pillar.highlight}
-                </Badge>
+                </div>
               </Card>
             ))}
           </div>
-        </div>
-      </section>
 
-      {/* ─── 7. HOW IT WORKS ─── */}
-      <section className="container-app py-16 sm:py-24">
-        <div className="text-center mb-14">
-          <Badge variant="accent" className="mb-3">
-            Simple Process
-          </Badge>
-          <h2 className="font-heading text-3xl sm:text-4xl font-bold text-primary">
-            How Home-e-Fix Works
-          </h2>
-          <p className="mt-3 text-sm sm:text-base text-foreground-secondary">
-            Book professional service in 4 simple steps
-          </p>
-        </div>
-
-        <div className="relative grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            {
-              step: "01",
-              title: "Select Service",
-              desc: "Choose from 100+ services with fixed upfront prices.",
-            },
-            {
-              step: "02",
-              title: "Pick Date & Slot",
-              desc: "Select your preferred date, time slot, and home address.",
-            },
-            {
-              step: "03",
-              title: "Verified Pro Arrives",
-              desc: "Track your assigned professional arriving on time with tools.",
-            },
-            {
-              step: "04",
-              title: "Pay After Job",
-              desc: "Inspect the completed job and pay securely via cash/UPI.",
-            },
-          ].map((item, idx) => (
-            <div key={item.step} className="relative text-center p-6 rounded-2xl bg-surface border border-border shadow-xs">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-white font-heading font-extrabold text-base shadow-glow">
-                {item.step}
-              </div>
-              <h3 className="font-heading text-base font-semibold text-primary mb-1">
-                {item.title}
-              </h3>
-              <p className="text-xs text-foreground-secondary leading-relaxed">
-                {item.desc}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ─── 8. HOME-E-FIX PROMISE ─── */}
-      <section className="gradient-hero text-white py-16 sm:py-20 border-y border-white/10">
-        <div className="container-app">
-          <div className="mx-auto max-w-3xl text-center mb-12">
-            <div className="inline-flex items-center gap-2 rounded-full bg-accent/20 px-3 py-1 text-xs font-bold text-accent mb-3">
-              <Shield className="h-4 w-4" />
-              100% Peace of Mind
-            </div>
-            <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-white">
-              The Home-e-Fix Guarantee
-            </h2>
-            <p className="mt-3 text-sm sm:text-base text-white/70">
-              We stand behind every repair and installation with uncompromising quality standards.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {HOMEEFIX_PROMISE.map((item, idx) => (
+          {/* 4 Operational Points */}
+          <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-6 border-t border-slate-200/60 dark:border-slate-800">
+            {OPERATIONAL_PILLARS.map((item) => (
               <div
-                key={idx}
-                className="rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-md space-y-3"
+                key={item.id}
+                className="p-4 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800 text-left space-y-1"
               >
-                <div className="text-3xl mb-2">{item.icon}</div>
-                <h3 className="font-heading text-base font-semibold text-white">
-                  {item.title}
-                </h3>
-                <p className="text-xs text-white/70 leading-relaxed">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <h4 className="text-xs font-bold text-slate-900 dark:text-white">{item.title}</h4>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 pl-6 leading-relaxed">
                   {item.description}
                 </p>
               </div>
@@ -542,86 +698,200 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── 9. MEMBERSHIP SHOWCASE ─── */}
+      {/* ─────────────────────────────────────────────────────────────
+          7. HOW HOME-E-FIX WORKS (4 Sequential Steps)
+         ───────────────────────────────────────────────────────────── */}
       <section className="container-app py-16 sm:py-24">
-        <div className="mx-auto max-w-4xl">
-          <MembershipCard
-            onSubscribe={() => navigate("/dashboard/membership")}
-          />
+        <div className="text-center space-y-3 mb-14">
+          <Badge variant="accent" className="px-3 py-1 uppercase font-bold text-xs">
+            Simple Process
+          </Badge>
+          <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-primary dark:text-white">
+            How Home-e-Fix Works
+          </h2>
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300">
+            Book professional service in 4 simple, transparent steps.
+          </p>
+        </div>
+
+        <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {[
+            {
+              step: "01",
+              title: "Choose a Service",
+              desc: "Browse from 100+ verified home repair & maintenance services with upfront fixed rates.",
+            },
+            {
+              step: "02",
+              title: "Pick Your Time",
+              desc: "Select your preferred date, convenient time slot, and service address.",
+            },
+            {
+              step: "03",
+              title: "Meet Your Professional",
+              desc: "Track your assigned background-checked technician arriving on time with tools.",
+            },
+            {
+              step: "04",
+              title: "Relax — We Handle the Rest",
+              desc: "Inspect the completed job and pay securely via cash, UPI, or card with digital receipt.",
+            },
+          ].map((item, idx) => (
+            <div
+              key={item.step}
+              className="relative text-center p-6 rounded-3xl bg-white dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3"
+            >
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-[#FF6A00] font-heading font-extrabold text-base shadow-sm">
+                {item.step}
+              </div>
+              <h3 className="font-heading text-base font-bold text-slate-900 dark:text-white">
+                {item.title}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                {item.desc}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* ─── 10. TESTIMONIALS ─── */}
-      <section className="bg-surface py-16 sm:py-24 border-y border-border">
-        <div className="container-app">
-          <div className="text-center mb-12">
-            <Badge variant="accent" className="mb-3">
-              Customer Reviews
-            </Badge>
-            <h2 className="font-heading text-3xl sm:text-4xl font-bold text-primary">
-              Loved by 100,000+ Homeowners
+      {/* ─────────────────────────────────────────────────────────────
+          8. THE HOME-E-FIX GUARANTEE (High Trust Visual Section)
+         ───────────────────────────────────────────────────────────── */}
+      <section className="bg-primary text-white py-16 sm:py-24 border-y border-white/10 relative overflow-hidden">
+        <div className="absolute -top-32 -left-32 w-80 h-80 rounded-full bg-[#FF6A00]/10 blur-3xl pointer-events-none" />
+
+        <div className="container-app relative z-10">
+          <div className="mx-auto max-w-3xl text-center mb-14 space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/20 text-[#FF6A00] text-xs font-bold uppercase tracking-wider">
+              <Shield className="w-3.5 h-3.5" />
+              <span>Platform Commitment</span>
+            </div>
+            <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-white">
+              The Home-e-Fix Guarantee
             </h2>
-            <p className="mt-3 text-sm text-foreground-secondary">
-              Real feedback from verified homeowners across India
+            <p className="text-sm sm:text-base text-slate-300">
+              From verified professionals to transparent pricing and digital invoices, every booking is designed around trust.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            {TESTIMONIALS.map((t, idx) => (
-              <ReviewCard
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            {HOMEEFIX_GUARANTEE_PILLARS.map((pillar, idx) => (
+              <div
                 key={idx}
-                userName={t.userName}
-                userAvatar={t.userAvatar}
-                rating={t.rating}
-                date={t.date}
-                comment={t.comment}
-                serviceName={t.serviceName}
-                isVerified={t.isVerified}
-                helpfulCount={t.helpfulCount}
-              />
+                className="p-5 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-md space-y-2.5 text-left"
+              >
+                <div className="text-2xl mb-1">{pillar.icon}</div>
+                <h3 className="font-heading text-sm sm:text-base font-bold text-white">
+                  {pillar.title}
+                </h3>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {pillar.description}
+                </p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ─── 11. BLOG & TIPS ─── */}
-      <section className="container-app py-16 sm:py-24">
-        <div className="flex items-end justify-between mb-10">
-          <div>
-            <Badge variant="accent" className="mb-2">
-              Home Care Guide
+      {/* ─────────────────────────────────────────────────────────────
+          9. CUSTOMER REVIEWS (Authentic Homeowner Reviews)
+         ───────────────────────────────────────────────────────────── */}
+      <section className="bg-slate-50 dark:bg-slate-900/40 py-16 sm:py-24 border-b border-slate-200/60 dark:border-slate-800">
+        <div className="container-app">
+          <div className="text-center space-y-3 mb-12">
+            <Badge variant="accent" className="px-3 py-1 uppercase font-bold text-xs">
+              Verified Feedback
             </Badge>
-            <h2 className="font-heading text-2xl sm:text-3xl font-bold text-primary">
-              Expert Maintenance Tips & Articles
+            <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-primary dark:text-white">
+              Loved by Homeowners
             </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Authentic reviews from verified homeowners following completed jobs.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {TESTIMONIALS.map((t, idx) => (
+              <Card
+                key={idx}
+                hover
+                className="p-6 bg-white dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800 rounded-3xl flex flex-col justify-between space-y-4"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center gap-1 text-amber-500">
+                    {Array.from({ length: t.rating }).map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-amber-500 text-amber-500" />
+                    ))}
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 italic leading-relaxed">
+                    &ldquo;{t.comment}&rdquo;
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">{t.userName}</h4>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block">{t.serviceName}</span>
+                  </div>
+                  <Badge variant="success" className="text-[10px] font-semibold">
+                    Verified Job
+                  </Badge>
+                </div>
+              </Card>
+            ))}
           </div>
         </div>
+      </section>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+      {/* ─────────────────────────────────────────────────────────────
+          10. MAINTENANCE CONTENT & TIPS (Articles)
+         ───────────────────────────────────────────────────────────── */}
+      <section className="container-app py-16 sm:py-24">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
+          <div>
+            <Badge variant="accent" className="mb-2 px-3 py-1 uppercase font-bold text-xs">
+              Home Maintenance Guide
+            </Badge>
+            <h2 className="font-heading text-2xl sm:text-3xl font-extrabold text-primary dark:text-white">
+              Home Maintenance Tips & Best Practices
+            </h2>
+          </div>
+          <Button variant="outline" size="sm" asChild>
+            <Link to={ROUTES.BLOG}>Browse All Guides</Link>
+          </Button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {BLOG_ARTICLES.map((article) => (
-            <Card key={article.id} hover className="overflow-hidden flex flex-col h-full">
-              <div className="aspect-video w-full overflow-hidden bg-muted">
+            <Card
+              key={article.id}
+              hover
+              className="overflow-hidden flex flex-col h-full rounded-3xl border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60"
+            >
+              <div className="aspect-16/10 w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
                 <img
                   src={article.image}
                   alt={article.title}
                   className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
                 />
               </div>
-              <CardContent className="p-5 flex-1 flex flex-col justify-between space-y-3">
+              <CardContent className="p-6 flex-1 flex flex-col justify-between space-y-4">
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-foreground-muted">
-                    <span className="font-semibold text-accent">{article.category}</span>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span className="font-bold text-[#FF6A00]">{article.category}</span>
                     <span>{article.readTime}</span>
                   </div>
-                  <h3 className="font-heading text-base font-semibold text-primary line-clamp-2">
+                  <h3 className="font-heading text-base font-bold text-slate-900 dark:text-white line-clamp-2">
                     {article.title}
                   </h3>
-                  <p className="text-xs text-foreground-secondary line-clamp-2">
+                  <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 leading-relaxed">
                     {article.snippet}
                   </p>
                 </div>
-                <div className="pt-2 text-xs font-semibold text-accent flex items-center gap-1 cursor-pointer hover:underline">
-                  Read Article <ArrowRight className="h-3.5 w-3.5" />
+
+                <div className="pt-2 text-xs font-bold text-[#FF6A00] flex items-center gap-1 cursor-pointer hover:underline">
+                  Read Guide <ArrowRight className="w-3.5 h-3.5" />
                 </div>
               </CardContent>
             </Card>
@@ -629,185 +899,267 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ─── 12. FAQ ACCORDION ─── */}
-      <section className="bg-surface py-16 sm:py-24 border-t border-border">
-        <div className="container-app">
-          <div className="mx-auto max-w-3xl">
-            <div className="text-center mb-12">
-              <Badge variant="accent" className="mb-3">
-                Got Questions?
-              </Badge>
-              <h2 className="font-heading text-3xl sm:text-4xl font-bold text-primary">
-                Frequently Asked Questions
-              </h2>
-            </div>
+      {/* ─────────────────────────────────────────────────────────────
+          11. MEMBERSHIP SHOWCASE (Home-e-Fix PLUS)
+         ───────────────────────────────────────────────────────────── */}
+      <section className="bg-slate-50 dark:bg-slate-900/40 py-16 sm:py-24 border-y border-slate-200/60 dark:border-slate-800">
+        <div className="container-app max-w-4xl">
+          <div className="p-8 sm:p-12 rounded-3xl bg-primary border border-orange-500/30 text-white relative overflow-hidden shadow-2xl">
+            <div className="absolute -top-24 -right-24 h-72 w-72 rounded-full bg-[#FF6A00]/20 blur-3xl pointer-events-none" />
 
-            <div className="space-y-3">
-              {HOMEPAGE_FAQS.map((faq, idx) => {
-                const isOpen = openFaqIndex === idx;
+            <div className="relative z-10 grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+              <div className="md:col-span-8 space-y-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-orange-400 text-xs font-bold uppercase tracking-wider">
+                  <Crown className="w-3.5 h-3.5 text-[#FF6A00]" />
+                  <span>VIP Home Care</span>
+                </div>
 
-                return (
-                  <div
-                    key={idx}
-                    className="rounded-2xl border border-border bg-background overflow-hidden transition-colors"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                      className="flex w-full items-center justify-between p-5 text-left font-heading text-sm sm:text-base font-semibold text-primary hover:text-accent transition-colors cursor-pointer"
-                    >
-                      <span>{faq.question}</span>
-                      <ChevronDown
-                        className={cn(
-                          "h-5 w-5 text-foreground-muted transition-transform duration-200 shrink-0 ml-4",
-                          isOpen && "rotate-180 text-accent"
-                        )}
-                      />
-                    </button>
+                <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-white">
+                  Home-e-Fix <span className="text-[#FF6A00]">PLUS</span>
+                </h2>
 
-                    <AnimatePresence>
-                      {isOpen && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: "auto", opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          <div className="px-5 pb-5 text-xs sm:text-sm text-foreground-secondary leading-relaxed border-t border-border/40 pt-3">
-                            {faq.answer}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  Join our annual home care membership starting at ₹99/month or ₹999/year for priority bookings and guaranteed savings.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 text-xs text-slate-200">
+                  {[
+                    "Priority Booking Queue",
+                    "Annual Home Health Checkup",
+                    "15% Discount on Labour",
+                    "Extended 60-Day Warranty",
+                    "Dedicated Account Manager",
+                  ].map((benefit) => (
+                    <div key={benefit} className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-[#FF6A00] shrink-0" />
+                      <span>{benefit}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Dynamic User Authentication Membership State */}
+                {isAuthenticated && user && (
+                  <div className="p-3 rounded-xl bg-white/10 border border-white/15 text-xs text-slate-200 mt-2">
+                    <span className="font-semibold block">Account Status:</span>
+                    <span className="text-[#FF6A00] font-bold">
+                      Standard Homeowner (Eligible for PLUS VIP Upgrade)
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── 13. MOBILE APP DOWNLOAD CTA ─── */}
-      <section className="container-app py-16">
-        <div className="rounded-3xl gradient-hero text-white p-8 sm:p-12 relative overflow-hidden">
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-12 md:items-center">
-            <div className="md:col-span-7 space-y-4">
-              <Badge variant="accent">Mobile App</Badge>
-              <h2 className="font-heading text-3xl sm:text-4xl font-bold text-white">
-                Book Services Faster on the Home-e-Fix App
-              </h2>
-              <p className="text-sm text-white/80 max-w-md">
-                Get real-time pro tracking, exclusive app-only coupons, and instant 1-tap booking on iOS and Android.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <Button
-                  variant="outline"
-                  className="border border-white/30 bg-white/10 text-white hover:bg-white/20 gap-2"
-                >
-                  <Smartphone className="h-5 w-5 text-accent" />
-                  Google Play Store
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border border-white/30 bg-white/10 text-white hover:bg-white/20 gap-2"
-                >
-                  <Smartphone className="h-5 w-5 text-accent" />
-                  Apple App Store
-                </Button>
+                )}
               </div>
-            </div>
 
-            <div className="md:col-span-5 flex items-center justify-center">
-              <div className="rounded-2xl bg-white/10 p-6 backdrop-blur-md border border-white/20 text-center space-y-3">
-                <QrCode className="mx-auto h-28 w-28 text-white" />
-                <p className="text-xs text-white/70">Scan QR Code to Install App</p>
+              <div className="md:col-span-4 text-center md:text-right space-y-4">
+                <div className="p-5 rounded-2xl bg-white/10 border border-white/15 backdrop-blur-md inline-block text-center w-full max-w-60">
+                  <span className="text-xs text-slate-300 block uppercase tracking-wider">Starting at</span>
+                  <span className="font-heading text-3xl font-extrabold text-white block my-1">
+                    ₹99<span className="text-xs font-normal text-slate-300">/mo</span>
+                  </span>
+                  <span className="text-[11px] text-orange-300 block">Or ₹999 billed annually</span>
+                </div>
+
+                <div>
+                  <Button
+                    size="lg"
+                    className="w-full bg-[#FF6A00] hover:bg-[#E55F00] text-white font-bold rounded-xl shadow-lg shadow-orange-500/20 cursor-pointer"
+                    asChild
+                  >
+                    <Link to={ROUTES.MEMBERSHIP}>Explore PLUS</Link>
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ─── LOCATION SELECTOR DIALOG MODAL ─── */}
+      {/* ─────────────────────────────────────────────────────────────
+          12. FREQUENTLY ASKED QUESTIONS (Accessible Accordion)
+         ───────────────────────────────────────────────────────────── */}
+      <section className="container-app py-16 sm:py-24">
+        <div className="mx-auto max-w-3xl">
+          <div className="text-center space-y-3 mb-12">
+            <Badge variant="accent" className="px-3 py-1 uppercase font-bold text-xs">
+              Clear Policies
+            </Badge>
+            <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-primary dark:text-white">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              Genuine operational guidelines on verification, pricing, warranty, and cancellations.
+            </p>
+          </div>
+
+          <div className="space-y-3.5">
+            {HOMEPAGE_FAQS.map((faq, idx) => {
+              const isOpen = openFaqIndex === idx;
+
+              return (
+                <div
+                  key={idx}
+                  className="rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900/60 overflow-hidden transition-all duration-200"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                    className="flex w-full items-center justify-between p-5 text-left font-heading text-sm sm:text-base font-bold text-primary dark:text-white hover:text-[#FF6A00] dark:hover:text-[#FF6A00] transition-colors cursor-pointer"
+                  >
+                    <span>{faq.question}</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-5 w-5 text-slate-400 transition-transform duration-200 shrink-0 ml-4",
+                        isOpen && "rotate-180 text-[#FF6A00]"
+                      )}
+                    />
+                  </button>
+
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div className="px-5 pb-5 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-slate-800 pt-3">
+                          {faq.answer}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────────────────────────────────────────────
+          13. FINAL BOOKING CTA SECTION
+         ───────────────────────────────────────────────────────────── */}
+      <section className="container-app py-12 pb-20">
+        <div className="rounded-3xl bg-linear-to-r from-primary to-[#143560] text-white p-8 sm:p-14 text-center space-y-6 relative overflow-hidden shadow-2xl border border-white/10">
+          <div className="mx-auto max-w-2xl space-y-3">
+            <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-white">
+              Your home deserves better care.
+            </h2>
+            <p className="text-sm sm:text-base text-slate-200">
+              Book trusted professionals with Home-e-Fix. Transparent pricing, verified tradesmen, and dependable warranty on every job.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Button
+              size="lg"
+              className="bg-[#FF6A00] hover:bg-[#E55F00] text-white font-bold text-base px-8 py-3.5 rounded-xl shadow-lg shadow-orange-500/25 cursor-pointer"
+              asChild
+            >
+              <Link to={ROUTES.APP_BOOK}>Book a Service</Link>
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="border-white/20 bg-white/5 hover:bg-white/10 text-white font-semibold text-base px-6 py-3.5 rounded-xl"
+              asChild
+            >
+              <Link to={ROUTES.BECOME_A_PROFESSIONAL}>Become a Professional</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────────────────────────────────────────────────
+          14. MOBILE STICKY BOOKING ACTION BAR (Appears on Scroll)
+         ───────────────────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showMobileSticky && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="md:hidden fixed bottom-14 inset-x-0 z-40 p-3 bg-white/95 dark:bg-[#07172E]/95 backdrop-blur-xl border-t border-slate-200 dark:border-slate-800 shadow-2xl"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#FF6A00] block">
+                  Quick Booking
+                </span>
+                <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                  Fixed Upfront Pricing
+                </span>
+              </div>
+              <Button
+                size="sm"
+                className="bg-[#FF6A00] hover:bg-[#E55F00] text-white font-bold text-xs px-5 py-2.5 rounded-xl shadow-md cursor-pointer"
+                onClick={() => navigate(ROUTES.APP_BOOK)}
+              >
+                Book a Service
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─────────────────────────────────────────────────────────────
+          15. LOCATION SELECTOR DIALOG MODAL
+         ───────────────────────────────────────────────────────────── */}
       <Dialog open={showLocationModal} onClose={() => setShowLocationModal(false)} size="md">
         <DialogHeader onClose={() => setShowLocationModal(false)}>
           <div className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-accent" />
+            <MapPin className="h-5 w-5 text-[#FF6A00]" />
             <DialogTitle>Select Your Service Location</DialogTitle>
           </div>
         </DialogHeader>
         <DialogContent className="space-y-5">
           {/* Active Startup Notice */}
-          <div className="p-3.5 rounded-xl bg-accent/10 border border-accent/30 space-y-1">
-            <div className="flex items-center gap-2 text-xs font-bold text-accent">
+          <div className="p-3.5 rounded-2xl bg-orange-500/10 border border-orange-500/20 space-y-1">
+            <div className="flex items-center gap-2 text-xs font-bold text-[#FF6A00]">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
               Home-e-Fix Kolkata HQ & Live Operations
             </div>
-            <p className="text-[11px] text-foreground-secondary leading-relaxed">
-              We are a Kolkata-based startup operating across all Kolkata & Howrah zones with 30-minute instant technician arrival.
+            <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+              Operating across all Kolkata and Howrah operational hubs with background-verified technicians and standard rate cards.
             </p>
           </div>
 
-          {/* 1. Live Kolkata Hubs */}
+          {/* Live Kolkata Hubs */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-primary uppercase tracking-wider block">
-                🟢 Live in Kolkata (30-Min Dispatch)
-              </label>
-              <Badge variant="success" className="text-[10px]">9 Active Hubs</Badge>
-            </div>
+            <label className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider block">
+              🟢 Live Hubs in Kolkata
+            </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {[
-                "Salt Lake & Sector V, Kolkata",
-                "New Town & Rajarhat, Kolkata",
-                "Park Street & Camac St, Kolkata",
-                "Ballygunge & Gariahat, Kolkata",
-                "Alipore & New Alipore, Kolkata",
-                "Behala & Thakurpukur, Kolkata",
-                "Dum Dum & Lake Town, Kolkata",
-                "Tollygunge & Jadavpur, Kolkata",
-                "Howrah & Sibpur, Kolkata",
-              ].map((loc) => (
+              {OPERATIONAL_CITIES.activeHubs.map((hub) => (
                 <button
-                  key={loc}
+                  key={hub.id}
                   type="button"
                   onClick={() => {
-                    setLocation(loc);
+                    setLocation(`${hub.name}, Kolkata`);
                     setShowLocationModal(false);
                     setSelectedUpcomingCity(null);
                   }}
                   className={cn(
                     "p-2.5 rounded-xl border text-xs font-medium text-left transition-all cursor-pointer flex items-center gap-1.5",
-                    location === loc
-                      ? "border-accent bg-accent/10 text-accent font-bold"
-                      : "border-border bg-surface hover:border-accent/50 text-foreground"
+                    location.startsWith(hub.name)
+                      ? "border-[#FF6A00] bg-orange-500/10 text-[#FF6A00] font-bold"
+                      : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-orange-300"
                   )}
                 >
-                  <MapPin className="h-3.5 w-3.5 shrink-0 text-accent" />
-                  <span className="truncate">{loc}</span>
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-[#FF6A00]" />
+                  <span className="truncate">{hub.name}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* 2. Expanding Soon Cities */}
-          <div className="pt-3 border-t border-border space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-primary uppercase tracking-wider block">
-                🚀 Expanding Soon (Join Waitlist)
-              </label>
-              <Badge variant="outline" className="text-[10px]">Coming 2026</Badge>
-            </div>
+          {/* Upcoming Cities */}
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+            <label className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider block">
+              🚀 Expanding Soon
+            </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {[
-                { name: "Bengaluru", status: "Launching Q3" },
-                { name: "Mumbai", status: "Launching Q3" },
-                { name: "Delhi - NCR", status: "Launching Q4" },
-                { name: "Hyderabad", status: "Launching Q4" },
-                { name: "Pune", status: "Launching Q4" },
-              ].map((city) => (
+              {OPERATIONAL_CITIES.upcomingCities.map((city) => (
                 <button
-                  key={city.name}
+                  key={city.id}
                   type="button"
                   onClick={() => {
                     setSelectedUpcomingCity(city.name);
@@ -816,24 +1168,23 @@ export default function Home() {
                   className={cn(
                     "p-2.5 rounded-xl border text-xs font-medium text-left transition-all cursor-pointer flex flex-col justify-between",
                     selectedUpcomingCity === city.name
-                      ? "border-accent bg-accent/10 text-accent font-bold"
-                      : "border-border/60 bg-muted/40 hover:border-accent/40 text-foreground-muted"
+                      ? "border-[#FF6A00] bg-orange-500/10 text-[#FF6A00] font-bold"
+                      : "border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-500"
                   )}
                 >
-                  <span className="font-semibold text-primary">{city.name}</span>
-                  <span className="text-[10px] text-accent font-normal mt-1">{city.status}</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">{city.name}</span>
+                  <span className="text-[10px] text-[#FF6A00] font-normal mt-0.5">{city.status}</span>
                 </button>
               ))}
             </div>
 
-            {/* Launch Notification Form */}
             {selectedUpcomingCity && (
-              <div className="p-3.5 rounded-xl bg-surface border border-accent/30 space-y-2.5 mt-2">
-                <div className="text-xs font-bold text-primary flex items-center justify-between">
-                  <span>Get notified when Home-e-Fix launches in {selectedUpcomingCity}!</span>
-                </div>
+              <div className="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-orange-500/30 space-y-2.5 mt-2">
+                <span className="text-xs font-bold text-slate-900 dark:text-white block">
+                  Get notified when Home-e-Fix launches in {selectedUpcomingCity}!
+                </span>
                 {notifySuccess ? (
-                  <div className="text-xs font-semibold text-emerald-500 bg-emerald-500/10 p-2 rounded-lg border border-emerald-500/20">
+                  <div className="text-xs font-semibold text-emerald-600 bg-emerald-500/10 p-2.5 rounded-xl">
                     {notifySuccess}
                   </div>
                 ) : (
@@ -842,14 +1193,14 @@ export default function Home() {
                       placeholder="Enter phone or email..."
                       value={notifyInput}
                       onChange={(e) => setNotifyInput(e.target.value)}
-                      className="text-xs"
+                      className="text-xs h-9 rounded-xl"
                     />
                     <Button
-                      variant="accent"
                       size="sm"
+                      className="bg-[#FF6A00] hover:bg-[#E55F00] text-white text-xs font-bold rounded-xl shrink-0"
                       onClick={() => {
                         if (notifyInput.trim()) {
-                          setNotifySuccess(`🎉 You're on the list for ${selectedUpcomingCity}! We'll send your VIP early launch pass soon.`);
+                          setNotifySuccess(`🎉 You're on the list for ${selectedUpcomingCity}!`);
                           setNotifyInput("");
                         }
                       }}
@@ -862,19 +1213,21 @@ export default function Home() {
             )}
           </div>
 
-          {/* 3. Custom Area or Pincode Input */}
-          <div className="pt-3 border-t border-border space-y-2">
-            <label className="text-xs font-semibold text-primary block">Enter Custom Kolkata Area or Pincode</label>
+          {/* Custom Area Input */}
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+            <label className="text-xs font-semibold text-slate-900 dark:text-white block">
+              Enter Custom Area or Pincode
+            </label>
             <div className="flex gap-2">
               <Input
                 placeholder="e.g. 700091 or Salt Lake Sector V"
                 value={customPincode}
                 onChange={(e) => setCustomPincode(e.target.value)}
-                className="text-xs"
+                className="text-xs h-9 rounded-xl"
               />
               <Button
-                variant="accent"
                 size="sm"
+                className="bg-primary hover:bg-[#143560] text-white text-xs font-bold rounded-xl shrink-0"
                 onClick={() => {
                   if (customPincode.trim()) {
                     setLocation(`${customPincode.trim()}, Kolkata`);

@@ -19,11 +19,13 @@ export function Footer() {
       <div className="container-app relative py-12 lg:py-16">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-5">
           {/* Brand Column */}
-          <div className="lg:col-span-1 space-y-4">
-            <Logo size="md" linkToHome={false} />
-            
-            <p className="text-xs sm:text-sm leading-relaxed text-white/85 font-body">
-              {APP_CONFIG.description}
+          <div className="lg:col-span-1 space-y-3">
+            <Logo size="md" textColor="light" linkToHome={false} />
+            <p className="text-xs font-bold uppercase tracking-wider text-[#FF6A00]">
+              Fixing Homes. Earning Trust.
+            </p>
+            <p className="text-xs sm:text-sm leading-relaxed text-slate-300 font-normal">
+              Book verified professionals for repairs, maintenance, cleaning and more—with transparent pricing, digital invoices and dependable service.
             </p>
 
             {/* Contact Info Card */}
