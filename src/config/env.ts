@@ -32,17 +32,23 @@ const envSchema = z.object({
  * Safe parsed environment variables with fallback flags.
  */
 function parseEnv() {
+  const metaEnv =
+    typeof import.meta !== "undefined" && import.meta.env
+      ? import.meta.env
+      : typeof (globalThis as any).process !== "undefined"
+      ? (globalThis as any).process.env
+      : {};
   const rawEnv = {
-    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
-    VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
-    VITE_SUPABASE_AUTH_CALLBACK_URL: import.meta.env.VITE_SUPABASE_AUTH_CALLBACK_URL,
-    VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
-    VITE_RAZORPAY_KEY_ID: import.meta.env.VITE_RAZORPAY_KEY_ID,
-    VITE_GOOGLE_CLIENT_ID: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-    VITE_MAP_API_KEY: import.meta.env.VITE_MAP_API_KEY,
-    VITE_MAPMYINDIA_MAP_API_KEY: import.meta.env.VITE_MAPMYINDIA_MAP_API_KEY,
-    VITE_MAPMYINDIA_CLIENT_ID: import.meta.env.VITE_MAPMYINDIA_CLIENT_ID,
-    MODE: import.meta.env.MODE || "development",
+    VITE_SUPABASE_URL: metaEnv.VITE_SUPABASE_URL,
+    VITE_SUPABASE_ANON_KEY: metaEnv.VITE_SUPABASE_ANON_KEY,
+    VITE_SUPABASE_AUTH_CALLBACK_URL: metaEnv.VITE_SUPABASE_AUTH_CALLBACK_URL,
+    VITE_API_BASE_URL: metaEnv.VITE_API_BASE_URL,
+    VITE_RAZORPAY_KEY_ID: metaEnv.VITE_RAZORPAY_KEY_ID,
+    VITE_GOOGLE_CLIENT_ID: metaEnv.VITE_GOOGLE_CLIENT_ID,
+    VITE_MAP_API_KEY: metaEnv.VITE_MAP_API_KEY,
+    VITE_MAPMYINDIA_MAP_API_KEY: metaEnv.VITE_MAPMYINDIA_MAP_API_KEY,
+    VITE_MAPMYINDIA_CLIENT_ID: metaEnv.VITE_MAPMYINDIA_CLIENT_ID,
+    MODE: metaEnv.MODE || "development",
   };
 
   const result = envSchema.safeParse(rawEnv);

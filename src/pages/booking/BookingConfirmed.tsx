@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router";
 import { motion } from "framer-motion";
 import {
@@ -18,23 +19,43 @@ import { Badge } from "@/components/ui/badge";
 import { TechnicianCard } from "@/components/ui/technician-card";
 import { ROUTES } from "@/constants/routes";
 import { formatCurrency } from "@/lib/utils";
+import { dbRepository } from "@/services/db/repository";
 
 export default function BookingConfirmed() {
-  const { bookingId = "HEF-894102" } = useParams<{ bookingId: string }>();
+  const { bookingId = "" } = useParams<{ bookingId: string }>();
+  const [booking, setBooking] = useState<any>(() => {
+    return bookingId
+      ? dbRepository.getBookingById(bookingId) || dbRepository.getBookingByReference(bookingId)
+      : null;
+  });
 
-  const assignedTech: any = {
-    id: "tech-1",
-    displayName: "Suresh Reddy",
-    avatar: "https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&q=80",
-    status: "available",
-    experience: 7,
-    rating: 4.9,
-    reviewCount: 340,
-    completedJobs: 620,
-    phone: "+91 98765 43210",
-    specializations: ["Split AC Foam Washing", "Electrical Diagnostics"],
-    verificationStatus: "verified",
-  };
+  useEffect(() => {
+    if (bookingId) {
+      const b = dbRepository.getBookingById(bookingId) || dbRepository.getBookingByReference(bookingId);
+      if (b) setBooking(b);
+    }
+  }, [bookingId]);
+
+  const assignedTech: any = booking?.technician_name
+    ? {
+        id: booking.technician_id || "tech-live",
+        displayName: booking.technician_name,
+        avatar: "https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&q=80",
+        status: "available",
+        experience: 5,
+        rating: 4.8,
+        completedJobs: 120,
+        phone: booking.technician_phone || "+91 98300 00000",
+        specializations: [booking.service_name || "Home Service"],
+        verificationStatus: "verified",
+      }
+    : null;
+
+  const displayAddress = booking?.address
+    ? typeof booking.address === "string"
+      ? booking.address
+      : `${booking.address.streetAddress || booking.address.street || booking.address.address_line_1 || ""}, ${booking.address.city || "Kolkata"} - ${booking.address.pincode || "700064"}`
+    : "Service Location, Kolkata";
 
   return (
     <div className="min-h-screen bg-background py-12 sm:py-16">
@@ -58,7 +79,7 @@ export default function BookingConfirmed() {
               Booking Confirmed!
             </h1>
             <p className="text-xs sm:text-sm text-foreground-secondary mt-1">
-              Booking Reference ID: <span className="font-mono font-bold text-accent">{bookingId}</span>
+              Booking Reference ID: <span className="font-mono font-bold text-accent">{booking?.booking_number || bookingId || "HEF-ORDER"}</span>
             </p>
           </div>
         </motion.div>
@@ -71,25 +92,29 @@ export default function BookingConfirmed() {
               <Clock className="h-5 w-5 text-accent animate-pulse" />
               <div>
                 <div className="text-xs font-bold text-primary">Scheduled Arrival</div>
-                <div className="text-[11px] text-foreground-secondary">Tomorrow, Aug 05 • 10:00 AM - 11:00 AM</div>
+                <div className="text-[11px] text-foreground-secondary">
+                  {booking?.scheduled_date || "Today"} • {booking?.scheduled_time_slot || "Within 60-90 Mins"}
+                </div>
               </div>
             </div>
 
             <Badge variant="secondary" className="text-xs font-bold text-emerald-600 bg-emerald-50">
-              Confirmed & Dispatched
+              {booking?.status || "Confirmed & Dispatched"}
             </Badge>
           </div>
 
           {/* Assigned Technician Card */}
-          <div className="space-y-3">
-            <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
-              <UserCheck className="h-4 w-4 text-accent" /> Assigned Verified Professional
-            </h4>
-            <TechnicianCard
-              technician={assignedTech}
-              onCall={(tech: any) => window.open(`tel:${tech?.phone || "+919876543210"}`)}
-            />
-          </div>
+          {assignedTech && (
+            <div className="space-y-3">
+              <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
+                <UserCheck className="h-4 w-4 text-accent" /> Assigned Verified Professional
+              </h4>
+              <TechnicianCard
+                technician={assignedTech}
+                onCall={(tech: any) => window.open(`tel:${tech?.phone || "+919830000000"}`)}
+              />
+            </div>
+          )}
 
           {/* Service Summary Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border">
@@ -98,7 +123,7 @@ export default function BookingConfirmed() {
                 <MapPin className="h-3.5 w-3.5 text-accent" /> Service Location
               </div>
               <p className="text-xs text-primary font-medium">
-                Flat 402, Rainbow Vistas Rock Gardens, Hitech City, Hyderabad - 500081
+                {displayAddress}
               </p>
             </div>
 

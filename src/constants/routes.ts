@@ -103,6 +103,8 @@ export const ROUTES = {
   ADMIN_REPORTS: "/admin/reports",
   ADMIN_AUDIT_LOGS: "/admin/audit-logs",
   ADMIN_SETTINGS: "/admin/settings",
+  ADMIN_INTEGRATIONS: "/admin/system/integrations",
+  ADMIN_DATA_QUALITY: "/admin/system/data-quality",
 
   // Backward compatibility alias for admin
   ADMIN_DASHBOARD: "/admin/analytics",

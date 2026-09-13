@@ -4,6 +4,9 @@ import { Sidebar } from "./components/Sidebar";
 import { useUIStore } from "@/store/ui.store";
 import type { NavLink } from "@/constants/navigation";
 
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { RouteErrorBoundary } from "@/components/shared/RouteErrorBoundary";
+
 interface DashboardLayoutProps {
   links: NavLink[];
   title?: string;
@@ -30,7 +33,9 @@ export function DashboardLayout({ links, title }: DashboardLayoutProps) {
         )}
       >
         <div className="container-app py-6 lg:py-8">
-          <Outlet />
+          <ErrorBoundary fallback={<RouteErrorBoundary />}>
+            <Outlet />
+          </ErrorBoundary>
         </div>
       </div>
     </div>

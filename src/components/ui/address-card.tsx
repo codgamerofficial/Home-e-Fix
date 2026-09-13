@@ -4,13 +4,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { BookingAddress } from "@/types/booking.types";
+import type { Address } from "@/types/address.types";
 
 export interface AddressCardProps {
-  address: Partial<BookingAddress>;
+  address: Partial<BookingAddress> | Address | any;
   selected?: boolean;
-  onSelect?: (address: Partial<BookingAddress>) => void;
-  onEdit?: (address: Partial<BookingAddress>) => void;
-  onDelete?: (address: Partial<BookingAddress>) => void;
+  onSelect?: (address: any) => void;
+  onEdit?: (address: any) => void;
+  onDelete?: (address: any) => void;
   className?: string;
 }
 
@@ -22,12 +23,20 @@ export function AddressCard({
   onDelete,
   className,
 }: AddressCardProps) {
-  const {
-    label = "Home",
-    fullAddress = "Flat 402, Sunshine Heights, Road No. 12, Hitech City, Hyderabad - 500081",
-    landmark = "Near Mindspace Tech Park",
-    floor = "4th Floor",
-  } = address;
+  const label = address.label || address.title || "Home";
+  const landmark = address.landmark || "";
+  const floor = (address as any).floor || "";
+  const fullAddress =
+    address.fullAddress ||
+    [
+      (address as any).streetAddress || (address as any).address_line_1 || (address as any).house_flat,
+      landmark ? `Near ${landmark}` : null,
+      (address as any).city,
+      (address as any).pincode,
+    ]
+      .filter(Boolean)
+      .join(", ") ||
+    "Address details not specified";
 
   const getTagIcon = (tag: string) => {
     switch (tag.toLowerCase()) {

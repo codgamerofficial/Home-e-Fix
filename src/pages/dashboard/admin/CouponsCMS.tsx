@@ -1,21 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Tag, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { formatCurrency } from "@/lib/utils";
-
-const INITIAL_COUPONS = [
-  { id: "c-101", code: "FIRSTFIX100", title: "Flat ₹100 Off", discount: "₹100 Fixed", minOrder: 299, uses: 1420 },
-  { id: "c-102", code: "HOMEEFIX20", title: "20% Off AC Services", discount: "20% Percentage", minOrder: 499, uses: 890 },
-];
+import { dbRepository } from "@/services/db/repository";
+import { formatCurrency } from "@/lib/currency";
 
 export default function CouponsCMS() {
-  const [coupons, setCoupons] = useState(INITIAL_COUPONS);
+  const [coupons, setCoupons] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [newCode, setNewCode] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newDiscount, setNewDiscount] = useState("150");
+
+  useEffect(() => {
+    const allCoupons = dbRepository.getCoupons();
+    const bookings = dbRepository.getBookings();
+    
+    // Calculate actual redemption count from real database bookings
+    const formatted = allCoupons.map((c) => {
+      const realRedemptions = bookings.filter(
+        (b) => b.coupon_code && b.coupon_code.toUpperCase() === c.code.toUpperCase()
+      ).length;
+      return {
+        ...c,
+        uses: realRedemptions,
+      };
+    });
+    setCoupons(formatted);
+  }, []);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();

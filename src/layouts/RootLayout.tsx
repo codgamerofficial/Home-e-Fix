@@ -1,7 +1,6 @@
 import { Outlet, useLocation } from "react-router";
 import { Navbar, MobileBottomNav, Footer } from "./components";
 import { NotificationToast } from "@/components/shared/NotificationToast";
-import { CommandMenu } from "@/components/shared/CommandMenu";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { FloatingCartBar } from "@/components/shared/FloatingCartBar";
 import { PwaInstallBanner } from "@/components/shared/PwaInstallBanner";
@@ -40,9 +39,8 @@ export function RootLayout() {
       <MobileBottomNav />
       <FloatingCartBar />
       <PwaInstallBanner />
-      <RoleSwitcherWidget />
+      {import.meta.env.DEV && <RoleSwitcherWidget />}
       <NotificationToast />
-      <CommandMenu />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -18,150 +18,134 @@ import {
   ShieldCheck,
   Sparkles,
   AlertCircle,
+  CheckCircle2,
+  Zap,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
-import { TimePicker, type TimeSlotOption } from "@/components/ui/time-picker";
-import { AddressCard } from "@/components/ui/address-card";
 import { ProgressTimeline } from "@/components/ui/progress-timeline";
 import { ROUTES } from "@/constants/routes";
 import { POPULAR_SERVICES } from "@/constants/services";
 import { useCartStore } from "@/store/cart.store";
 import { useAuthStore } from "@/store/auth.store";
 import { displayRazorpayCheckout } from "@/lib/razorpay";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/currency";
+import { formatDate } from "@/lib/date";
 import { dbRepository } from "@/services/db/repository";
-
-/* ─── Mock User Addresses ─── */
-
-const INITIAL_ADDRESSES: any[] = [
-  {
-    id: "addr-1",
-    title: "Home Address",
-    type: "home",
-    streetAddress: "Flat 402, Block CD, Salt Lake Sector 1",
-    landmark: "Near City Centre 1 Mall",
-    city: "Kolkata",
-    state: "West Bengal",
-    pincode: "700064",
-    isDefault: true,
-  },
-  {
-    id: "addr-2",
-    title: "Work Office",
-    type: "work",
-    streetAddress: "Tower 5, Action Area 1, New Town",
-    landmark: "Near Eco Park Gateway 2",
-    city: "Kolkata",
-    state: "West Bengal",
-    pincode: "700156",
-    isDefault: false,
-  },
-];
-
-/* ─── Mock Available Coupons ─── */
-
-const COUPONS_MAP: Record<string, { discount: number; type: "fixed" | "percentage"; minBill: number }> = {
-  FIRSTFIX100: { discount: 100, type: "fixed", minBill: 299 },
-  HOMEEFIX20: { discount: 20, type: "percentage", minBill: 499 },
-  VIPPASS: { discount: 150, type: "fixed", minBill: 399 },
-};
+import { pricingEngine } from "@/services/marketplace/pricing.engine";
+import { serviceabilityEngine } from "@/services/marketplace/serviceability.engine";
+import { slotEngine } from "@/services/marketplace/slot.engine";
+import { paymentOrchestrator } from "@/lib/payments/orchestrator";
 
 export default function BookingWizard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const { items: cartItems, addItem, removeItem, updateQuantity, clearCart, getSubtotal } = useCartStore();
+  const { items: cartItems, addItem, removeItem, clearCart } = useCartStore();
+  const { user } = useAuthStore();
 
   // Wizard Stage (0 to 5)
   const [currentStep, setCurrentStep] = useState<number>(0);
 
   // Selected Service Items fallback
   const selectedServices = cartItems.length > 0 ? cartItems : [POPULAR_SERVICES[0]];
+  const primaryService = selectedServices[0] || POPULAR_SERVICES[0];
+  const categorySlug = (primaryService.category?.slug || primaryService.category || "ac") as string;
 
-  // Address State
-  const [addresses, setAddresses] = useState<any[]>(INITIAL_ADDRESSES);
-  const [selectedAddressId, setSelectedAddressId] = useState<string>("addr-1");
+  // Category-Specific Questions State
+  const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({
+    ac_tonnage: "1.5 Ton (Most Common)",
+    ac_type: "Split AC (High-wall)",
+    plumbing_fixture: "Bathroom washbasin",
+    cleaning_bhk: "2 BHK Apartment",
+    electrician_issue: "Switchboard / Socket burning",
+  });
+
+  // Emergency Option
+  const [isEmergencyRequested, setIsEmergencyRequested] = useState(false);
+
+  // Address State (Dynamically loaded from real user repository)
+  const [addresses, setAddresses] = useState<any[]>(() => dbRepository.getAddresses(user?.id));
+  const [selectedAddressId, setSelectedAddressId] = useState<string>(() => {
+    const saved = dbRepository.getAddresses(user?.id);
+    return saved.length > 0 ? (saved.find((a) => a.isDefault)?.id || saved[0].id) : "";
+  });
   const [showAddAddressModal, setShowAddAddressModal] = useState(false);
   const [newAddrForm, setNewAddrForm] = useState({
-    title: "Home Address",
+    title: "Home",
     type: "home" as "home" | "work" | "other",
     streetAddress: "",
     landmark: "",
-    city: "Hyderabad",
-    pincode: "",
+    city: "Kolkata",
+    pincode: "700064",
   });
 
   // Schedule State
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
-  const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string>("s2");
+  const [selectedSlotId, setSelectedSlotId] = useState<string>("");
 
-  // Problem Details & Photos
-  const [problemDescription, setProblemDescription] = useState("");
-  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([
-    "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&q=80",
-  ]);
+  // Photos & Notes
+  const [customerNotes, setCustomerNotes] = useState("");
+  const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
 
   // Coupon State
   const [couponCode, setCouponCode] = useState("FIRSTFIX100");
-  const [appliedDiscount, setAppliedDiscount] = useState<number>(100);
-  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponNotice, setCouponNotice] = useState<{ valid?: boolean; message?: string }>({});
 
   // Payment Method
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi" | "card" | "wallet">("upi");
+  const [paymentMethod, setPaymentMethod] = useState<"upi" | "card" | "wallet" | "cash">("upi");
+  const [paymentErrorNotice, setPaymentErrorNotice] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Calculation Logic
-  const itemsSubtotal = selectedServices.reduce(
+  // Active Address & Serviceability Check
+  const currentAddress = addresses.find((a) => a.id === selectedAddressId) || addresses[0];
+  const serviceability = useMemo(() => {
+    return serviceabilityEngine.checkPincode(currentAddress?.pincode || "700064", isEmergencyRequested);
+  }, [currentAddress, isEmergencyRequested]);
+
+  // Dynamic Available Slots
+  const generatedSlots = useMemo(() => {
+    if (isEmergencyRequested) {
+      const emSlot = slotEngine.getEmergencySlot();
+      return emSlot ? [emSlot] : [];
+    }
+    return slotEngine.generateSlotsForDate(selectedDate || new Date());
+  }, [selectedDate, isEmergencyRequested]);
+
+  // Set default slot if unset
+  useMemo(() => {
+    if (generatedSlots.length > 0 && !selectedSlotId) {
+      const firstAvail = generatedSlots.find((s) => s.isAvailable);
+      if (firstAvail) setSelectedSlotId(firstAvail.slotId);
+    }
+  }, [generatedSlots, selectedSlotId]);
+
+  // Pricing Calculation via Engine
+  const baseLaborPrice = selectedServices.reduce(
     (sum, s: any) => sum + (s.discountedPrice || s.basePrice || 499) * (s.quantity || 1),
     0
   );
-  const safetyHygieneFee = 29;
-  const taxGst = Math.round(itemsSubtotal * 0.18);
-  const totalAmount = Math.max(0, itemsSubtotal + safetyHygieneFee + taxGst - appliedDiscount);
 
-  // Steps Progress Timeline
-  const wizardSteps = [
-    { title: "Service", status: currentStep > 0 ? "completed" : currentStep === 0 ? "current" : "upcoming" },
-    { title: "Address", status: currentStep > 1 ? "completed" : currentStep === 1 ? "current" : "upcoming" },
-    { title: "Schedule", status: currentStep > 2 ? "completed" : currentStep === 2 ? "current" : "upcoming" },
-    { title: "Details", status: currentStep > 3 ? "completed" : currentStep === 3 ? "current" : "upcoming" },
-    { title: "Summary", status: currentStep > 4 ? "completed" : currentStep === 4 ? "current" : "upcoming" },
-    { title: "Payment", status: currentStep === 5 ? "current" : "upcoming" },
-  ] as const;
+  const isPlusMember = Boolean(user?.isVerified); // PLUS check
 
-  const handleApplyCoupon = () => {
-    setCouponError(null);
-    const code = couponCode.trim().toUpperCase();
-    const c = COUPONS_MAP[code];
+  const pricingBreakdown = useMemo(() => {
+    return pricingEngine.calculate({
+      basePrice: baseLaborPrice,
+      quantity: 1,
+      isEmergency: isEmergencyRequested,
+      couponCode: couponNotice.valid ? couponCode : undefined,
+      isPlusMember,
+    });
+  }, [baseLaborPrice, isEmergencyRequested, couponCode, couponNotice, isPlusMember]);
 
-    if (!c) {
-      setCouponError("Invalid coupon code. Try 'FIRSTFIX100' or 'HOMEEFIX20'");
-      setAppliedDiscount(0);
-      return;
-    }
-
-    if (itemsSubtotal < c.minBill) {
-      setCouponError(`Coupon requires a minimum booking subtotal of ${formatCurrency(c.minBill)}`);
-      setAppliedDiscount(0);
-      return;
-    }
-
-    let discountVal = 0;
-    if (c.type === "fixed") {
-      discountVal = c.discount;
-    } else {
-      discountVal = Math.round((itemsSubtotal * c.discount) / 100);
-    }
-
-    setAppliedDiscount(discountVal);
-  };
-
-  const handleAddPhoto = () => {
-    const fakePhoto = "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=300&q=80";
-    setUploadedPhotos((prev) => [...prev, fakePhoto]);
+  const handleApplyCoupon = (e: React.FormEvent) => {
+    e.preventDefault();
+    const res = pricingEngine.validateCoupon(couponCode, pricingBreakdown.subtotal);
+    setCouponNotice({ valid: res.valid, message: res.message });
   };
 
   const handleCreateAddress = (e: React.FormEvent) => {
@@ -169,683 +153,612 @@ export default function BookingWizard() {
     if (!newAddrForm.streetAddress || !newAddrForm.pincode) return;
 
     const newAddr: any = {
-      id: `addr-${Date.now()}`,
+      userId: user?.id || "usr-guest",
+      user_id: user?.id || "usr-guest",
       title: newAddrForm.title,
       type: newAddrForm.type,
       streetAddress: newAddrForm.streetAddress,
       landmark: newAddrForm.landmark,
       city: newAddrForm.city,
-      state: "Telangana",
+      state: "West Bengal",
       pincode: newAddrForm.pincode,
-      isDefault: false,
+      isDefault: addresses.length === 0,
     };
 
-    setAddresses((prev) => [...prev, newAddr]);
-    setSelectedAddressId(newAddr.id);
+    const saved = dbRepository.saveAddress(newAddr);
+    const updatedList = dbRepository.getAddresses(user?.id);
+    setAddresses(updatedList);
+    setSelectedAddressId(saved.id || (updatedList.length > 0 ? updatedList[updatedList.length - 1].id : ""));
     setShowAddAddressModal(false);
   };
 
-  const { user } = useAuthStore();
-
-  // Payment Notice State
-  const [paymentErrorNotice, setPaymentErrorNotice] = useState<string | null>(null);
-
   const handleConfirmBooking = async () => {
-    setPaymentErrorNotice(null);
-    const primaryService = selectedServices[0] || { id: "s-1", name: "Home Service", category: "ac" };
-    const selectedAddr = addresses.find((a) => a.id === selectedAddressId) || addresses[0];
-
-    const saveBookingRecord = () => {
-      return dbRepository.createBooking({
-        serviceId: primaryService.id,
-        serviceName: primaryService.name,
-        categorySlug: typeof primaryService.category === "string" ? primaryService.category : (primaryService.category as any)?.slug || "ac",
-        customerName: user?.fullName || "Valued Homeowner",
-        customerPhone: user?.phone || "+91 98301 23456",
-        scheduledDate: selectedDate ? selectedDate.toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
-        scheduledTimeSlot: "10:00 AM - 11:00 AM",
-        address: selectedAddr,
-        subtotal: itemsSubtotal,
-        safetyFee: safetyHygieneFee,
-        taxGst: taxGst,
-        discount: appliedDiscount,
-        totalAmount: totalAmount,
-        paymentMethod: paymentMethod.toUpperCase(),
-        customerNotes: problemDescription || "",
-      });
-    };
-
-    // Cash / Pay after service
-    if (paymentMethod === "cash") {
-      const newBooking = saveBookingRecord();
-      clearCart();
-      navigate(`/app/bookings/${newBooking.id}`);
+    if (!serviceability.isServiceable) {
+      setPaymentErrorNotice("Your selected address is outside active service zones. Please choose a serviceable address.");
       return;
     }
 
-    // Razorpay Online Gateway Checkout (UPI, Card, Netbanking)
-    // 1. Create booking in PENDING_PAYMENT state first
-    const pendingBooking = saveBookingRecord();
-    dbRepository.updateBookingPayment(pendingBooking.id, "PROCESSING", paymentMethod.toUpperCase());
+    setIsSubmitting(true);
+    setPaymentErrorNotice(null);
 
-    // 2. Initiate server-verified Razorpay payment flow
-    await displayRazorpayCheckout({
-      bookingId: pendingBooking.id,
-      amount: totalAmount,
-      purpose: "BOOKING",
-      currency: "INR",
-      name: "Home-e-Fix",
-      description: `Payment for ${primaryService.name}`,
-      customerName: user?.fullName || "Valued Customer",
-      customerEmail: user?.email || "customer@homeefix.com",
-      customerPhone: user?.phone || "+91 98301 23456",
-      onSuccess: (paymentId) => {
-        dbRepository.updateBookingPayment(pendingBooking.id, "SUCCESS", paymentMethod.toUpperCase(), paymentId);
-        dbRepository.updateBookingStatus(pendingBooking.id, "CONFIRMED");
-        clearCart();
-        navigate(`/app/bookings/${pendingBooking.id}`);
-      },
-      onCancel: (reason) => {
-        dbRepository.updateBookingPayment(pendingBooking.id, "CANCELLED");
-        setPaymentErrorNotice(`❌ Payment Cancelled: ${reason}`);
-      },
-      onFailure: (err) => {
-        dbRepository.updateBookingPayment(pendingBooking.id, "FAILED");
-        setPaymentErrorNotice(`❌ Payment Failed: ${err}`);
-      },
-    });
+    try {
+      const activeSlot = generatedSlots.find((s) => s.slotId === selectedSlotId);
+      const slotLabel = activeSlot ? activeSlot.timeRangeLabel : "09:00 AM - 11:00 AM";
+
+      const createdBooking = dbRepository.createBooking({
+        serviceId: primaryService.id,
+        serviceName: primaryService.name,
+        categorySlug: categorySlug,
+        customerId: user?.id || "usr-guest",
+        customerName: user?.fullName || "Valued Customer",
+        customerPhone: user?.phone || "+91 98300 00000",
+        customerEmail: user?.email || "customer@homeefix.in",
+        address: currentAddress.streetAddress || "Kolkata Hub",
+        scheduledDate: formatDate(selectedDate || new Date()),
+        scheduledTimeSlot: slotLabel,
+        subtotal: pricingBreakdown.subtotal,
+        safetyFee: pricingBreakdown.safetyFee,
+        taxGst: pricingBreakdown.taxGst,
+        discount: pricingBreakdown.discountCoupon + pricingBreakdown.discountMembership,
+        totalAmount: pricingBreakdown.totalPayableInr,
+        paymentMethod: paymentMethod.toUpperCase(),
+      });
+
+      // If Razorpay online payment selected
+      if (paymentMethod === "upi" || paymentMethod === "card") {
+        try {
+          await displayRazorpayCheckout({
+            amount: pricingBreakdown.totalPayableInr,
+            bookingId: createdBooking.id,
+            purpose: "BOOKING",
+            name: "Home-e-Fix",
+            description: `${primaryService.name} Booking`,
+            customerName: user?.fullName || "Valued Customer",
+            customerEmail: user?.email || "customer@homeefix.in",
+            customerPhone: user?.phone || "9830000000",
+            onSuccess: (paymentId: string) => {
+              dbRepository.updateBookingStatus(createdBooking.id, "CONFIRMED", `Payment verified via Razorpay: ${paymentId}`);
+              clearCart();
+              navigate(`/booking/confirmation/${createdBooking.booking_number}`);
+            },
+            onCancel: () => {
+              setPaymentErrorNotice("Payment window closed. Your booking is placed with pending payment status.");
+              clearCart();
+              navigate(`/booking/confirmation/${createdBooking.booking_number}`);
+            },
+            onFailure: (err) => {
+              console.warn("Payment Gateway failure:", err);
+            },
+          });
+          return;
+        } catch (gatewayErr: any) {
+          console.warn("Payment Gateway fallback to Pay After Service:", gatewayErr);
+        }
+      }
+
+      // Cash after service or instant confirmation
+      clearCart();
+      navigate(`/booking/confirmation/${createdBooking.booking_number}`);
+    } catch (err: any) {
+      setPaymentErrorNotice(err.message || "Failed to create booking. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
+  // Steps Progress
+  const wizardSteps = [
+    { title: "Service", status: currentStep > 0 ? "completed" : currentStep === 0 ? "current" : "upcoming" },
+    { title: "Questions", status: currentStep > 1 ? "completed" : currentStep === 1 ? "current" : "upcoming" },
+    { title: "Address", status: currentStep > 2 ? "completed" : currentStep === 2 ? "current" : "upcoming" },
+    { title: "Slot", status: currentStep > 3 ? "completed" : currentStep === 3 ? "current" : "upcoming" },
+    { title: "Summary", status: currentStep > 4 ? "completed" : currentStep === 4 ? "current" : "upcoming" },
+    { title: "Payment", status: currentStep === 5 ? "current" : "upcoming" },
+  ] as const;
+
   return (
-    <div className="min-h-screen bg-background pb-24">
-      {/* HEADER */}
-      <section className="bg-surface border-b border-border py-6">
-        <div className="container-app flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => {
-              if (currentStep > 0) setCurrentStep(currentStep - 1);
-              else navigate(ROUTES.SERVICES);
-            }}
-            className="flex items-center gap-2 text-xs font-semibold text-foreground-secondary hover:text-primary transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            {currentStep === 0 ? "Back to Catalog" : "Previous Step"}
-          </button>
-
-          <Badge variant="accent" className="px-3 py-1">
-            🔒 256-Bit SSL Secure Checkout
-          </Badge>
+    <div className="container-app py-8 max-w-4xl space-y-8">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="font-heading text-2xl font-extrabold text-primary">
+              Book Home Service
+            </h1>
+            <Badge variant="secondary" className="bg-[#FF6A00]/10 text-[#FF6A00] font-bold text-[10px]">
+              Guaranteed Pricing
+            </Badge>
+          </div>
+          <p className="text-xs text-foreground-secondary mt-1">
+            Service booked in Salt Lake & New Town operational hubs with 30-day warranty
+          </p>
         </div>
-      </section>
 
-      {/* STEPPER PROGRESS */}
-      <div className="container-app py-6 max-w-4xl">
-        <ProgressTimeline steps={wizardSteps as any} orientation="horizontal" />
+        <Button variant="ghost" size="sm" asChild>
+          <button type="button" onClick={() => navigate(-1)} className="text-xs gap-1.5 cursor-pointer">
+            <ArrowLeft className="h-4 w-4" /> Go Back
+          </button>
+        </Button>
       </div>
 
-      {/* WIZARD CONTENT BOX */}
-      <div className="container-app max-w-4xl">
-        <Card className="p-6 sm:p-8 border border-border/80 shadow-lg">
-          <AnimatePresence mode="wait">
-            {/* ─── STAGE 0: SERVICE SELECTION ─── */}
-            {currentStep === 0 && (
-              <motion.div
-                key="step-0"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h2 className="font-heading text-xl sm:text-2xl font-bold text-primary">
-                    1. Review Selected Services
-                  </h2>
-                  <p className="text-xs text-foreground-secondary mt-1">
-                    Confirm your selected items and add recommended spare parts or add-ons.
+      {/* Progress Timeline */}
+      <ProgressTimeline steps={wizardSteps as any} />
+
+      {/* ERROR / NOTICE BANNER */}
+      {paymentErrorNotice && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between gap-3 text-xs font-semibold">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-rose-600 shrink-0" />
+            <span>{paymentErrorNotice}</span>
+          </div>
+          <button onClick={() => setPaymentErrorNotice(null)} className="font-bold px-2 py-0.5">✕</button>
+        </div>
+      )}
+
+      {/* MAIN STEP CARDS */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-6">
+          {/* STEP 0: SERVICE SPEC */}
+          {currentStep === 0 && (
+            <Card className="p-6 border border-border bg-surface space-y-6">
+              <h2 className="font-heading text-lg font-bold text-primary flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-accent" /> Selected Service Package
+              </h2>
+
+              <div className="flex items-start justify-between p-4 rounded-2xl bg-muted/40 border border-border">
+                <div className="space-y-1">
+                  <h3 className="font-bold text-sm text-primary">{primaryService.name}</h3>
+                  <p className="text-xs text-foreground-secondary">
+                    {(primaryService as any).shortDescription || (primaryService as any).description || ""}
+                  </p>
+                  <div className="flex items-center gap-2 pt-2 text-[11px] text-foreground-muted">
+                    <span>⏱️ 45-60 mins</span>
+                    <span>•</span>
+                    <span className="text-success font-bold">🛡️ 30-Day Warranty</span>
+                  </div>
+                </div>
+                <span className="font-mono font-bold text-lg text-[#FF6A00]">
+                  {formatCurrency(baseLaborPrice)}
+                </span>
+              </div>
+
+              {/* Emergency Surcharge Toggle */}
+              <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/50 flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <Zap className="h-4 w-4 text-amber-600 fill-amber-500" />
+                    <span className="font-bold text-xs text-amber-900">Need Emergency Dispatch Within 2 Hours?</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    Priority allocation of closest certified master technician. Emergency visit fee ₹499 applies.
                   </p>
                 </div>
+                <input
+                  type="checkbox"
+                  checked={isEmergencyRequested}
+                  onChange={(e) => setIsEmergencyRequested(e.target.checked)}
+                  className="h-5 w-5 accent-[#FF6A00] cursor-pointer mt-1"
+                />
+              </div>
 
-                <div className="space-y-3">
-                  {selectedServices.map((service) => (
-                    <div
-                      key={service.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-border bg-surface gap-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center text-xl shrink-0">
-                          🛠️
-                        </div>
-                        <div>
-                          <h4 className="font-heading text-sm font-semibold text-primary">
-                            {service.name}
-                          </h4>
-                          <p className="text-xs text-foreground-secondary">
-                            Duration: {service.duration || 45} mins • 30-Day Warranty
-                          </p>
-                        </div>
-                      </div>
+              <div className="flex justify-end">
+                <Button variant="accent" onClick={() => setCurrentStep(1)} className="gap-2">
+                  Continue to Requirements <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
+          )}
 
-                      <div className="flex items-center justify-between sm:justify-end gap-4 border-t sm:border-t-0 pt-2 sm:pt-0 border-border">
-                        {/* Quantity Controls */}
-                        <div className="flex items-center gap-1.5 border border-border rounded-lg p-1 bg-background">
-                          <button
-                            type="button"
-                            onClick={() => updateQuantity(service.id, -1)}
-                            className="h-6 w-6 rounded bg-surface hover:bg-muted text-primary font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
-                          >
-                            -
-                          </button>
-                          <span className="text-xs font-bold px-2 text-primary">
-                            {(service as any).quantity || 1}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => updateQuantity(service.id, 1)}
-                            className="h-6 w-6 rounded bg-surface hover:bg-muted text-primary font-bold text-xs flex items-center justify-center transition-colors cursor-pointer"
-                          >
-                            +
-                          </button>
-                        </div>
+          {/* STEP 1: SERVICE SPECIFIC QUESTIONS */}
+          {currentStep === 1 && (
+            <Card className="p-6 border border-border bg-surface space-y-6">
+              <div>
+                <h2 className="font-heading text-lg font-bold text-primary flex items-center gap-2">
+                  <HelpCircle className="h-5 w-5 text-accent" /> Service Diagnosis Questions
+                </h2>
+                <p className="text-xs text-foreground-secondary mt-1">
+                  Help the technician arrive with the exact replacement materials and diagnostic equipment
+                </p>
+              </div>
 
-                        {/* Price Display */}
-                        <div className="text-right">
-                          <div className="font-heading text-base font-bold text-primary">
-                            {formatCurrency((service.discountedPrice || service.basePrice) * ((service as any).quantity || 1))}
-                          </div>
-                          {service.discountedPrice && service.basePrice > service.discountedPrice && (
-                            <span className="text-[11px] text-foreground-muted line-through block">
-                              {formatCurrency(service.basePrice * ((service as any).quantity || 1))}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Delete Service Button */}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeItem(service.id)}
-                          className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 h-8 w-8 shrink-0"
-                          title="Remove service"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Add-ons Box */}
-                <div className="rounded-xl border border-dashed border-accent/40 bg-accent/5 p-4 space-y-3">
-                  <h4 className="font-heading text-xs font-bold text-accent flex items-center gap-1.5">
-                    <Sparkles className="h-4 w-4" /> Recommended Add-ons
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-background border border-border">
-                      <div>
-                        <div className="text-xs font-semibold text-primary">Post-Service Sanitization Spray</div>
-                        <div className="text-[10px] text-foreground-secondary">+ ₹49</div>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => alert("Sanitization spray added!")}>
-                        + Add
-                      </Button>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-background border border-border">
-                      <div>
-                        <div className="text-xs font-semibold text-primary">6-Month Extended Warranty</div>
-                        <div className="text-[10px] text-foreground-secondary">+ ₹99</div>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => alert("Extended warranty added!")}>
-                        + Add
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* ─── STAGE 1: ADDRESS SELECTION ─── */}
-            {currentStep === 1 && (
-              <motion.div
-                key="step-1"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
-                <div className="flex items-center justify-between">
+              {categorySlug.includes("ac") ? (
+                <div className="space-y-4 text-xs">
                   <div>
-                    <h2 className="font-heading text-xl sm:text-2xl font-bold text-primary">
-                      2. Select Service Address
-                    </h2>
-                    <p className="text-xs text-foreground-secondary mt-1">
-                      Where should our verified professional arrive?
-                    </p>
+                    <label className="font-bold text-primary">AC System Type</label>
+                    <select
+                      value={questionAnswers.ac_type}
+                      onChange={(e) => setQuestionAnswers({ ...questionAnswers, ac_type: e.target.value })}
+                      className="w-full mt-1.5 p-2.5 rounded-xl border border-border bg-surface text-xs"
+                    >
+                      <option>Split AC (High-wall mounted)</option>
+                      <option>Window AC</option>
+                      <option>Inverter Split AC (5 Star)</option>
+                    </select>
                   </div>
+                  <div>
+                    <label className="font-bold text-primary">Approximate Tonnage</label>
+                    <select
+                      value={questionAnswers.ac_tonnage}
+                      onChange={(e) => setQuestionAnswers({ ...questionAnswers, ac_tonnage: e.target.value })}
+                      className="w-full mt-1.5 p-2.5 rounded-xl border border-border bg-surface text-xs"
+                    >
+                      <option>1.0 Ton</option>
+                      <option>1.5 Ton (Most Common)</option>
+                      <option>2.0 Ton or above</option>
+                    </select>
+                  </div>
+                </div>
+              ) : categorySlug.includes("plumb") ? (
+                <div className="space-y-4 text-xs">
+                  <div>
+                    <label className="font-bold text-primary">Fixture Location</label>
+                    <select
+                      value={questionAnswers.plumbing_fixture}
+                      onChange={(e) => setQuestionAnswers({ ...questionAnswers, plumbing_fixture: e.target.value })}
+                      className="w-full mt-1.5 p-2.5 rounded-xl border border-border bg-surface text-xs"
+                    >
+                      <option>Bathroom washbasin</option>
+                      <option>Kitchen sink</option>
+                      <option>Shower mixer area</option>
+                      <option>Toilet cistern / flush tank</option>
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 text-xs">
+                  <div>
+                    <label className="font-bold text-primary">Primary Issue Description</label>
+                    <Input
+                      placeholder="e.g. Loose switch, noisy fan capacitor, leaking water"
+                      value={customerNotes}
+                      onChange={(e) => setCustomerNotes(e.target.value)}
+                      className="text-xs mt-1.5"
+                    />
+                  </div>
+                </div>
+              )}
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    leftIcon={<Plus className="h-4 w-4" />}
-                    onClick={() => setShowAddAddressModal(true)}
-                  >
-                    Add New Address
+              <div className="flex justify-between pt-4 border-t border-border">
+                <Button variant="outline" onClick={() => setCurrentStep(0)}>Back</Button>
+                <Button variant="accent" onClick={() => setCurrentStep(2)} className="gap-2">
+                  Select Address <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {/* STEP 2: ADDRESS & SERVICEABILITY */}
+          {currentStep === 2 && (
+            <Card className="p-6 border border-border bg-surface space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-heading text-lg font-bold text-primary flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-accent" /> Service Location
+                  </h2>
+                  <p className="text-xs text-foreground-secondary mt-1">
+                    Select delivery address to confirm local serviceability
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setShowAddAddressModal(true)} className="text-xs gap-1">
+                  <Plus className="h-3.5 w-3.5" /> Add Address
+                </Button>
+              </div>
+
+              {/* Address Cards */}
+              {addresses.length === 0 ? (
+                <div className="p-8 rounded-2xl border border-dashed border-border text-center space-y-3 bg-muted/20">
+                  <MapPin className="h-8 w-8 text-foreground-muted mx-auto" />
+                  <p className="font-bold text-sm text-primary">No saved addresses found</p>
+                  <p className="text-xs text-foreground-secondary max-w-sm mx-auto">
+                    Please add your service delivery address in Kolkata to verify local serviceability and dispatch slots.
+                  </p>
+                  <Button variant="accent" size="sm" onClick={() => setShowAddAddressModal(true)} className="gap-1.5 font-bold">
+                    <Plus className="h-4 w-4" /> Add Service Address
                   </Button>
                 </div>
-
+              ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {addresses.map((addr) => (
-                    <div
-                      key={addr.id}
-                      onClick={() => setSelectedAddressId(addr.id)}
-                      className="cursor-pointer"
-                    >
-                      <AddressCard
-                        address={addr}
-                        selected={selectedAddressId === addr.id}
-                        onSelect={() => setSelectedAddressId(addr.id)}
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Add Address Form Modal */}
-                {showAddAddressModal && (
-                  <div className="p-4 rounded-xl border border-border bg-surface space-y-4">
-                    <h4 className="font-heading text-sm font-bold text-primary">
-                      Enter New Address Details
-                    </h4>
-                    <form onSubmit={handleCreateAddress} className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[11px] font-semibold text-foreground-secondary">
-                            Address Label (Home / Work)
-                          </label>
-                          <Input
-                            value={newAddrForm.title}
-                            onChange={(e) => setNewAddrForm({ ...newAddrForm, title: e.target.value })}
-                            placeholder="e.g. Home, Parent's House"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[11px] font-semibold text-foreground-secondary">
-                            Pincode
-                          </label>
-                          <Input
-                            value={newAddrForm.pincode}
-                            onChange={(e) => setNewAddrForm({ ...newAddrForm, pincode: e.target.value })}
-                            placeholder="500081"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] font-semibold text-foreground-secondary">
-                          Flat / House No / Building Name
-                        </label>
-                        <Input
-                          value={newAddrForm.streetAddress}
-                          onChange={(e) => setNewAddrForm({ ...newAddrForm, streetAddress: e.target.value })}
-                          placeholder="Flat 102, Green Valley Apartments"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] font-semibold text-foreground-secondary">
-                          Street / Area / Landmark
-                        </label>
-                        <Input
-                          value={newAddrForm.landmark}
-                          onChange={(e) => setNewAddrForm({ ...newAddrForm, landmark: e.target.value })}
-                          placeholder="Near Axis Bank ATM, Madhapur"
-                        />
-                      </div>
-
-                      <div className="flex justify-end gap-2 pt-2">
-                        <Button variant="ghost" size="sm" onClick={() => setShowAddAddressModal(false)}>
-                          Cancel
-                        </Button>
-                        <Button variant="accent" size="sm" type="submit">
-                          Save Address
-                        </Button>
-                      </div>
-                    </form>
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            {/* ─── STAGE 2: DATE & TIME SLOT ─── */}
-            {currentStep === 2 && (
-              <motion.div
-                key="step-2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h2 className="font-heading text-xl sm:text-2xl font-bold text-primary">
-                    3. Select Date & Time Slot
-                  </h2>
-                  <p className="text-xs text-foreground-secondary mt-1">
-                    Choose when you want the technician to visit your home.
-                  </p>
-                </div>
-
-                <div className="space-y-6">
-                  {/* Date Picker */}
-                  <div>
-                    <label className="text-xs font-semibold text-foreground-secondary mb-2 block">
-                      Preferred Date
-                    </label>
-                    <DatePicker
-                      selectedDate={selectedDate}
-                      onSelectDate={setSelectedDate}
-                      minDate={new Date()}
-                    />
-                  </div>
-
-                  {/* Time Slot Picker */}
-                  <div>
-                    <label className="text-xs font-semibold text-foreground-secondary mb-2 block">
-                      Available Time Slots
-                    </label>
-                    <TimePicker
-                      selectedSlotId={selectedTimeSlotId}
-                      onSelectSlot={(slot: TimeSlotOption) => setSelectedTimeSlotId(slot.id)}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* ─── STAGE 3: PROBLEM DETAILS & PHOTO UPLOAD ─── */}
-            {currentStep === 3 && (
-              <motion.div
-                key="step-3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h2 className="font-heading text-xl sm:text-2xl font-bold text-primary">
-                    4. Describe Problem & Upload Photos
-                  </h2>
-                  <p className="text-xs text-foreground-secondary mt-1">
-                    Helping our technician bring the right tools & spare parts.
-                  </p>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-semibold text-foreground-secondary mb-1 block">
-                      Problem Details / Specific Instructions
-                    </label>
-                    <textarea
-                      value={problemDescription}
-                      onChange={(e) => setProblemDescription(e.target.value)}
-                      rows={3}
-                      placeholder="e.g. AC is leaking water from the left side and making a rattling sound..."
-                      className="w-full rounded-xl border border-border bg-background p-3 text-xs text-primary focus:outline-hidden focus:ring-2 focus:ring-accent"
-                    />
-                  </div>
-
-                  {/* Photo Uploader */}
-                  <div>
-                    <label className="text-xs font-semibold text-foreground-secondary mb-2 block">
-                      Attach Photos (Optional)
-                    </label>
-                    <div className="flex flex-wrap items-center gap-3">
-                      {uploadedPhotos.map((photo, idx) => (
-                        <div key={idx} className="relative h-20 w-20 rounded-xl overflow-hidden border border-border group">
-                          <img src={photo} alt="Issue" className="h-full w-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => setUploadedPhotos((prev) => prev.filter((_, i) => i !== idx))}
-                            className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-
-                      <button
-                        type="button"
-                        onClick={handleAddPhoto}
-                        className="h-20 w-20 rounded-xl border-2 border-dashed border-border hover:border-accent flex flex-col items-center justify-center gap-1 text-foreground-muted hover:text-accent transition-colors cursor-pointer"
-                      >
-                        <Upload className="h-5 w-5" />
-                        <span className="text-[10px] font-semibold">Upload</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* ─── STAGE 4: SUMMARY & COUPON ─── */}
-            {currentStep === 4 && (
-              <motion.div
-                key="step-4"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h2 className="font-heading text-xl sm:text-2xl font-bold text-primary">
-                    5. Price Breakdown & Coupon
-                  </h2>
-                  <p className="text-xs text-foreground-secondary mt-1">
-                    Review your itemized invoice before payment.
-                  </p>
-                </div>
-
-                {/* Coupon Input Box */}
-                <div className="rounded-xl border border-border bg-surface p-4 space-y-2">
-                  <label className="text-xs font-semibold text-foreground-secondary flex items-center gap-1.5">
-                    <Tag className="h-4 w-4 text-accent" /> Have a Coupon Code?
-                  </label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value)}
-                      placeholder="e.g. FIRSTFIX100"
-                      className="uppercase"
-                    />
-                    <Button variant="accent" size="sm" onClick={handleApplyCoupon}>
-                      Apply
-                    </Button>
-                  </div>
-                  {couponError && (
-                    <div className="text-[11px] text-red-500 flex items-center gap-1">
-                      <AlertCircle className="h-3.5 w-3.5" /> {couponError}
-                    </div>
-                  )}
-                  {appliedDiscount > 0 && !couponError && (
-                    <div className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                      <CheckCircle className="h-3.5 w-3.5" /> Coupon Applied! Saved {formatCurrency(appliedDiscount)}
-                    </div>
-                  )}
-                </div>
-
-                {/* Itemized Invoice Box */}
-                <div className="rounded-xl border border-border bg-surface p-5 space-y-3 text-xs">
-                  <h4 className="font-heading text-sm font-bold text-primary pb-2 border-b border-border">
-                    Payment Summary
-                  </h4>
-
-                  <div className="flex justify-between text-foreground-secondary">
-                    <span>Service Subtotal ({selectedServices.length} items)</span>
-                    <span>{formatCurrency(itemsSubtotal)}</span>
-                  </div>
-
-                  <div className="flex justify-between text-foreground-secondary">
-                    <span>Safety & Hygiene Fee</span>
-                    <span>{formatCurrency(safetyHygieneFee)}</span>
-                  </div>
-
-                  <div className="flex justify-between text-foreground-secondary">
-                    <span>Taxes & GST (18%)</span>
-                    <span>{formatCurrency(taxGst)}</span>
-                  </div>
-
-                  {appliedDiscount > 0 && (
-                    <div className="flex justify-between text-emerald-600 font-semibold">
-                      <span>Coupon Discount</span>
-                      <span>- {formatCurrency(appliedDiscount)}</span>
-                    </div>
-                  )}
-
-                  <div className="pt-3 border-t border-border flex justify-between font-heading text-base font-bold text-primary">
-                    <span>Total Amount Payable</span>
-                    <span className="text-accent">{formatCurrency(totalAmount)}</span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* ─── STAGE 5: PAYMENT SELECTION ─── */}
-            {currentStep === 5 && (
-              <motion.div
-                key="step-5"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
-                <div>
-                  <h2 className="font-heading text-xl sm:text-2xl font-bold text-primary">
-                    6. Choose Payment Method
-                  </h2>
-                  <p className="text-xs text-foreground-secondary mt-1">
-                    Select how you want to pay for your service.
-                  </p>
-                </div>
-
-                {/* PAYMENT ERROR / CANCELLATION NOTICE BANNER */}
-                {paymentErrorNotice && (
-                  <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-base shrink-0">❌</span>
-                      <span className="text-xs sm:text-sm font-semibold">{paymentErrorNotice}</span>
-                    </div>
-                    <button
-                      onClick={() => setPaymentErrorNotice(null)}
-                      className="text-xs text-rose-400 hover:text-rose-300 font-bold px-2 py-0.5"
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  {[
-                    {
-                      id: "cash",
-                      title: "Pay After Service (Cash / UPI)",
-                      subtitle: "Inspect the completed job, then pay technician directly",
-                      icon: ShieldCheck,
-                    },
-                    {
-                      id: "upi",
-                      title: "Instant UPI (Google Pay, PhonePe, Paytm)",
-                      subtitle: "Pay now via UPI QR code or VPA ID",
-                      icon: Sparkles,
-                    },
-                    {
-                      id: "card",
-                      title: "Credit / Debit Card",
-                      subtitle: "Visa, MasterCard, RuPay cards supported",
-                      icon: CreditCard,
-                    },
-                    {
-                      id: "wallet",
-                      title: "Home-e-Fix Wallet (Balance: ₹500)",
-                      subtitle: "Fastest 1-tap checkout from your wallet",
-                      icon: Wallet,
-                    },
-                  ].map((method) => {
-                    const Icon = method.icon;
-                    const isSelected = paymentMethod === method.id;
-
+                  {addresses.map((addr) => {
+                    const isSelected = selectedAddressId === addr.id;
                     return (
                       <div
-                        key={method.id}
-                        onClick={() => setPaymentMethod(method.id as any)}
-                        className={`flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all ${
+                        key={addr.id}
+                        onClick={() => setSelectedAddressId(addr.id)}
+                        className={`p-4 rounded-2xl border text-left cursor-pointer transition-all ${
                           isSelected
-                            ? "border-accent bg-accent/5 ring-2 ring-accent/30"
-                            : "border-border bg-surface hover:border-accent/50"
+                            ? "border-accent bg-accent/5 ring-2 ring-accent/20"
+                            : "border-border bg-surface hover:border-slate-300"
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
-                            <Icon className="h-5 w-5 text-accent" />
-                          </div>
-                          <div>
-                            <h4 className="font-heading text-xs font-bold text-primary">
-                              {method.title}
-                            </h4>
-                            <p className="text-[11px] text-foreground-secondary">
-                              {method.subtitle}
-                            </p>
-                          </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-primary">{addr.title}</span>
+                          {isSelected && <CheckCircle2 className="h-4 w-4 text-[#FF6A00]" />}
                         </div>
-
-                        <div
-                          className={`h-5 w-5 rounded-full border flex items-center justify-center ${
-                            isSelected ? "border-accent bg-accent text-white" : "border-border"
-                          }`}
-                        >
-                          {isSelected && <CheckCircle className="h-3.5 w-3.5" />}
-                        </div>
+                        <p className="text-xs text-foreground-secondary mt-1 leading-relaxed">
+                          {addr.streetAddress}, {addr.city} - {addr.pincode}
+                        </p>
                       </div>
                     );
                   })}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              )}
 
-          {/* WIZARD BOTTOM ACTIONS */}
-          <div className="mt-8 pt-6 border-t border-border flex items-center justify-between">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (currentStep > 0) setCurrentStep(currentStep - 1);
-              }}
-              disabled={currentStep === 0}
-            >
-              Back
-            </Button>
+              {/* Serviceability Result Box */}
+              <div
+                className={`p-4 rounded-2xl flex items-start gap-3 text-xs ${
+                  serviceability.isServiceable
+                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                    : "bg-rose-50 text-rose-800 border border-rose-200"
+                }`}
+              >
+                {serviceability.isServiceable ? (
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
+                )}
+                <div>
+                  <p className="font-bold">
+                    {serviceability.isServiceable ? "Service Available" : "Out of Service Zone"}
+                  </p>
+                  <p className="mt-0.5 leading-relaxed">
+                    {serviceability.isServiceable
+                      ? `Your location is served by the ${serviceability.zoneCode} operational hub.`
+                      : serviceability.reason}
+                  </p>
+                </div>
+              </div>
 
-            {currentStep < 5 ? (
-              <Button
-                variant="accent"
-                size="sm"
-                rightIcon={<ArrowRight className="h-4 w-4" />}
-                onClick={() => setCurrentStep(currentStep + 1)}
-              >
-                Continue to Next Step
-              </Button>
-            ) : (
-              <Button
-                variant="accent"
-                size="lg"
-                rightIcon={<CheckCircle className="h-5 w-5" />}
-                onClick={handleConfirmBooking}
-                className="font-bold shadow-glow"
-              >
-                Confirm & Book Service ({formatCurrency(totalAmount)})
-              </Button>
-            )}
+              <div className="flex justify-between pt-4 border-t border-border">
+                <Button variant="outline" onClick={() => setCurrentStep(1)}>Back</Button>
+                <Button
+                  variant="accent"
+                  disabled={!serviceability.isServiceable}
+                  onClick={() => setCurrentStep(3)}
+                  className="gap-2"
+                >
+                  Choose Time Slot <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {/* STEP 3: SCHEDULE & SLOTS */}
+          {currentStep === 3 && (
+            <Card className="p-6 border border-border bg-surface space-y-6">
+              <div>
+                <h2 className="font-heading text-lg font-bold text-primary flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-accent" /> Appointment Date & Slot
+                </h2>
+                <p className="text-xs text-foreground-secondary mt-1">
+                  Generated in real-time based on active technician capacity
+                </p>
+              </div>
+
+              {!isEmergencyRequested && (
+                <div>
+                  <label className="text-xs font-bold text-primary mb-2 block">Select Appointment Date</label>
+                  <DatePicker
+                    selectedDate={selectedDate}
+                    onSelectDate={(d: Date) => setSelectedDate(d)}
+                    minDate={new Date()}
+                  />
+                </div>
+              )}
+
+              {/* Slots Grid */}
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-primary block">
+                  {isEmergencyRequested ? "Emergency Arrival Window" : "Available Time Slots"}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {generatedSlots.map((slot) => {
+                    const isSelected = selectedSlotId === slot.slotId;
+                    return (
+                      <button
+                        key={slot.slotId}
+                        type="button"
+                        disabled={!slot.isAvailable}
+                        onClick={() => setSelectedSlotId(slot.slotId)}
+                        className={`p-3.5 rounded-2xl border text-left transition-all ${
+                          !slot.isAvailable
+                            ? "opacity-40 bg-slate-100 border-border cursor-not-allowed"
+                            : isSelected
+                            ? "border-accent bg-accent/5 ring-2 ring-accent/20 cursor-pointer"
+                            : "border-border bg-surface hover:border-slate-300 cursor-pointer"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-primary">{slot.timeRangeLabel}</span>
+                          {isSelected && <CheckCircle2 className="h-4 w-4 text-[#FF6A00]" />}
+                        </div>
+                        <div className="text-[10px] text-foreground-muted mt-1">
+                          {slot.isAvailable ? `Capacity: ${slot.capacityScore} slots open` : "Slot filled / past"}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex justify-between pt-4 border-t border-border">
+                <Button variant="outline" onClick={() => setCurrentStep(2)}>Back</Button>
+                <Button variant="accent" disabled={!selectedSlotId} onClick={() => setCurrentStep(4)} className="gap-2">
+                  Review Summary <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {/* STEP 4: ORDER REVIEW */}
+          {currentStep === 4 && (
+            <Card className="p-6 border border-border bg-surface space-y-6">
+              <div>
+                <h2 className="font-heading text-lg font-bold text-primary flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-accent" /> Booking Review & Coupon
+                </h2>
+                <p className="text-xs text-foreground-secondary mt-1">
+                  Review itemized price and apply coupons or membership discounts
+                </p>
+              </div>
+
+              {/* Coupon Form */}
+              <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                <Input
+                  placeholder="Enter Coupon Code (FIRSTFIX100, HOMEEFIX20)"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  className="text-xs uppercase"
+                />
+                <Button type="submit" variant="outline" size="sm" className="text-xs shrink-0">
+                  Apply Coupon
+                </Button>
+              </form>
+
+              {couponNotice.message && (
+                <p className={`text-xs font-bold ${couponNotice.valid ? "text-emerald-700" : "text-rose-600"}`}>
+                  {couponNotice.message}
+                </p>
+              )}
+
+              {/* PLUS Membership Notice */}
+              {isPlusMember && (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-300 text-amber-900 flex items-center gap-2 text-xs font-bold">
+                  <Sparkles className="h-4 w-4 text-amber-600" />
+                  Home-e-Fix PLUS Member: 20% discount applied on labour + ₹29 safety fee waived!
+                </div>
+              )}
+
+              <div className="flex justify-between pt-4 border-t border-border">
+                <Button variant="outline" onClick={() => setCurrentStep(3)}>Back</Button>
+                <Button variant="accent" onClick={() => setCurrentStep(5)} className="gap-2">
+                  Proceed to Payment <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {/* STEP 5: PAYMENT SELECTION */}
+          {currentStep === 5 && (
+            <Card className="p-6 border border-border bg-surface space-y-6">
+              <div>
+                <h2 className="font-heading text-lg font-bold text-primary flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-accent" /> Select Payment Method
+                </h2>
+                <p className="text-xs text-foreground-secondary mt-1">
+                  100% server-authoritative payment. Cashless online or pay after service completion.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { id: "upi", label: "Instant UPI (GPay, PhonePe, Paytm)", icon: Zap },
+                  { id: "card", label: "Credit / Debit Card (All Banks)", icon: CreditCard },
+                  { id: "wallet", label: "Home-e-Fix Wallet", icon: Wallet },
+                  { id: "cash", label: "Pay After Service Completion", icon: CheckCircle },
+                ].map((pm) => {
+                  const isSelected = paymentMethod === pm.id;
+                  const Icon = pm.icon;
+                  return (
+                    <button
+                      key={pm.id}
+                      type="button"
+                      onClick={() => setPaymentMethod(pm.id as any)}
+                      className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                        isSelected
+                          ? "border-accent bg-accent/5 ring-2 ring-accent/20"
+                          : "border-border bg-surface hover:border-slate-300"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Icon className="h-4 w-4 text-[#FF6A00]" />
+                          <span className="font-bold text-xs text-primary">{pm.label}</span>
+                        </div>
+                        {isSelected && <CheckCircle2 className="h-4 w-4 text-[#FF6A00]" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-between pt-4 border-t border-border">
+                <Button variant="outline" onClick={() => setCurrentStep(4)}>Back</Button>
+                <Button
+                  variant="accent"
+                  size="lg"
+                  disabled={isSubmitting}
+                  onClick={handleConfirmBooking}
+                  className="shadow-glow gap-2"
+                >
+                  {isSubmitting ? "Placing Booking..." : `Confirm Booking • ${formatCurrency(pricingBreakdown.totalPayableInr)}`}
+                </Button>
+              </div>
+            </Card>
+          )}
+        </div>
+
+        {/* Right 1 Column: Authoritative Bill Breakdown */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-24 rounded-3xl border border-border bg-surface p-6 shadow-sm space-y-4">
+            <h3 className="font-heading text-sm font-bold text-primary uppercase tracking-wider">
+              Payment Breakdown
+            </h3>
+
+            <div className="space-y-2.5 text-xs text-foreground-secondary border-t border-border pt-4">
+              <div className="flex justify-between">
+                <span>Base Service Labour</span>
+                <span className="font-mono text-primary font-bold">{formatCurrency(pricingBreakdown.baseAmount)}</span>
+              </div>
+
+              {isEmergencyRequested && (
+                <div className="flex justify-between text-amber-700 font-semibold">
+                  <span>Emergency 2-Hr Surcharge</span>
+                  <span className="font-mono">+₹499</span>
+                </div>
+              )}
+
+              {pricingBreakdown.discountMembership > 0 && (
+                <div className="flex justify-between text-emerald-700 font-semibold">
+                  <span>PLUS Membership (20% Off)</span>
+                  <span className="font-mono">-₹{pricingBreakdown.discountMembership}</span>
+                </div>
+              )}
+
+              {pricingBreakdown.discountCoupon > 0 && (
+                <div className="flex justify-between text-emerald-700 font-semibold">
+                  <span>Coupon ({pricingBreakdown.couponCode})</span>
+                  <span className="font-mono">-₹{pricingBreakdown.discountCoupon}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between">
+                <span>Safety & Sanitation Fee</span>
+                <span className="font-mono text-primary">
+                  {pricingBreakdown.safetyFee === 0 ? "FREE" : formatCurrency(pricingBreakdown.safetyFee)}
+                </span>
+              </div>
+
+              <div className="flex justify-between">
+                <span>Taxes & GST (18%)</span>
+                <span className="font-mono text-primary font-bold">{formatCurrency(pricingBreakdown.taxGst)}</span>
+              </div>
+
+              <div className="flex justify-between pt-3 border-t border-border text-sm font-extrabold text-primary">
+                <span>Total Amount Payable</span>
+                <span className="font-mono text-lg text-[#FF6A00]">
+                  {formatCurrency(pricingBreakdown.totalPayableInr)}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-muted/40 text-[11px] text-foreground-muted space-y-1">
+              <p className="font-bold text-primary">Home-e-Fix Trust Assurance:</p>
+              <p>• 100% price lock guaranteed</p>
+              <p>• 30-Day workmanship warranty</p>
+              <p>• No extra charge without customer digital approval</p>
+            </div>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

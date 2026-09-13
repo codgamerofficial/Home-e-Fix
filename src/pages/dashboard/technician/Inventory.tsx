@@ -1,29 +1,53 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Package, Plus, CheckCircle, AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-
-const MOCK_INVENTORY = [
-  { id: "inv-1", name: "Split AC Dual Capacitor 45uF", category: "AC Spares", stock: 6, unitPrice: 350 },
-  { id: "inv-2", name: "R32 Eco Refrigerant Can (1kg)", category: "AC Spares", stock: 2, unitPrice: 1200 },
-  { id: "inv-3", name: "Brass Basin Tap Spout Cartridge", category: "Plumbing", stock: 12, unitPrice: 120 },
-  { id: "inv-4", name: "Single Pole 32A MCB Breaker", category: "Electrical", stock: 8, unitPrice: 220 },
-];
+import { dbRepository } from "@/services/db/repository";
 
 export default function Inventory() {
+  const [inventory, setInventory] = useState<any[]>([]);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [partName, setPartName] = useState("");
   const [quantity, setQuantity] = useState("5");
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const loadData = () => {
+    setInventory(dbRepository.getInventory());
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleRequestStock = (e: React.FormEvent) => {
     e.preventDefault();
     if (partName) {
+      dbRepository.requestInventoryStock({
+        name: partName,
+        category: "Toolkit Spares",
+        stock: Number(quantity) || 1,
+        unitPrice: 0,
+      });
+      loadData();
       setShowRequestModal(false);
       setPartName("");
-      alert(`Stock replenishment request for ${quantity}x '${partName}' submitted to Central Hub!`);
+      setNotice(`Stock replenishment request for ${quantity}x '${partName}' submitted to Central Warehouse.`);
+      setTimeout(() => setNotice(null), 5000);
     }
+  };
+
+  const handleRequestItemMore = (itemName: string) => {
+    dbRepository.requestInventoryStock({
+      name: itemName,
+      category: "Toolkit Replenishment",
+      stock: 2,
+      unitPrice: 0,
+    });
+    loadData();
+    setNotice(`Replenishment batch (+2 units) requested for ${itemName}.`);
+    setTimeout(() => setNotice(null), 5000);
   };
 
   return (
@@ -45,6 +69,13 @@ export default function Inventory() {
           Request Hub Stock
         </Button>
       </div>
+
+      {notice && (
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center justify-between">
+          <span>{notice}</span>
+          <button onClick={() => setNotice(null)} className="font-bold text-xs">Dismiss</button>
+        </div>
+      )}
 
       {showRequestModal && (
         <Card className="p-6 border border-accent/30 bg-accent/5 space-y-4 max-w-md">
@@ -83,30 +114,40 @@ export default function Inventory() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {MOCK_INVENTORY.map((item) => (
-          <Card key={item.id} className="p-5 border border-border space-y-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <Badge variant="secondary" className="mb-1 text-[10px]">{item.category}</Badge>
-                <h4 className="font-heading text-sm font-bold text-primary">{item.name}</h4>
+      {inventory.length === 0 ? (
+        <Card className="p-10 border border-border text-center space-y-3">
+          <Package className="h-10 w-10 text-foreground-muted mx-auto" />
+          <p className="text-sm font-semibold text-primary">No toolkit inventory registered</p>
+          <p className="text-xs text-foreground-secondary max-w-xs mx-auto">
+            Use &quot;Request Hub Stock&quot; to issue certified components and spare parts to your kit.
+          </p>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {inventory.map((item) => (
+            <Card key={item.id} className="p-5 border border-border space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <Badge variant="secondary" className="mb-1 text-[10px]">{item.category}</Badge>
+                  <h4 className="font-heading text-sm font-bold text-primary">{item.name}</h4>
+                </div>
+
+                <div className="text-right">
+                  <span className="font-heading text-base font-bold text-accent">x{item.stock}</span>
+                  <span className="text-[10px] text-foreground-muted block">In Toolkit</span>
+                </div>
               </div>
 
-              <div className="text-right">
-                <span className="font-heading text-base font-bold text-accent">x{item.stock}</span>
-                <span className="text-[10px] text-foreground-muted block">In Toolkit</span>
+              <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-foreground-secondary">
+                <span>Unit Price: {item.unitPrice ? `₹${item.unitPrice}` : "Hub Dispatched"}</span>
+                <Button variant="ghost" size="sm" onClick={() => handleRequestItemMore(item.name)}>
+                  Request More
+                </Button>
               </div>
-            </div>
-
-            <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-foreground-secondary">
-              <span>Unit Price: ₹{item.unitPrice}</span>
-              <Button variant="ghost" size="sm" onClick={() => alert(`Replenishment requested for ${item.name}`)}>
-                Request More
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

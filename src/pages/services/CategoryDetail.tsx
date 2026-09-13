@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -27,10 +27,9 @@ import { ROUTES } from "@/constants/routes";
 import {
   SERVICE_CATEGORIES,
   CATEGORY_SERVICES_MAP,
-  CATEGORY_TECHNICIANS_MAP,
   CATEGORY_FAQS_MAP,
-  TESTIMONIALS,
 } from "@/constants/services";
+import { dbRepository } from "@/services/db/repository";
 import { cn, formatCurrency } from "@/lib/utils";
 
 export default function CategoryDetail() {
@@ -40,13 +39,24 @@ export default function CategoryDetail() {
   // Find category details
   const category = SERVICE_CATEGORIES.find((c) => c.slug === categorySlug) || SERVICE_CATEGORIES[0];
   const categoryServices = CATEGORY_SERVICES_MAP[category.slug] || CATEGORY_SERVICES_MAP.electrical;
-  const categoryTechnicians = CATEGORY_TECHNICIANS_MAP[category.slug] || CATEGORY_TECHNICIANS_MAP.electrical;
   const categoryFaqs = CATEGORY_FAQS_MAP[category.slug] || CATEGORY_FAQS_MAP.electrical;
 
+  const [realTechnicians, setRealTechnicians] = useState<any[]>([]);
   const [selectedServices, setSelectedServices] = useState<Record<string, any>>({});
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [showWarrantyModal, setShowWarrantyModal] = useState(false);
   const [techNotice, setTechNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    const pros = dbRepository.getProfessionals();
+    const matched = pros.filter(
+      (p: any) =>
+        p.category?.toLowerCase() === category.name.toLowerCase() ||
+        p.category?.toLowerCase() === category.slug.toLowerCase() ||
+        (p.skills && p.skills.some((s: string) => s.toLowerCase().includes(category.slug.toLowerCase())))
+    );
+    setRealTechnicians(matched.length > 0 ? matched : pros);
+  }, [category]);
 
   const toggleSelectService = (service: any) => {
     setSelectedServices((prev) => {
@@ -204,28 +214,56 @@ export default function CategoryDetail() {
       <section className="container-app py-12">
         <div className="mb-8">
           <Badge variant="accent" className="mb-2">
-            Local Experts
+            Verified Professionals
           </Badge>
           <h2 className="font-heading text-2xl font-bold text-primary">
-            Top Rated {category.name} Technicians Nearby
+            {category.name} Specialists
           </h2>
           <p className="text-xs sm:text-sm text-foreground-secondary">
-            Verified, police checked, and trained specialists ready for dispatch
+            Verified, police checked, and trained specialists dispatched on demand
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {categoryTechnicians.map((tech: any) => (
-            <TechnicianCard
-              key={tech.id}
-              technician={tech}
-              onSelect={() => {
-                setTechNotice(`✅ Selected ${tech.displayName} for your upcoming service!`);
-                setTimeout(() => setTechNotice(null), 5000);
-              }}
-            />
-          ))}
-        </div>
+        {realTechnicians.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {realTechnicians.map((tech: any) => (
+              <TechnicianCard
+                key={tech.id}
+                technician={{
+                  displayName: tech.name,
+                  status: tech.status || "available",
+                  experience: tech.experienceYears || 5,
+                  rating: tech.rating || 4.9,
+                  reviewCount: tech.reviewCount || 0,
+                  completedJobs: tech.completedJobsCount || 0,
+                  serviceRadius: tech.serviceRadiusKm || 10,
+                  specializations: tech.skills || [category.name],
+                  verificationStatus: tech.verificationStatus || "verified",
+                  avatar: tech.avatarUrl,
+                }}
+                onSelect={() => {
+                  setTechNotice(`✅ Specialist ${tech.name} requested for your booking assignment.`);
+                  setTimeout(() => setTechNotice(null), 5000);
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <Card className="p-8 border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/60 rounded-3xl text-center max-w-xl mx-auto space-y-4">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+              <Zap className="w-7 h-7" />
+            </div>
+            <h3 className="font-heading text-lg font-bold text-slate-900 dark:text-white">
+              Dynamic Hub Dispatch Active
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              Specialists are dynamically allocated from our central Kolkata hubs upon slot confirmation based on proximity, trade certification, and live availability.
+            </p>
+            <div className="flex items-center justify-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+              <CheckCircle className="w-4 h-4" /> 100% Background Verified & Insured
+            </div>
+          </Card>
+        )}
 
         {techNotice && (
           <div className="mt-4 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs sm:text-sm font-semibold flex items-center justify-between">

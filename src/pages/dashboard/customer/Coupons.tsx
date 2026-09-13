@@ -1,39 +1,11 @@
 import { useState } from "react";
 import { CouponCard } from "@/components/ui/coupon-card";
 import { Badge } from "@/components/ui/badge";
-
-const MOCK_COUPONS = [
-  {
-    id: "c-1",
-    code: "FIRSTFIX100",
-    title: "Flat ₹100 Off On First Booking",
-    description: "Applicable on any home service category with minimum booking amount of ₹299.",
-    discountAmount: 100,
-    minOrderAmount: 299,
-    expiresAt: "2026-12-31",
-  },
-  {
-    id: "c-2",
-    code: "HOMEEFIX20",
-    title: "20% Off AC Deep Cleaning & Servicing",
-    description: "Get 20% discount up to ₹300 on Split & Window AC foam servicing.",
-    discountPercentage: 20,
-    minOrderAmount: 499,
-    expiresAt: "2026-08-31",
-  },
-  {
-    id: "c-3",
-    code: "VIPPASS",
-    title: "Exclusive ₹150 Off for VIP Pass Members",
-    description: "Special voucher valid across all plumbing and electrical services.",
-    discountAmount: 150,
-    minOrderAmount: 399,
-    expiresAt: "2026-10-15",
-  },
-];
+import { dbRepository } from "@/services/db/repository";
 
 export default function Coupons() {
   const [copiedNotice, setCopiedNotice] = useState<string | null>(null);
+  const coupons = dbRepository.getCoupons();
 
   const handleCopyCoupon = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -58,7 +30,7 @@ export default function Coupons() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {MOCK_COUPONS.map((coupon) => (
+        {coupons.map((coupon) => (
           <CouponCard
             key={coupon.id}
             code={coupon.code}

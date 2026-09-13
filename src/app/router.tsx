@@ -1,5 +1,7 @@
 import { lazy, Suspense } from "react";
-import { createBrowserRouter, Navigate } from "react-router";
+import { createBrowserRouter, Navigate, Outlet } from "react-router";
+import { SearchProvider } from "../context/SearchContext";
+import { CommandMenu } from "../components/shared/CommandMenu";
 import { RootLayout } from "../layouts/RootLayout";
 import { AuthLayout } from "../layouts/AuthLayout";
 import { DashboardLayout } from "../layouts/DashboardLayout";
@@ -11,6 +13,7 @@ import {
 } from "../constants/navigation";
 import { PageSkeleton } from "../components/shared/LoadingSkeleton";
 import { ProtectedRoute, RoleProtectedRoute, PublicOnlyRoute } from "../components/shared/ProtectedRoute";
+import { RouteErrorBoundary } from "../components/shared/RouteErrorBoundary";
 
 /* ─── Suspense Wrapper ─── */
 function LazyPage({ children }: { children: React.ReactNode }) {
@@ -91,13 +94,24 @@ const AdminContentCMS = lazy(() => import("../pages/dashboard/admin/ContentCMS")
 const AdminReports = lazy(() => import("../pages/dashboard/admin/Reports"));
 const AdminAuditLogsCMS = lazy(() => import("../pages/dashboard/admin/AuditLogsCMS"));
 const AdminSettingsCMS = lazy(() => import("../pages/dashboard/admin/SettingsCMS"));
+const AdminSystemIntegrations = lazy(() => import("../pages/dashboard/admin/SystemIntegrations"));
+const AdminDataQualityCMS = lazy(() => import("../pages/dashboard/admin/DataQualityCMS"));
 
 /* ─── Router Configuration ─── */
 export const router = createBrowserRouter([
   {
-    // Public routes wrapped in RootLayout
-    element: <RootLayout />,
+    errorElement: <RouteErrorBoundary />,
+    element: (
+      <SearchProvider>
+        <Outlet />
+        <CommandMenu />
+      </SearchProvider>
+    ),
     children: [
+      {
+        // Public routes wrapped in RootLayout
+        element: <RootLayout />,
+        children: [
       {
         path: ROUTES.HOME,
         element: (
@@ -302,6 +316,7 @@ export const router = createBrowserRouter([
   // ─── Customer Platform Routes (/app/* - Section 44) ───
   {
     path: "/app",
+    errorElement: <RouteErrorBoundary />,
     element: (
       <ProtectedRoute>
         <RoleProtectedRoute allowedRoles={["CUSTOMER", "ADMIN", "SUPER_ADMIN"]}>
@@ -442,6 +457,7 @@ export const router = createBrowserRouter([
   // ─── Professional Platform Routes (/professional/* - Section 45) ───
   {
     path: "/professional",
+    errorElement: <RouteErrorBoundary />,
     element: (
       <ProtectedRoute>
         <RoleProtectedRoute allowedRoles={["PROFESSIONAL", "TECHNICIAN", "ADMIN", "SUPER_ADMIN"]}>
@@ -585,6 +601,7 @@ export const router = createBrowserRouter([
   // ─── Admin Platform Routes (/admin/* - Section 46) ───
   {
     path: "/admin",
+    errorElement: <RouteErrorBoundary />,
     element: (
       <ProtectedRoute>
         <RoleProtectedRoute allowedRoles={["ADMIN", "SUPER_ADMIN", "FINANCE_ADMIN", "OPERATIONS_MANAGER", "SUPPORT_AGENT"]}>
@@ -749,6 +766,40 @@ export const router = createBrowserRouter([
           </LazyPage>
         ),
       },
+      {
+        path: "system/integrations",
+        element: (
+          <LazyPage>
+            <AdminSystemIntegrations />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "integrations",
+        element: (
+          <LazyPage>
+            <AdminSystemIntegrations />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "system/data-quality",
+        element: (
+          <LazyPage>
+            <AdminDataQualityCMS />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "data-quality",
+        element: (
+          <LazyPage>
+            <AdminDataQualityCMS />
+          </LazyPage>
+        ),
+      },
+    ],
+  },
     ],
   },
 ]);

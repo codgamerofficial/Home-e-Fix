@@ -17,6 +17,9 @@ import {
   Download,
   Star,
   FileText,
+  Printer,
+  Shield,
+  LifeBuoy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -35,12 +38,26 @@ export default function BookingDetail() {
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
+  // Digital Invoice Modal State
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [digitalInvoice, setDigitalInvoice] = useState<any | null>(null);
+
+  // Warranty State & Modal
+  const [warranty, setWarranty] = useState<any | null>(null);
+  const [showWarrantyModal, setShowWarrantyModal] = useState(false);
+  const [warrantyIssue, setWarrantyIssue] = useState("");
+  const [warrantySubmitted, setWarrantySubmitted] = useState(false);
+
   const loadData = () => {
     if (!id) return;
     const found = dbRepository.getBookingById(id);
     setBooking(found);
     if (found) {
       setMaterials(dbRepository.getMaterials(found.id));
+      const inv = dbRepository.getDigitalInvoice(found.id);
+      setDigitalInvoice(inv);
+      const wrn = dbRepository.getWarrantyByBookingId(found.id);
+      setWarranty(wrn);
     }
   };
 
@@ -364,14 +381,57 @@ export default function BookingDetail() {
                 variant="outline"
                 size="sm"
                 className="w-full gap-1.5"
-                asChild
+                onClick={() => setShowInvoiceModal(true)}
               >
-                <Link to="/app/invoices">
-                  <Download className="h-3.5 w-3.5" /> View Official GST Tax Invoice
-                </Link>
+                <Download className="h-3.5 w-3.5" /> View Official GST Tax Invoice
               </Button>
             </div>
           </Card>
+
+          {/* Warranty & Assurance Card (Active or Eligible) */}
+          {warranty && (
+            <Card className="p-6 border border-emerald-200 bg-emerald-50/30 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-emerald-600" />
+                  <h4 className="font-heading text-xs font-bold uppercase tracking-wider text-emerald-900">
+                    Workmanship Warranty
+                  </h4>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] font-bold ${
+                    warranty.status === "ACTIVE"
+                      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                      : "bg-slate-100 text-slate-600 border-slate-300"
+                  }`}
+                >
+                  {warranty.status}
+                </Badge>
+              </div>
+
+              <div className="text-xs space-y-1 text-emerald-950">
+                <p className="font-mono text-[11px] text-emerald-800">{warranty.warrantyNumber}</p>
+                <p className="text-[11px] text-foreground-secondary">
+                  Coverage: {warranty.terms}
+                </p>
+                <p className="text-[11px] text-foreground-secondary">
+                  Valid until: <strong className="text-emerald-900">{formatDate(warranty.expiresAt)}</strong>
+                </p>
+              </div>
+
+              {warranty.status === "ACTIVE" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs font-semibold border-emerald-300 text-emerald-800 hover:bg-emerald-100/50"
+                  onClick={() => setShowWarrantyModal(true)}
+                >
+                  <LifeBuoy className="h-3.5 w-3.5 mr-1" /> File Warranty Claim / Revisit
+                </Button>
+              )}
+            </Card>
+          )}
 
           {/* Contextual Actions Card */}
           <Card className="p-6 border border-border bg-surface space-y-3">
@@ -418,6 +478,238 @@ export default function BookingDetail() {
         onClose={() => setIsTrackingOpen(false)}
         booking={booking}
       />
+
+      {/* DIGITAL GST TAX INVOICE MODAL */}
+      {showInvoiceModal && digitalInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <Card className="w-full max-w-xl border border-border bg-surface p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-accent" />
+                <h3 className="font-heading text-base font-bold text-primary">
+                  Official GST Tax Invoice
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInvoiceModal(false)}
+                className="text-foreground-muted hover:text-primary font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Printable Invoice Sheet */}
+            <div className="p-6 rounded-xl border border-border bg-white text-slate-900 space-y-4 text-xs">
+              <div className="flex justify-between items-start border-b border-slate-200 pb-4">
+                <div>
+                  <h2 className="font-heading text-lg font-extrabold text-slate-900">
+                    Home-e-Fix Technologies Pvt. Ltd.
+                  </h2>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Salt Lake Sector 1, Bidhannagar, Kolkata, WB 700064
+                  </p>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    GSTIN: {digitalInvoice.gstinBusiness} | CIN: U72900WB2026PTC123456
+                  </p>
+                </div>
+                <div className="text-right">
+                  <Badge variant="outline" className="text-xs font-mono font-bold text-slate-900 border-slate-300">
+                    ORIGINAL FOR RECIPIENT
+                  </Badge>
+                  <p className="text-[11px] text-slate-500 mt-1 font-mono">{digitalInvoice.invoiceNumber}</p>
+                  <p className="text-[11px] text-slate-500">Date: {digitalInvoice.bookingDate}</p>
+                </div>
+              </div>
+
+              {/* Billed To */}
+              <div className="grid grid-cols-2 gap-4 py-2 border-b border-slate-200">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Billed To (Recipient)
+                  </span>
+                  <p className="font-bold text-slate-800 text-xs">{digitalInvoice.customerName}</p>
+                  <p className="text-[11px] text-slate-600">{digitalInvoice.customerAddress}</p>
+                  <p className="text-[11px] text-slate-600 font-mono">{digitalInvoice.customerPhone}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Service Reference
+                  </span>
+                  <p className="font-mono text-slate-800 font-bold">{digitalInvoice.bookingNumber}</p>
+                  <p className="text-[11px] text-slate-600">Assigned Pro: {digitalInvoice.technicianName}</p>
+                  <p className="text-[11px] text-slate-600">
+                    Payment: <span className="uppercase font-semibold">{digitalInvoice.paymentMethod}</span> ({digitalInvoice.paymentStatus})
+                  </p>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500 font-semibold">
+                    <th className="py-2">Description of Supply</th>
+                    <th className="py-2">SAC Code</th>
+                    <th className="py-2 text-right">Taxable Value</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  <tr>
+                    <td className="py-2.5 font-medium text-slate-900">{digitalInvoice.serviceName}</td>
+                    <td className="py-2.5 font-mono text-slate-600">998719</td>
+                    <td className="py-2.5 text-right font-medium">{formatCurrency(digitalInvoice.taxableAmount)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 font-medium text-slate-900">Safety, Sanitation & Convenience Fee</td>
+                    <td className="py-2 font-mono text-slate-600">998719</td>
+                    <td className="py-2 text-right font-medium">{formatCurrency(digitalInvoice.safetyFee)}</td>
+                  </tr>
+                  {digitalInvoice.discountAmount > 0 && (
+                    <tr className="text-emerald-700">
+                      <td className="py-2 font-medium">Promotional Discount Applied</td>
+                      <td className="py-2 font-mono">—</td>
+                      <td className="py-2 text-right font-medium">- {formatCurrency(digitalInvoice.discountAmount)}</td>
+                    </tr>
+                  )}
+                  <tr>
+                    <td className="py-2 text-slate-600">Central GST (CGST 9%)</td>
+                    <td className="py-2 font-mono text-slate-600">—</td>
+                    <td className="py-2 text-right font-medium">{formatCurrency(digitalInvoice.cgstAmount)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 text-slate-600">State GST (SGST 9%)</td>
+                    <td className="py-2 font-mono text-slate-600">—</td>
+                    <td className="py-2 text-right font-medium">{formatCurrency(digitalInvoice.sgstAmount)}</td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr className="border-t border-slate-300 font-bold text-sm">
+                    <td colSpan={2} className="py-3 text-slate-900">Total Invoice Amount (INR):</td>
+                    <td className="py-3 text-right text-slate-900">{formatCurrency(digitalInvoice.totalAmount)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+
+              <div className="pt-3 border-t border-slate-200 text-[10px] text-slate-500 space-y-1">
+                <p>• {digitalInvoice.warrantyCoverage}</p>
+                <p>• This is a computer-generated tax invoice issued in accordance with GST Law and does not require physical signature.</p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setShowInvoiceModal(false)}>
+                Close
+              </Button>
+              <Button variant="accent" size="sm" onClick={() => window.print()} className="gap-1.5 font-bold">
+                <Printer className="h-4 w-4" /> Print / Save PDF
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* WARRANTY CLAIM MODAL */}
+      {showWarrantyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
+          <Card className="w-full max-w-lg border border-border bg-surface p-6 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                <h3 className="font-heading text-base font-bold text-primary">
+                  File Warranty Revisit Claim
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowWarrantyModal(false);
+                  setWarrantySubmitted(false);
+                }}
+                className="text-foreground-muted hover:text-primary font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            {warrantySubmitted ? (
+              <div className="text-center py-6 space-y-3">
+                <CheckCircle2 className="h-12 w-12 text-emerald-600 mx-auto" />
+                <h4 className="font-bold text-base text-primary">Warranty Claim Submitted</h4>
+                <p className="text-xs text-foreground-secondary max-w-sm mx-auto">
+                  Our quality audit team has received your claim. A senior supervisor will review your report and schedule a free priority re-work visit within 24 hours.
+                </p>
+                <Button
+                  variant="accent"
+                  size="sm"
+                  onClick={() => {
+                    setShowWarrantyModal(false);
+                    setWarrantySubmitted(false);
+                    loadData();
+                  }}
+                  className="font-bold"
+                >
+                  Done
+                </Button>
+              </div>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!warrantyIssue.trim()) return;
+                  dbRepository.createWarrantyClaim(booking.id, warrantyIssue.trim());
+                  setWarrantySubmitted(true);
+                  setWarrantyIssue("");
+                }}
+                className="space-y-4 text-xs"
+              >
+                <div className="p-3 rounded-xl bg-accent/5 border border-accent/20 text-xs">
+                  <p className="font-semibold text-primary">Booking: #{booking.booking_number || booking.id}</p>
+                  <p className="text-foreground-secondary">{booking.service_name}</p>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-semibold text-foreground-secondary block mb-1">
+                    Describe the recurring problem or defect:
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={warrantyIssue}
+                    onChange={(e) => setWarrantyIssue(e.target.value)}
+                    placeholder="Please explain what is not working after the service was completed..."
+                    className="w-full rounded-xl border border-border p-2.5 bg-background text-primary text-xs resize-none focus:outline-none focus:ring-1 focus:ring-accent"
+                    required
+                  />
+                </div>
+
+                <p className="text-[11px] text-foreground-muted">
+                  Note: Home-e-Fix covers 100% rework labour charges under our verified workmanship guarantee.
+                </p>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowWarrantyModal(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="accent"
+                    size="sm"
+                    className="font-bold"
+                  >
+                    Submit Claim
+                  </Button>
+                </div>
+              </form>
+            )}
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

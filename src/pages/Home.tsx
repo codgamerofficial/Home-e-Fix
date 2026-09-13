@@ -41,12 +41,12 @@ import {
   WHY_HOMEEFIX,
   OPERATIONAL_PILLARS,
   HOMEEFIX_GUARANTEE_PILLARS,
-  TESTIMONIALS,
   BLOG_ARTICLES,
   HOMEPAGE_FAQS,
   APP_CONFIG,
   OPERATIONAL_CITIES,
 } from "@/constants/services";
+import { dbRepository } from "@/services/db/repository";
 
 /* ─── Motion Variants ─── */
 const fadeUp = {
@@ -94,6 +94,11 @@ export default function Home() {
 
   // Mobile Sticky CTA trigger
   const [showMobileSticky, setShowMobileSticky] = useState(false);
+  const [realReviews, setRealReviews] = useState<any[]>([]);
+
+  useEffect(() => {
+    setRealReviews(dbRepository.getReviews());
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -811,36 +816,85 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((t, idx) => (
-              <Card
-                key={idx}
-                hover
-                className="p-6 bg-white dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800 rounded-3xl flex flex-col justify-between space-y-4"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center gap-1 text-amber-500">
-                    {Array.from({ length: t.rating }).map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-amber-500 text-amber-500" />
-                    ))}
+          {realReviews.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {realReviews.map((t, idx) => (
+                <Card
+                  key={t.id || idx}
+                  hover
+                  className="p-6 bg-white dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800 rounded-3xl flex flex-col justify-between space-y-4"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-1 text-amber-500">
+                      {Array.from({ length: t.rating || 5 }).map((_, i) => (
+                        <Star key={i} className="w-4 h-4 fill-amber-500 text-amber-500" />
+                      ))}
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 italic leading-relaxed">
+                      &ldquo;{t.comment}&rdquo;
+                    </p>
                   </div>
-                  <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 italic leading-relaxed">
-                    &ldquo;{t.comment}&rdquo;
-                  </p>
-                </div>
 
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">{t.userName}</h4>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block">{t.serviceName}</span>
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white">{t.userName || "Verified Homeowner"}</h4>
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400 block">{t.serviceName || "Home Service"}</span>
+                    </div>
+                    <Badge variant="success" className="text-[10px] font-semibold">
+                      Verified Job
+                    </Badge>
                   </div>
-                  <Badge variant="success" className="text-[10px] font-semibold">
-                    Verified Job
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="p-6 bg-white dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800 rounded-3xl space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">100% Background Verified</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Every specialist completes Aadhaar KYC, police verification, and trade credential validation before taking live bookings.
+                </p>
+                <div className="pt-2">
+                  <Badge variant="outline" className="text-[10px] font-medium text-slate-500">
+                    Strict Verification SLA
                   </Badge>
                 </div>
               </Card>
-            ))}
-          </div>
+
+              <Card className="p-6 bg-white dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800 rounded-3xl space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary dark:text-orange-400 flex items-center justify-center">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">Standardized Rate Cards</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Clear upfront labor rates, authentic replacement parts, and automated digital GST invoices. Zero on-site bargaining.
+                </p>
+                <div className="pt-2">
+                  <Badge variant="outline" className="text-[10px] font-medium text-slate-500">
+                    Zero Hidden Charges
+                  </Badge>
+                </div>
+              </Card>
+
+              <Card className="p-6 bg-white dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800 rounded-3xl space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <Award className="w-6 h-6" />
+                </div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">30-Day Workmanship Cover</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Every completed job is backed by our 30-day rework warranty. If anything isn't right, we re-inspect and fix it at zero extra charge.
+                </p>
+                <div className="pt-2">
+                  <Badge variant="outline" className="text-[10px] font-medium text-slate-500">
+                    Home-e-Fix Protection
+                  </Badge>
+                </div>
+              </Card>
+            </div>
+          )}
         </div>
       </section>
 

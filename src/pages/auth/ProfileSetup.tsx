@@ -33,10 +33,10 @@ export default function ProfileSetup() {
   const [dob, setDob] = useState("1996-05-15");
 
   // Step 2: Address
-  const [houseNo, setHouseNo] = useState("Flat 402, Rainbow Vistas");
-  const [street, setStreet] = useState("Rock Gardens, Hitech City");
-  const [city, setCity] = useState("Hyderabad");
-  const [pincode, setPincode] = useState("500081");
+  const [houseNo, setHouseNo] = useState("");
+  const [street, setStreet] = useState("");
+  const [city, setCity] = useState("Kolkata");
+  const [pincode, setPincode] = useState("700064");
 
   // Step 3: Preferences & Notifications
   const [selectedCats, setSelectedCats] = useState<string[]>(["ac", "plumbing", "electrical"]);
@@ -165,7 +165,7 @@ export default function ProfileSetup() {
                   <Input
                     value={street}
                     onChange={(e) => setStreet(e.target.value)}
-                    placeholder="Rock Gardens, Hitech City"
+                    placeholder="e.g. Salt Lake Sector 1, Near City Centre"
                   />
                 </div>
 
@@ -177,7 +177,7 @@ export default function ProfileSetup() {
                     <Input
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
-                      placeholder="Hyderabad"
+                      placeholder="Kolkata"
                     />
                   </div>
 
@@ -188,7 +188,7 @@ export default function ProfileSetup() {
                     <Input
                       value={pincode}
                       onChange={(e) => setPincode(e.target.value)}
-                      placeholder="500081"
+                      placeholder="700064"
                     />
                   </div>
                 </div>

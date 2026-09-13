@@ -17,24 +17,11 @@ export interface LiveTrackingModalProps {
 export function LiveTrackingModal({
   isOpen,
   onClose,
-  bookingRef = "HEF-894102",
-  serviceName = "AC Deep Cleaning & Servicing",
-  technicianName = "Suresh Reddy",
-  technicianPhone = "+91 98300 12345",
+  bookingRef = "HEF-ORDER",
+  serviceName = "Home Service",
+  technicianName = "Assigned Specialist",
+  technicianPhone = "+91 80000 00000",
 }: LiveTrackingModalProps) {
-  const [etaSeconds, setEtaSeconds] = useState(740); // 12 mins 20 secs
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const interval = setInterval(() => {
-      setEtaSeconds((prev) => (prev > 10 ? prev - 1 : 10));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isOpen]);
-
-  const mins = Math.floor(etaSeconds / 60);
-  const secs = etaSeconds % 60;
-
   if (!isOpen) return null;
 
   return (
@@ -86,7 +73,7 @@ export function LiveTrackingModal({
               <div className="h-8 w-8 rounded-full bg-blue-600/30 border border-blue-400 flex items-center justify-center text-blue-400">
                 <MapPin className="h-4 w-4" />
               </div>
-              <span className="text-[9px] font-bold text-white/70 mt-1">Salt Lake Hub</span>
+              <span className="text-[9px] font-bold text-white/70 mt-1">Service Hub</span>
             </div>
 
             {/* Destination Marker */}
@@ -94,30 +81,19 @@ export function LiveTrackingModal({
               <div className="h-8 w-8 rounded-full bg-emerald-600/30 border border-emerald-400 flex items-center justify-center text-emerald-400">
                 <CheckCircle2 className="h-4 w-4" />
               </div>
-              <span className="text-[9px] font-bold text-white/70 mt-1">Your Location</span>
+              <span className="text-[9px] font-bold text-white/70 mt-1">Service Address</span>
             </div>
 
-            {/* Moving Pro Marker */}
-            <motion.div
-              animate={{
-                x: [-100, 100, -100],
-                y: [-20, 10, -20],
-              }}
-              transition={{
-                duration: 12,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
-              className="relative z-10 flex flex-col items-center"
-            >
+            {/* Pro Marker */}
+            <div className="relative z-10 flex flex-col items-center">
               <div className="px-2.5 py-1 rounded-full bg-accent text-white font-extrabold text-[11px] shadow-glow flex items-center gap-1.5 mb-1">
-                <Navigation className="h-3 w-3 animate-spin" />
-                <span>ETA {mins}m {secs}s</span>
+                <Navigation className="h-3 w-3" />
+                <span>GPS Telemetry Active</span>
               </div>
               <div className="h-10 w-10 rounded-full bg-accent border-2 border-white flex items-center justify-center text-white shadow-xl">
                 <span className="text-lg">👨‍🔧</span>
               </div>
-            </motion.div>
+            </div>
           </div>
 
           {/* Pro & Booking Info */}
@@ -133,7 +109,7 @@ export function LiveTrackingModal({
                     <h4 className="font-heading text-sm font-bold text-white">{technicianName}</h4>
                     <ShieldCheck className="h-4 w-4 text-emerald-400" />
                   </div>
-                  <p className="text-xs text-white/70">Verified Tradesman • ⭐ 4.9 (850+ Jobs)</p>
+                  <p className="text-xs text-white/70">100% Background Verified Professional</p>
                   <span className="text-[10px] text-accent font-semibold block mt-0.5">
                     {serviceName}
                   </span>
@@ -168,15 +144,15 @@ export function LiveTrackingModal({
               <div className="space-y-2">
                 <div className="flex items-center gap-2.5 text-emerald-400 font-semibold">
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-                  <span>10:00 AM — Booking Confirmed & Verified</span>
+                  <span>Order Verified & Scheduled</span>
                 </div>
                 <div className="flex items-center gap-2.5 text-emerald-400 font-semibold">
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
-                  <span>10:15 AM — Suresh Reddy Dispatched from Salt Lake Hub</span>
+                  <span>Specialist {technicianName} Allocated from Nearest Hub</span>
                 </div>
-                <div className="flex items-center gap-2.5 text-amber-400 font-bold animate-pulse">
+                <div className="flex items-center gap-2.5 text-amber-400 font-bold">
                   <Clock className="h-4 w-4 shrink-0 text-amber-400" />
-                  <span>En Route to your address (Arriving in ~{mins} mins)</span>
+                  <span>Live GPS Connected • En route for scheduled slot</span>
                 </div>
               </div>
             </div>

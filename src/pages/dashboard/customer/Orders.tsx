@@ -19,8 +19,10 @@ import { LiveTrackingExperience } from "@/components/customer/LiveTrackingExperi
 import { dbRepository } from "@/services/db/repository";
 import { ROUTES } from "@/constants/routes";
 import { formatCurrency } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth.store";
 
 export default function Orders() {
+  const { user } = useAuthStore();
   const [filterTab, setFilterTab] = useState<
     "all" | "upcoming" | "active" | "completed" | "cancelled"
   >("all");
@@ -33,13 +35,13 @@ export default function Orders() {
 
   // Load bookings from repository
   const loadBookings = () => {
-    const list = dbRepository.getBookings();
+    const list = dbRepository.getBookings(user?.id);
     setBookings(list);
   };
 
   useEffect(() => {
     loadBookings();
-  }, []);
+  }, [user?.id]);
 
   const filteredBookings = bookings.filter((b) => {
     const status = (b.status || "").toUpperCase();
@@ -84,6 +86,8 @@ export default function Orders() {
 
     dbRepository.createReview({
       bookingId: reviewBooking.id,
+      customerId: user?.id,
+      userName: user?.fullName || reviewBooking.customer_name || "Verified Customer",
       serviceName: reviewBooking.service_name || "Home Service",
       rating: reviewRating,
       comment: reviewComment || "Excellent workmanship and polite professional.",

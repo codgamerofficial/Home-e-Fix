@@ -47,7 +47,7 @@ export default function Attendance() {
               </Badge>
             </div>
             <p className="text-xs text-foreground-secondary mt-0.5">
-              Clock-in time: {clockInTime} • GPS Location: Hitech City Hub
+              Clock-in time: {clockInTime} • GPS Location: Salt Lake Central Hub (Kolkata)
             </p>
           </div>
         </div>

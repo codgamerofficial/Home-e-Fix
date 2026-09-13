@@ -5,10 +5,18 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { dbRepository } from "@/services/db/repository";
+import { useAuthStore } from "@/store/auth.store";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/date";
 
 export default function Earnings() {
+  const { user } = useAuthStore();
+  const proId = user?.id || "pro-1";
+  const proName = user?.fullName || (user as any)?.name || "Professional Partner";
+  const bankDisplay = user?.phone
+    ? `Verified Bank (••• ${user.phone.slice(-4)})`
+    : "Primary Settlement Account";
+
   const [completedJobs, setCompletedJobs] = useState<any[]>([]);
   const [payouts, setPayouts] = useState<any[]>([]);
   const [showPayoutModal, setShowPayoutModal] = useState(false);
@@ -18,15 +26,17 @@ export default function Earnings() {
   const loadEarningsData = () => {
     const allBookings = dbRepository.getBookings();
     const completed = allBookings.filter(
-      (b) => b.status === "COMPLETED" || b.status === "SERVICE_COMPLETED"
+      (b) =>
+        (b.status === "COMPLETED" || b.status === "SERVICE_COMPLETED") &&
+        b.assigned_technician_id === proId
     );
     setCompletedJobs(completed);
-    setPayouts(dbRepository.getPayouts());
+    setPayouts(dbRepository.getPayouts().filter((p) => p.proId === proId || p.techId === proId));
   };
 
   useEffect(() => {
     loadEarningsData();
-  }, []);
+  }, [proId]);
 
   // Compute metrics from actual bookings
   const now = new Date();
@@ -56,10 +66,10 @@ export default function Earnings() {
     if (amt <= 0 || amt > availableForPayout) return;
 
     const newPayout = dbRepository.requestPayout(
-      "pro-seed-1",
-      "Suresh Reddy",
+      proId,
+      proName,
       amt,
-      "HDFC Bank (**** 4891)"
+      bankDisplay
     );
     setPayouts([newPayout, ...payouts]);
     setShowPayoutModal(false);
@@ -138,7 +148,7 @@ export default function Earnings() {
             <h4 className="font-heading text-base font-bold text-primary">Request Bank Settlement</h4>
             <p className="text-xs text-foreground-secondary">
               Transfer available earnings to your linked bank account:{" "}
-              <span className="font-bold text-primary">HDFC Bank (•••• 4891)</span>.
+              <span className="font-bold text-primary">{bankDisplay}</span>.
             </p>
 
             <form onSubmit={handleRequestPayout} className="space-y-4">

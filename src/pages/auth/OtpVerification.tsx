@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useLocation } from "react-router";
 import { ShieldCheck, Phone, ArrowLeft, RefreshCw, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,14 +7,20 @@ import { Badge } from "@/components/ui/badge";
 import { OtpInput } from "@/components/ui/otp-input";
 import { ROUTES } from "@/constants/routes";
 import { useAuthStore } from "@/store/auth.store";
+import { dbRepository } from "@/services/db/repository";
 
 export default function OtpVerification() {
   const navigate = useNavigate();
+  const location = useLocation();
   const loginStore = useAuthStore((state) => state.login);
 
   const [otpValue, setOtpValue] = useState("");
   const [timerSeconds, setTimerSeconds] = useState(60);
   const [canResend, setCanResend] = useState(false);
+
+  const submittedPhone = location.state?.phone || "+91 98765 00000";
+  const submittedName = location.state?.fullName || "Verified Homeowner";
+  const submittedEmail = location.state?.email || "homeowner@homeefix.in";
 
   useEffect(() => {
     let interval: any = null;
@@ -34,22 +40,29 @@ export default function OtpVerification() {
   const handleResendOtp = () => {
     setTimerSeconds(60);
     setCanResend(false);
-    alert("New 6-digit OTP code sent via SMS!");
   };
 
   const handleVerify = (code: string) => {
     if (code.length === 6) {
-      const mockUser: any = {
-        id: "usr-otp-1",
-        email: "user@homeefix.com",
-        fullName: "Priya Sharma",
-        phone: "+91 98765 43210",
+      const verifiedUser: any = {
+        id: `usr-${Date.now()}`,
+        email: submittedEmail,
+        fullName: submittedName,
+        phone: submittedPhone,
         role: "customer",
         isEmailVerified: true,
         isPhoneVerified: true,
       };
 
-      loginStore(mockUser, "mock-otp-token", "mock-refresh-token");
+      dbRepository.saveProfile({
+        id: verifiedUser.id,
+        email: verifiedUser.email,
+        full_name: verifiedUser.fullName,
+        phone: verifiedUser.phone,
+        role: "customer",
+      });
+
+      loginStore(verifiedUser, "hef-otp-token", "hef-refresh-token");
       navigate(ROUTES.HOME);
     }
   };

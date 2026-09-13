@@ -1,39 +1,63 @@
 import { useState, useEffect } from "react";
 import { ReviewCard } from "@/components/ui/review-card";
-import { Star, MessageSquare, Plus, CheckCircle2 } from "lucide-react";
+import { Star, MessageSquare, Plus, CheckCircle2, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { dbRepository } from "@/services/db/repository";
 import { formatDate } from "@/lib/date";
+import { useAuthStore } from "@/store/auth.store";
 
 export default function Reviews() {
+  const { user } = useAuthStore();
   const [reviews, setReviews] = useState<any[]>([]);
+  const [completedBookings, setCompletedBookings] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedBookingId, setSelectedBookingId] = useState("");
   const [newRating, setNewRating] = useState(5);
-  const [newServiceName, setNewServiceName] = useState("AC Foam Deep Cleaning");
   const [newComment, setNewComment] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
 
-  const loadReviews = () => {
+  const loadData = () => {
     setReviews(dbRepository.getReviews());
+    const userCompleted = dbRepository
+      .getBookings(user?.id)
+      .filter((b) => b.status === "COMPLETED" || b.status === "SERVICE_COMPLETED");
+    setCompletedBookings(userCompleted);
+    if (userCompleted.length > 0) {
+      setSelectedBookingId(userCompleted[0].id);
+    }
   };
 
   useEffect(() => {
-    loadReviews();
-  }, []);
+    loadData();
+  }, [user?.id]);
+
+  const handleOpenWriteModal = () => {
+    if (completedBookings.length === 0) {
+      setNotice("You do not have any completed bookings yet. Reviews can only be submitted for verified, completed service appointments.");
+      setTimeout(() => setNotice(null), 6000);
+      return;
+    }
+    setShowAddModal(true);
+  };
 
   const handleAddReview = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment) return;
+    if (!newComment || !selectedBookingId) return;
+
+    const matchedBooking = completedBookings.find((b) => b.id === selectedBookingId);
+    if (!matchedBooking) return;
 
     dbRepository.createReview({
-      bookingId: `b-${Date.now()}`,
-      serviceName: newServiceName,
+      bookingId: matchedBooking.id,
+      customerId: user?.id,
+      userName: user?.fullName || matchedBooking.customer_name || "Verified Customer",
+      serviceName: matchedBooking.service_name || "Home Service",
       rating: newRating,
       comment: newComment,
     });
 
-    loadReviews();
+    loadData();
     setShowAddModal(false);
     setNewComment("");
     setNotice("Thank you! Your verified rating and feedback has been posted.");
@@ -54,7 +78,7 @@ export default function Reviews() {
           variant="accent"
           size="sm"
           leftIcon={<Plus className="h-4 w-4" />}
-          onClick={() => setShowAddModal(true)}
+          onClick={handleOpenWriteModal}
           className="font-bold shadow-xs"
         >
           Write a Review
@@ -62,8 +86,8 @@ export default function Reviews() {
       </div>
 
       {notice && (
-        <div className="p-3 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+        <div className="p-3.5 rounded-xl bg-muted/60 text-primary border border-border text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+          <AlertCircle className="h-4 w-4 text-accent shrink-0" />
           <span>{notice}</span>
         </div>
       )}
@@ -74,16 +98,19 @@ export default function Reviews() {
           <h4 className="font-heading text-sm font-bold text-primary">Share Service Feedback</h4>
           <form onSubmit={handleAddReview} className="space-y-3 text-xs">
             <div>
-              <label className="text-[11px] font-semibold text-foreground-secondary block mb-1">Service</label>
+              <label className="text-[11px] font-semibold text-foreground-secondary block mb-1">
+                Completed Booking Appointment
+              </label>
               <select
-                value={newServiceName}
-                onChange={(e) => setNewServiceName(e.target.value)}
+                value={selectedBookingId}
+                onChange={(e) => setSelectedBookingId(e.target.value)}
                 className="w-full rounded-xl border border-border p-2.5 bg-background text-primary text-xs"
               >
-                <option value="Split AC Foam Jet Deep Servicing">Split AC Foam Jet Deep Servicing</option>
-                <option value="Kitchen Sink Leakage Repair">Kitchen Sink Leakage Repair</option>
-                <option value="Switchboard & MCB Repair">Switchboard & MCB Repair</option>
-                <option value="Bathroom Deep Cleaning">Bathroom Deep Cleaning</option>
+                {completedBookings.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    #{b.booking_number || b.id} — {b.service_name} ({b.scheduled_date})
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -115,6 +142,7 @@ export default function Reviews() {
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Share your experience regarding punctuality, technical skill, and cleanliness..."
                 className="w-full rounded-xl border border-border p-3 bg-background text-primary"
+                required
               />
             </div>
 

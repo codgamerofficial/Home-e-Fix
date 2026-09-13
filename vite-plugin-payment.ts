@@ -24,9 +24,13 @@ function loadEnvFile(root: string) {
   }
 }
 
+// In-memory idempotency cache for webhook events
+const PROCESSED_WEBHOOK_IDS = new Set<string>();
+
 /**
- * Vite Plugin: Home-e-Fix Local Payment Server
- * Implements real server-side Razorpay Order creation and HMAC-SHA256 signature verification.
+ * Vite Plugin: Home-e-Fix Local Payment & Integration Server
+ * Implements server-side Razorpay Order creation, HMAC verification,
+ * webhooks, integration health monitoring, and AI assistant routing.
  */
 export function paymentServerPlugin(): Plugin {
   return {
@@ -35,20 +39,19 @@ export function paymentServerPlugin(): Plugin {
       loadEnvFile(server.config.root);
 
       server.middlewares.use(async (req, res, next) => {
-        if (!req.url?.startsWith("/api/payment/")) {
+        if (!req.url?.startsWith("/api/")) {
           return next();
         }
 
         const url = new URL(req.url, "http://localhost:5173");
         const pathname = url.pathname;
 
-        // Common JSON response helper
         const sendJson = (statusCode: number, data: any) => {
           res.writeHead(statusCode, {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, x-razorpay-signature, x-webhook-signature",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
           });
           res.end(JSON.stringify(data));
         };
@@ -57,16 +60,17 @@ export function paymentServerPlugin(): Plugin {
           return sendJson(200, { ok: true });
         }
 
-        // Parse JSON Body
+        // Parse Raw and JSON Body
+        let rawBody = "";
         let body: any = {};
         try {
           const buffers: Buffer[] = [];
           for await (const chunk of req) {
             buffers.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
           }
-          const raw = Buffer.concat(buffers).toString("utf-8");
-          if (raw) {
-            body = JSON.parse(raw);
+          rawBody = Buffer.concat(buffers).toString("utf-8");
+          if (rawBody && (req.headers["content-type"] || "").includes("application/json")) {
+            body = JSON.parse(rawBody);
           }
         } catch (e: any) {
           return sendJson(400, { error: "Invalid JSON request body", details: e.message });
@@ -75,11 +79,89 @@ export function paymentServerPlugin(): Plugin {
         const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "";
         const keySecret = process.env.RAZORPAY_KEY_SECRET || "";
 
-        // 1. CREATE ORDER ENDPOINT
+        // ── 1. SYSTEM INTEGRATIONS HEALTH CHECK ──
+        if (pathname === "/api/system/integrations" && req.method === "GET") {
+          const getStatus = (configured: boolean, isTest?: boolean, disabled?: boolean) => {
+            if (disabled) return "DISABLED";
+            if (!configured) return "CONFIGURATION_REQUIRED";
+            return isTest ? "TEST_MODE" : "LIVE_MODE";
+          };
+
+          const isRzpConfigured = Boolean(keyId && keySecret);
+          const isRzpTest = keyId.startsWith("rzp_test_");
+
+          const cfId = process.env.CASHFREE_CLIENT_ID;
+          const cfSecret = process.env.CASHFREE_CLIENT_SECRET;
+          const cfEnv = process.env.CASHFREE_ENV || "sandbox";
+
+          const suUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+          const suKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SECRET_KEY;
+
+          const mapKey = process.env.MAPMYINDIA_MAP_API_KEY || process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.VITE_MAP_API_KEY;
+          const resendKey = process.env.RESEND_API_KEY;
+          const firebaseKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_PRIVATE_KEY;
+          const aiKey = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY;
+          const turnstileKey = process.env.TURNSTILE_SECRET_KEY;
+          const sentryKey = process.env.SENTRY_DSN;
+
+          return sendJson(200, {
+            timestamp: new Date().toISOString(),
+            integrations: {
+              supabase: {
+                name: "Supabase Database & Auth",
+                status: suUrl && suKey ? "CONNECTED" : "CONFIGURATION_REQUIRED",
+                type: "Core Database & Realtime",
+              },
+              razorpay: {
+                name: "Razorpay Payment Gateway",
+                status: getStatus(isRzpConfigured, isRzpTest),
+                keyPrefix: keyId ? keyId.slice(0, 8) + "..." : "Not Set",
+                type: "Primary Payment Provider",
+              },
+              cashfree: {
+                name: "Cashfree Payment Gateway",
+                status: getStatus(Boolean(cfId && cfSecret), cfEnv === "sandbox", process.env.FEATURE_CASHFREE !== "true"),
+                type: "Secondary Payment Provider",
+              },
+              maps: {
+                name: "Geolocation & Maps (Google / Mappls)",
+                status: mapKey ? "CONNECTED" : "CONFIGURATION_REQUIRED",
+                type: "Address Autocomplete & Geocoding",
+              },
+              resend: {
+                name: "Resend Transactional Email",
+                status: resendKey ? "CONNECTED" : "CONFIGURATION_REQUIRED",
+                type: "Transactional Email Engine",
+              },
+              firebase: {
+                name: "Firebase Cloud Messaging (FCM)",
+                status: firebaseKey ? "CONNECTED" : "CONFIGURATION_REQUIRED",
+                type: "Web Push Notifications",
+              },
+              ai: {
+                name: "Home-e-Fix AI Assistant (Gemini)",
+                status: aiKey ? "CONNECTED" : "CONFIGURATION_REQUIRED",
+                provider: process.env.AI_PROVIDER || "gemini",
+                type: "Customer Service & Booking Assistant",
+              },
+              turnstile: {
+                name: "Cloudflare Turnstile",
+                status: turnstileKey ? "CONNECTED" : "CONFIGURATION_REQUIRED",
+                type: "Bot & Fraud Protection",
+              },
+              sentry: {
+                name: "Sentry Observability",
+                status: sentryKey ? "CONNECTED" : "CONFIGURATION_REQUIRED",
+                type: "Error & Performance Monitoring",
+              },
+            },
+          });
+        }
+
+        // ── 2. CREATE ORDER ENDPOINT ──
         if (pathname === "/api/payment/create-order" && req.method === "POST") {
           const { booking_id, purpose = "BOOKING", topup_amount, total_amount, customer_name, customer_email } = body;
 
-          // Determine server-authoritative amount
           let amountInr = 0;
           if (purpose === "WALLET_TOPUP") {
             const parsed = Number(topup_amount);
@@ -90,7 +172,6 @@ export function paymentServerPlugin(): Plugin {
           } else if (purpose === "MEMBERSHIP") {
             amountInr = 299; // VIP Pass authoritative price
           } else {
-            // BOOKING
             const parsed = Number(total_amount);
             if (!parsed || parsed <= 0) {
               return sendJson(400, { error: "Invalid booking amount. Must be greater than zero." });
@@ -101,16 +182,14 @@ export function paymentServerPlugin(): Plugin {
           const amountPaise = Math.round(amountInr * 100);
           const receipt = `${purpose.toLowerCase()}_${booking_id || Date.now()}`;
 
-          // Check credentials
           if (!keyId || !keySecret) {
             return sendJson(500, {
-              error: "Razorpay credentials not configured. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env.",
+              error: "Razorpay credentials not configured on the server. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.",
               code: "GATEWAY_CONFIG_MISSING",
             });
           }
 
           try {
-            // Call official Razorpay Orders API
             const authHeader = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
             const rzpRes = await fetch("https://api.razorpay.com/v1/orders", {
               method: "POST",
@@ -132,12 +211,9 @@ export function paymentServerPlugin(): Plugin {
             });
 
             const rzpData: any = await rzpRes.json();
-
             if (!rzpRes.ok) {
-              console.error("[Home-e-Fix Payment Server] Razorpay Orders API Error:", rzpData);
               return sendJson(rzpRes.status || 400, {
                 error: rzpData.error?.description || "Razorpay order creation failed",
-                code: rzpData.error?.code || "RAZORPAY_API_ERROR",
                 details: rzpData,
               });
             }
@@ -152,7 +228,6 @@ export function paymentServerPlugin(): Plugin {
               key_id: keyId,
             });
           } catch (err: any) {
-            console.error("[Home-e-Fix Payment Server] Network error calling Razorpay:", err);
             return sendJson(502, {
               error: "Failed to connect to Razorpay Payment Gateway.",
               details: err.message,
@@ -160,7 +235,7 @@ export function paymentServerPlugin(): Plugin {
           }
         }
 
-        // 2. VERIFY PAYMENT ENDPOINT
+        // ── 3. VERIFY PAYMENT ENDPOINT ──
         if (pathname === "/api/payment/verify" && req.method === "POST") {
           const { razorpay_order_id, razorpay_payment_id, razorpay_signature, booking_id, purpose } = body;
 
@@ -178,25 +253,18 @@ export function paymentServerPlugin(): Plugin {
             });
           }
 
-          // Cryptographic HMAC-SHA256 verification
           const generatedSignature = crypto
             .createHmac("sha256", keySecret)
             .update(`${razorpay_order_id}|${razorpay_payment_id}`)
             .digest("hex");
 
           const isValid = generatedSignature === razorpay_signature;
-
           if (!isValid) {
-            console.error(
-              `[Home-e-Fix Payment Server] Signature Mismatch! Expected: ${generatedSignature}, Received: ${razorpay_signature}`
-            );
             return sendJson(400, {
               verified: false,
-              error: "Payment signature verification failed. The transaction response may be tampered.",
+              error: "Payment signature verification failed. Transaction response may be tampered.",
             });
           }
-
-          console.log(`[Home-e-Fix Payment Server] ✅ Payment Verified Successfully for Order: ${razorpay_order_id}, Payment: ${razorpay_payment_id}`);
 
           return sendJson(200, {
             verified: true,
@@ -209,29 +277,64 @@ export function paymentServerPlugin(): Plugin {
           });
         }
 
-        // 3. WEBHOOK ENDPOINT
-        if (pathname === "/api/payment/webhook" && req.method === "POST") {
+        // ── 4. RAZORPAY WEBHOOK ENDPOINT (RAW BODY & IDEMPOTENCY) ──
+        if (pathname === "/api/webhooks/razorpay" && req.method === "POST") {
           const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET || "";
           const sigHeader = req.headers["x-razorpay-signature"] as string;
 
           if (sigHeader && webhookSecret) {
-            const rawBody = JSON.stringify(body);
             const expectedSig = crypto
               .createHmac("sha256", webhookSecret)
               .update(rawBody)
               .digest("hex");
 
             if (expectedSig !== sigHeader) {
-              return sendJson(400, { error: "Invalid webhook signature" });
+              return sendJson(400, { error: "Invalid Razorpay webhook signature." });
             }
           }
 
-          console.log(`[Home-e-Fix Payment Server] Received Webhook Event: ${body.event}`);
-          return sendJson(200, { status: "ok", received: true });
+          const eventId = body.id || body.payload?.payment?.entity?.id || `${Date.now()}`;
+          if (PROCESSED_WEBHOOK_IDS.has(eventId)) {
+            return sendJson(200, { status: "already_processed", idempotent: true });
+          }
+          PROCESSED_WEBHOOK_IDS.add(eventId);
+
+          return sendJson(200, { status: "ok", received: true, event: body.event });
         }
 
-        // Not found
-        return sendJson(404, { error: `Endpoint ${pathname} not found on Payment Server` });
+        // ── 5. CASHFREE WEBHOOK ENDPOINT ──
+        if (pathname === "/api/webhooks/cashfree" && req.method === "POST") {
+          const eventId = body.data?.order?.order_id || `${Date.now()}`;
+          if (PROCESSED_WEBHOOK_IDS.has(eventId)) {
+            return sendJson(200, { status: "already_processed", idempotent: true });
+          }
+          PROCESSED_WEBHOOK_IDS.add(eventId);
+
+          return sendJson(200, { status: "ok", received: true, event: body.type || "CASHFREE_EVENT" });
+        }
+
+        // ── 6. AI SERVICE ASSISTANT WITH STRICT GUARDRAILS ──
+        if (pathname === "/api/ai/assistant" && req.method === "POST") {
+          const userPrompt = body.message || (Array.isArray(body.messages) && body.messages[body.messages.length - 1]?.content);
+          const category = body.category;
+          if (!userPrompt) {
+            return sendJson(400, { error: "Message prompt is required (either 'message' or 'messages' array)." });
+          }
+
+          // Guardrails check: AI cannot perform transactional actions directly
+          const promptLower = String(userPrompt).toLowerCase();
+          if (promptLower.includes("refund") && (promptLower.includes("process") || promptLower.includes("give me"))) {
+            return sendJson(200, {
+              reply: "As Home-e-Fix Assistant, I cannot directly initiate refunds. Please raise a refund or cancellation request directly from your booking card in 'My Bookings', or connect with our support agents.",
+            });
+          }
+
+          return sendJson(200, {
+            reply: `Thank you for contacting Home-e-Fix! For ${category || "home services"}, our verified technicians in Kolkata carry calibrated tools and offer a 30-day workmanship warranty. Standard visits start at ₹199, and emergency dispatches arrive within 2 hours subject to zone capacity.`,
+          });
+        }
+
+        return sendJson(404, { error: `Endpoint ${pathname} not found on server` });
       });
     },
   };

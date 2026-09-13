@@ -44,6 +44,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
 import { useNotificationStore } from "@/store/notification.store";
 import { useCartStore } from "@/store/cart.store";
+import { useSearch } from "@/context/SearchContext";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 
 export function Navbar() {
@@ -54,7 +55,8 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuthStore();
-  const { theme, toggleTheme, setSearchOpen } = useUIStore();
+  const { theme, toggleTheme } = useUIStore();
+  const { openSearch } = useSearch();
   const { unreadCount } = useNotificationStore();
   const { getItemCount } = useCartStore();
   const cartCount = getItemCount();
@@ -148,7 +150,7 @@ export function Navbar() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setSearchOpen(true)}
+              onClick={openSearch}
               className="hidden sm:flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-100/70 dark:bg-slate-800/70 px-3 py-1.5 rounded-full border border-slate-200/60 dark:border-slate-700/60"
               aria-label="Search services"
             >
@@ -163,7 +165,7 @@ export function Navbar() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setSearchOpen(true)}
+              onClick={openSearch}
               className="sm:hidden text-slate-600 dark:text-slate-300"
               aria-label="Search services"
             >

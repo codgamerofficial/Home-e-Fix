@@ -11,6 +11,8 @@
 
 import { supabase } from "@/lib/supabase";
 import { nowIso, parseDate, formatDate } from "@/lib/date";
+import { warrantyEngine } from "@/services/marketplace/warranty.engine";
+import { invoiceEngine } from "@/services/marketplace/invoice.engine";
 import type {
   DbBooking,
   DbProfile,
@@ -41,11 +43,30 @@ export function generateReference(prefix: string): string {
   return `${prefix}-${year}-${hex}`;
 }
 
+export function generateSecureOtp(): string {
+  const bytes = new Uint8Array(2);
+  crypto.getRandomValues(bytes);
+  const num = (((bytes[0] << 8) | bytes[1]) % 9000) + 1000;
+  return String(num);
+}
+
 // Storage helpers
 function getStored<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_PREFIX + key);
-    return raw ? JSON.parse(raw) : fallback;
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(fallback) && !Array.isArray(parsed)) {
+      if (parsed && typeof parsed === "object") {
+        if (Array.isArray(parsed.data)) return parsed.data as unknown as T;
+        if (Array.isArray(parsed.addresses)) return parsed.addresses as unknown as T;
+        if (Array.isArray(parsed.bookings)) return parsed.bookings as unknown as T;
+        if (Array.isArray(parsed.items)) return parsed.items as unknown as T;
+        if (parsed.id) return [parsed] as unknown as T;
+      }
+      return fallback;
+    }
+    return parsed;
   } catch {
     return fallback;
   }
@@ -287,21 +308,32 @@ function createInitialDevSeeds() {
 export const dbRepository = {
   // ─── ENVIRONMENT MODE ───
   isDevSeedEnabled(): boolean {
-    return getStored<boolean>("dev_seed_mode", true);
+    return getStored<boolean>("dev_seed_mode", false);
   },
 
   setDevSeedMode(enabled: boolean): void {
     setStored<boolean>("dev_seed_mode", enabled);
   },
 
+  setDevSeedEnabled(enabled: boolean): void {
+    this.setDevSeedMode(enabled);
+  },
+
   initializeIfEmpty(): void {
     const existing = localStorage.getItem(STORAGE_KEY_PREFIX + "bookings");
     if (!existing) {
-      const { devBookings, devAssignments, devPros, devInvoices } = createInitialDevSeeds();
-      setStored("bookings", devBookings);
-      setStored("assignments", devAssignments);
-      setStored("professionals", devPros);
-      setStored("invoices", devInvoices);
+      if (this.isDevSeedEnabled()) {
+        const { devBookings, devAssignments, devPros, devInvoices } = createInitialDevSeeds();
+        setStored("bookings", devBookings);
+        setStored("assignments", devAssignments);
+        setStored("professionals", devPros);
+        setStored("invoices", devInvoices);
+      } else {
+        setStored("bookings", []);
+        setStored("assignments", []);
+        setStored("professionals", []);
+        setStored("invoices", []);
+      }
       setStored("pricing_config", DEFAULT_PRICING_CONFIG);
       setStored("audit_logs", [
         {
@@ -325,7 +357,7 @@ export const dbRepository = {
     const filtered = isDev ? all : all.filter((b) => !b.is_dev_seed);
 
     if (customerId) {
-      return filtered.filter((b) => b.customer_id === customerId || b.customer_id === "usr-seed-1");
+      return filtered.filter((b) => b.customer_id === customerId);
     }
     return filtered;
   },
@@ -343,6 +375,7 @@ export const dbRepository = {
     serviceId: string;
     serviceName: string;
     categorySlug: string;
+    customerId?: string;
     customerName: string;
     customerPhone: string;
     scheduledDate: string;
@@ -355,6 +388,8 @@ export const dbRepository = {
     totalAmount: number;
     paymentMethod: string;
     customerNotes?: string;
+    customerEmail?: string;
+    startOtp?: string;
   }): any {
     const all = getStored<any[]>("bookings", []);
     const bookingNumber = generateReference("HEF");
@@ -363,9 +398,10 @@ export const dbRepository = {
     const newBooking: any = {
       id,
       booking_number: bookingNumber,
-      customer_id: "usr-current",
+      customer_id: payload.customerId || "usr-current",
       customer_name: payload.customerName,
       customer_phone: payload.customerPhone,
+      customer_email: payload.customerEmail || "customer@homeefix.in",
       service_id: payload.serviceId,
       service_name: payload.serviceName,
       category_slug: payload.categorySlug,
@@ -381,7 +417,7 @@ export const dbRepository = {
       payment_method: payload.paymentMethod,
       payment_status: payload.paymentMethod === "CASH" ? "PENDING" : "SUCCESS",
       customer_notes: payload.customerNotes || "",
-      start_otp: String(Math.floor(1000 + Math.random() * 9000)),
+      start_otp: payload.startOtp || generateSecureOtp(),
       created_at: nowIso(),
       is_dev_seed: false,
       timeline: [
@@ -508,24 +544,15 @@ export const dbRepository = {
   },
 
   getRefunds(): any[] {
-    return getStored<any[]>("refunds", [
-      {
-        id: "RF-801",
-        bookingId: "HEF-2026-9A82B1C3",
-        customer: "Debanjan Sengupta",
-        amount: 499,
-        reason: "Technician delayed past emergency threshold",
-        status: "COMPLETED",
-        date: "11 Sep 2026",
-      },
-    ]);
+    const all = getStored<any[]>("refunds", []);
+    const isDev = this.isDevSeedEnabled();
+    return isDev ? all : all.filter((r) => !r.isDevSeed);
   },
 
   getPayouts(): any[] {
-    return getStored<any[]>("payouts", [
-      { id: "p-1", techId: "pro-seed-1", techName: "Suresh Reddy", bank: "HDFC Bank (**** 4891)", amount: 3450, status: "pending", requestedAt: nowIso() },
-      { id: "p-2", techId: "pro-seed-2", techName: "Mahesh Kumar", bank: "ICICI Bank (**** 1204)", amount: 2180, status: "approved", requestedAt: nowIso() },
-    ]);
+    const all = getStored<any[]>("payouts", []);
+    const isDev = this.isDevSeedEnabled();
+    return isDev ? all : all.filter((p) => !p.isDevSeed);
   },
 
   requestPayout(techId: string, techName: string, amount: number, bank: string): any {
@@ -533,6 +560,7 @@ export const dbRepository = {
     const newPayout = {
       id: `p-${Date.now().toString().slice(-4)}`,
       techId,
+      proId: techId,
       techName,
       bank,
       amount,
@@ -560,17 +588,6 @@ export const dbRepository = {
     const bookings = this.getBookings();
     const blockedCustomerIds = getStored<string[]>("blocked_customers", []);
     const customerMap = new Map<string, any>();
-
-    customerMap.set("usr-seed-1", {
-      id: "usr-seed-1",
-      name: "Debanjan Sengupta",
-      email: "debanjan@homeefix.in",
-      phone: "+91 98301 23456",
-      orders: 0,
-      spend: 0,
-      status: blockedCustomerIds.includes("usr-seed-1") ? "blocked" : "active",
-      joinedDate: "10 Aug 2026",
-    });
 
     bookings.forEach((b) => {
       const key = b.customer_id || b.customer_phone || b.customer_name;
@@ -659,9 +676,9 @@ export const dbRepository = {
     return assignment;
   },
 
-  acceptAssignment(assignmentId: string, professionalId: string): boolean {
+  acceptAssignment(assignmentIdOrBookingId: string, professionalId: string, professionalName?: string, professionalPhone?: string): any {
     const assignments = getStored<BookingAssignment[]>("assignments", []);
-    const idx = assignments.findIndex((a) => a.id === assignmentId);
+    const idx = assignments.findIndex((a) => a.id === assignmentIdOrBookingId || a.bookingId === assignmentIdOrBookingId);
     if (idx === -1) return false;
 
     const assignment = assignments[idx];
@@ -687,13 +704,21 @@ export const dbRepository = {
     const bookings = getStored<any[]>("bookings", []);
     const bIdx = bookings.findIndex((b) => b.id === assignment.bookingId);
     if (bIdx !== -1) {
+      const pros = this.getProfessionals();
+      const matchedPro = pros.find((p) => p.id === professionalId);
+      const finalName = professionalName || matchedPro?.name || "Assigned Professional";
+      const finalPhone = professionalPhone || matchedPro?.phone || "+91 98300 00000";
       bookings[bIdx].technician_id = professionalId;
-      bookings[bIdx].technician_name = "Suresh Reddy";
-      bookings[bIdx].technician_phone = "+91 98765 43210";
+      bookings[bIdx].technician_name = finalName;
+      bookings[bIdx].technician_phone = finalPhone;
+      bookings[bIdx].assigned_technician_id = professionalId;
+      bookings[bIdx].assigned_technician_name = finalName;
       setStored("bookings", bookings);
+      this.addAuditLog("JOB_ACCEPTED", "ASSIGNMENT", assignment.id, null, { professionalId });
+      return bookings[bIdx];
     }
 
-    this.addAuditLog("JOB_ACCEPTED", "ASSIGNMENT", assignmentId, null, { professionalId });
+    this.addAuditLog("JOB_ACCEPTED", "ASSIGNMENT", assignment.id, null, { professionalId });
     return true;
   },
 
@@ -757,7 +782,15 @@ export const dbRepository = {
     this.initializeIfEmpty();
     const all = getStored<any[]>("invoices", []);
     const isDev = this.isDevSeedEnabled();
-    return isDev ? all : all.filter((i) => !i.isDevSeed);
+    const filtered = isDev ? all : all.filter((i) => !i.isDevSeed);
+    if (customerId) {
+      const customerBookings = this.getBookings(customerId);
+      const bookingIds = new Set(
+        customerBookings.map((b) => b.id).concat(customerBookings.map((b) => b.booking_number))
+      );
+      return filtered.filter((i) => bookingIds.has(i.bookingId) || bookingIds.has(i.bookingNumber));
+    }
+    return filtered;
   },
 
   generateInvoiceForBooking(booking: any): any {
@@ -766,16 +799,24 @@ export const dbRepository = {
     const inv = {
       id: `inv-${Date.now()}`,
       invoiceNumber,
+      invoice_number: invoiceNumber,
       bookingId: booking.id,
+      booking_id: booking.id,
       bookingNumber: booking.booking_number,
+      booking_number: booking.booking_number,
       serviceName: booking.service_name,
+      service_name: booking.service_name,
       customerName: booking.customer_name,
+      customer_name: booking.customer_name,
       date: formatDate(nowIso()),
       subtotal: booking.subtotal,
       safetyFee: booking.safety_fee,
+      safety_fee: booking.safety_fee,
       taxGst: booking.tax_gst,
+      tax_gst: booking.tax_gst,
       discount: booking.discount,
       totalAmount: booking.total_amount,
+      total_amount: booking.total_amount,
       status: "PAID",
       paymentMethod: booking.payment_method,
       isDevSeed: false,
@@ -805,53 +846,102 @@ export const dbRepository = {
   },
 
   // ─── CUSTOMER ADDRESSES ───
-  getAddresses(): any[] {
-    return getStored<any[]>("addresses", [
-      {
-        id: "addr-seed-1",
-        title: "Home Address",
-        type: "home",
-        streetAddress: "Flat 402, Block CD, Salt Lake Sector 1",
-        landmark: "Near City Centre 1 Mall",
-        city: "Kolkata",
-        state: "West Bengal",
-        pincode: "700064",
-        isDefault: true,
-      },
-      {
-        id: "addr-seed-2",
-        title: "Work Office",
-        type: "work",
-        streetAddress: "Tower 5, Action Area 1, New Town",
-        landmark: "Near Eco Park Gateway 2",
-        city: "Kolkata",
-        state: "West Bengal",
-        pincode: "700156",
-        isDefault: false,
-      },
-    ]);
+  getAddresses(userId?: string): any[] {
+    const all = getStored<any[]>("addresses", []);
+    const isDev = this.isDevSeedEnabled();
+    const filtered = isDev ? all : all.filter((a) => !a.isDevSeed);
+    const userScoped = userId
+      ? filtered.filter((a) => a.userId === userId || a.user_id === userId)
+      : filtered;
+
+    return userScoped.map((a) => {
+      const isDef = Boolean(a.isDefault ?? a.is_default);
+      const street = a.streetAddress || a.address_line_1 || a.house_flat || "";
+      const city = a.city || "Kolkata";
+      const pincode = a.pincode || "700064";
+      const title = a.title || a.label || "Home";
+      return {
+        ...a,
+        id: a.id || `addr-${Date.now()}`,
+        userId: a.userId || a.user_id || userId || "usr-current",
+        user_id: a.user_id || a.userId || userId || "usr-current",
+        title,
+        label: title,
+        type: (a.type || "home").toLowerCase(),
+        streetAddress: street,
+        address_line_1: street,
+        city,
+        state: a.state || "West Bengal",
+        pincode,
+        landmark: a.landmark || "",
+        isDefault: isDef,
+        is_default: isDef,
+        fullAddress:
+          a.fullAddress ||
+          [street, a.landmark ? `Near ${a.landmark}` : null, city, pincode].filter(Boolean).join(", "),
+      };
+    });
   },
 
-  saveAddress(address: any): any[] {
-    const current = this.getAddresses();
-    if (address.id) {
-      const idx = current.findIndex((a) => a.id === address.id);
-      if (idx !== -1) current[idx] = address;
-    } else {
-      address.id = `addr-${Date.now()}`;
-      if (address.isDefault) {
-        current.forEach((a) => (a.isDefault = false));
-      }
-      current.push(address);
+  saveAddress(address: any, userId?: string): any {
+    const targetUserId = userId || address.userId || address.user_id || "usr-current";
+    address.userId = targetUserId;
+    address.user_id = targetUserId;
+    address.title = address.title || address.label || "Home";
+    address.label = address.title;
+    address.streetAddress = address.streetAddress || address.address_line_1 || "";
+    address.address_line_1 = address.streetAddress;
+    address.city = address.city || "Kolkata";
+    address.state = address.state || "West Bengal";
+    address.pincode = address.pincode || "700064";
+    const isDef = Boolean(address.isDefault ?? address.is_default);
+    address.isDefault = isDef;
+    address.is_default = isDef;
+    address.fullAddress =
+      address.fullAddress ||
+      [address.streetAddress, address.landmark ? `Near ${address.landmark}` : null, address.city, address.pincode]
+        .filter(Boolean)
+        .join(", ");
+
+    const all = getStored<any[]>("addresses", []);
+
+    if (isDef) {
+      // Unset other defaults for this user
+      all.forEach((a) => {
+        if (a.userId === targetUserId || a.user_id === targetUserId) {
+          a.isDefault = false;
+          a.is_default = false;
+        }
+      });
     }
-    setStored("addresses", current);
-    return current;
+
+    if (address.id) {
+      const idx = all.findIndex((a) => a.id === address.id);
+      if (idx !== -1) {
+        all[idx] = { ...all[idx], ...address, updated_at: nowIso() };
+      } else {
+        all.push({ ...address, created_at: nowIso(), updated_at: nowIso() });
+      }
+    } else {
+      address.id = `addr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      address.created_at = nowIso();
+      address.updated_at = nowIso();
+      all.push(address);
+    }
+
+    setStored("addresses", all);
+    return address;
   },
 
-  deleteAddress(id: string): any[] {
-    const current = this.getAddresses().filter((a) => a.id !== id);
-    setStored("addresses", current);
-    return current;
+  deleteAddress(id: string, userId?: string): any[] {
+    let all = getStored<any[]>("addresses", []);
+    if (userId) {
+      all = all.filter((a) => !(a.id === id && (a.userId === userId || a.user_id === userId)));
+    } else {
+      all = all.filter((a) => a.id !== id);
+    }
+    setStored("addresses", all);
+    return this.getAddresses(userId);
   },
 
   // ─── PRICING CONFIG ───
@@ -865,35 +955,133 @@ export const dbRepository = {
   },
 
   // ─── REVIEWS ───
-  getReviews(): any[] {
-    return getStored<any[]>("reviews", [
-      {
-        id: "rev-seed-1",
-        userName: "Debanjan Sengupta",
-        serviceName: "Kitchen Sink Leakage Repair",
-        rating: 5,
-        comment: "Plumber arrived on time with proper tools and fixed the mixer tap leak neatly.",
-        date: "2026-09-11",
-        isVerified: true,
-        isDevSeed: true,
-      },
-    ]);
+  getReviews(serviceId?: string): any[] {
+    const all = getStored<any[]>("reviews", []);
+    const isDev = this.isDevSeedEnabled();
+    const filtered = isDev ? all : all.filter((r) => !r.isDevSeed);
+    if (serviceId) {
+      return filtered.filter((r) => r.serviceId === serviceId || r.serviceName === serviceId);
+    }
+    return filtered;
   },
 
-  createReview(payload: { bookingId: string; rating: number; comment: string; serviceName: string }): void {
+  createReview(payload: { bookingId: string; serviceId?: string; rating: number; comment: string; serviceName: string; userName?: string; customerId?: string }): any {
     const reviews = getStored<any[]>("reviews", []);
-    reviews.unshift({
+    const newRev = {
       id: `rev-${Date.now()}`,
       bookingId: payload.bookingId,
-      userName: "Debanjan Sengupta",
+      customerId: payload.customerId,
+      serviceId: payload.serviceId,
+      userName: payload.userName || "Verified Customer",
       serviceName: payload.serviceName,
       rating: payload.rating,
       comment: payload.comment,
       date: formatDate(nowIso()),
       isVerified: true,
       isDevSeed: false,
-    });
+    };
+    reviews.unshift(newRev);
     setStored("reviews", reviews);
+    return newRev;
+  },
+
+  // ─── MEMBERSHIPS ───
+  getMemberships(): any[] {
+    return getStored<any[]>("memberships", []);
+  },
+
+  getMembership(userId: string): any | null {
+    if (!userId) return null;
+    const all = this.getMemberships();
+    return all.find((m) => (m.userId === userId || m.user_id === userId) && m.status === "ACTIVE") || null;
+  },
+
+  saveMembership(subscription: {
+    userId: string;
+    planName: string;
+    amount: number;
+    paymentId: string;
+    expiresAt: string;
+  }): any {
+    const all = this.getMemberships();
+    const newSub = {
+      id: `mem-${Date.now()}`,
+      userId: subscription.userId,
+      user_id: subscription.userId,
+      planName: subscription.planName,
+      amount: subscription.amount,
+      paymentId: subscription.paymentId,
+      status: "ACTIVE",
+      startedAt: nowIso(),
+      expiresAt: subscription.expiresAt,
+    };
+    all.unshift(newSub);
+    setStored("memberships", all);
+    this.addAuditLog("MEMBERSHIP_ACTIVATED", "SUBSCRIPTION", newSub.id, null, newSub);
+    return newSub;
+  },
+
+  // ─── PLATFORM COUPONS ───
+  getCoupons(): any[] {
+    return [
+      {
+        id: "c-1",
+        code: "FIRSTFIX100",
+        title: "Flat ₹100 Off On First Booking",
+        description: "Applicable on any home service category with minimum booking amount of ₹299.",
+        discountAmount: 100,
+        minOrderAmount: 299,
+        expiresAt: "2026-12-31",
+      },
+      {
+        id: "c-2",
+        code: "HOMEEFIX20",
+        title: "20% Off AC Deep Cleaning & Servicing",
+        description: "Get 20% discount up to ₹300 on Split & Window AC foam servicing.",
+        discountPercentage: 20,
+        minOrderAmount: 499,
+        expiresAt: "2026-08-31",
+      },
+      {
+        id: "c-3",
+        code: "VIPPASS",
+        title: "Exclusive ₹150 Off for VIP Pass Members",
+        description: "Special voucher valid across all plumbing and electrical services.",
+        discountAmount: 150,
+        minOrderAmount: 399,
+        expiresAt: "2026-10-15",
+      },
+    ];
+  },
+
+  // ─── SPARE PARTS INVENTORY ───
+  getInventory(technicianId?: string): any[] {
+    const all = getStored<any[]>("inventory", [
+      { id: "inv-1", name: "Split AC Dual Capacitor 45uF", category: "AC Spares", stock: 6, unitPrice: 350, technicianId: "pro-current" },
+      { id: "inv-2", name: "R32 Eco Refrigerant Can (1kg)", category: "AC Spares", stock: 2, unitPrice: 1200, technicianId: "pro-current" },
+      { id: "inv-3", name: "Brass Basin Tap Spout Cartridge", category: "Plumbing", stock: 12, unitPrice: 120, technicianId: "pro-current" },
+      { id: "inv-4", name: "Single Pole 32A MCB Breaker", category: "Electrical", stock: 8, unitPrice: 220, technicianId: "pro-current" },
+    ]);
+    if (technicianId) {
+      return all.filter((i) => i.technicianId === technicianId);
+    }
+    return all;
+  },
+
+  requestInventoryStock(partNameOrPayload: any, quantity?: number, technicianId?: string): void {
+    const partName = typeof partNameOrPayload === "string" ? partNameOrPayload : (partNameOrPayload.name || "Spare Component");
+    const qty = typeof partNameOrPayload === "string" ? (quantity || 1) : (partNameOrPayload.stock || partNameOrPayload.quantity || 1);
+    const requests = getStored<any[]>("inventory_requests", []);
+    requests.unshift({
+      id: `req-${Date.now()}`,
+      partName,
+      quantity: qty,
+      technicianId: technicianId || "pro-current",
+      status: "PENDING_DISPATCH",
+      createdAt: nowIso(),
+    });
+    setStored("inventory_requests", requests);
+    this.addAuditLog("STOCK_REQUESTED", "INVENTORY", `req-${Date.now()}`, null, { partName, quantity: qty });
   },
 
   // ─── SUPPORT TICKETS ───
@@ -901,21 +1089,56 @@ export const dbRepository = {
     return getStored<any[]>("support_tickets", []);
   },
 
-  createSupportTicket(payload: { subject: string; category: string; description: string; bookingNumber?: string }): any {
+  createSupportTicket(payload: any): any {
     const tickets = getStored<any[]>("support_tickets", []);
     const ticket = {
-      id: `tkt-${Date.now()}`,
+      id: generateReference("TCK"),
       ticketNumber: generateReference("TKT"),
+      customer_id: payload.customer_id || payload.customerId || "usr-anon",
+      customer_name: payload.customer_name || payload.customerName || payload.customer || "Homeowner",
       subject: payload.subject,
-      category: payload.category,
-      description: payload.description,
+      category: payload.category || "GENERAL",
+      priority: payload.priority || "MEDIUM",
+      description: payload.description || payload.message || "",
       bookingNumber: payload.bookingNumber,
       status: "OPEN",
       createdAt: nowIso(),
+      created_at: nowIso(),
+      messages: payload.message ? [{ sender: "customer", text: payload.message, timestamp: nowIso() }] : [],
     };
     tickets.unshift(ticket);
     setStored("support_tickets", tickets);
     return ticket;
+  },
+
+  updateSupportTicketStatus(ticketId: string, status: string): any {
+    const tickets = this.getSupportTickets();
+    const idx = tickets.findIndex((t) => t.id === ticketId || t.ticketNumber === ticketId);
+    if (idx !== -1) {
+      tickets[idx].status = status;
+      tickets[idx].updated_at = nowIso();
+      setStored("support_tickets", tickets);
+      return tickets[idx];
+    }
+    return null;
+  },
+
+  // ─── USER PROFILES ───
+  saveProfile(profile: any): any {
+    const profiles = getStored<any[]>("profiles", []);
+    const idx = profiles.findIndex((p) => p.id === profile.id);
+    if (idx !== -1) {
+      profiles[idx] = { ...profiles[idx], ...profile, updated_at: nowIso() };
+    } else {
+      profiles.push({ ...profile, created_at: nowIso(), updated_at: nowIso() });
+    }
+    setStored("profiles", profiles);
+    return profile;
+  },
+
+  getProfile(id: string): any {
+    const profiles = getStored<any[]>("profiles", []);
+    return profiles.find((p) => p.id === id) || null;
   },
 
   // ─── AUDIT LOGS ───
@@ -969,5 +1192,82 @@ export const dbRepository = {
       completedJobsCount: completedBookings.length,
       categoryTotals,
     };
+  },
+
+  // ─── DIGITAL INVOICES ───
+  getDigitalInvoice(bookingId: string) {
+    const booking = this.getBookingById(bookingId) || this.getBookingByReference(bookingId);
+    if (!booking) return null;
+
+    return invoiceEngine.generate({
+      bookingId: booking.id,
+      bookingNumber: booking.booking_number || booking.id,
+      bookingDate: booking.created_at || nowIso(),
+      customerName: booking.customer_name || "Valued Customer",
+      customerPhone: booking.customer_phone || "+91 98300 00000",
+      customerAddress: typeof booking.address === "string" ? booking.address : `${booking.address?.street || ""}, ${booking.address?.city || "Kolkata"}`,
+      serviceName: booking.service_name || "Home Service",
+      technicianName: booking.technician_name,
+      subtotal: Number(booking.subtotal) || Number(booking.total_amount) || 0,
+      safetyFee: Number(booking.safety_fee) || 29,
+      discountAmount: Number(booking.discount) || 0,
+      paymentMethod: booking.payment_method || "UPI",
+      paymentStatus: booking.payment_status || "SUCCESS",
+      warrantyDays: booking.warranty_days || 30,
+    });
+  },
+
+  // ─── SERVICE WARRANTIES ───
+  getWarranties(customerId?: string) {
+    const bookings = this.getBookings();
+    const completed = bookings.filter(
+      (b) => b.status === "COMPLETED" || b.status === "SERVICE_COMPLETED"
+    );
+
+    const userBookings = customerId
+      ? completed.filter((b) => b.customer_id === customerId)
+      : completed;
+
+    return userBookings.map((b) =>
+      warrantyEngine.createWarranty(
+        b.id,
+        b.booking_number || b.id,
+        b.service_name || "Home Service",
+        b.completed_at || b.created_at || nowIso(),
+        b.warranty_days || 30
+      )
+    );
+  },
+
+  getWarrantyByBookingId(bookingId: string) {
+    const booking = this.getBookingById(bookingId) || this.getBookingByReference(bookingId);
+    if (!booking) return null;
+    return warrantyEngine.createWarranty(
+      booking.id,
+      booking.booking_number || booking.id,
+      booking.service_name || "Home Service",
+      booking.completed_at || booking.created_at || nowIso(),
+      booking.warranty_days || 30
+    );
+  },
+
+  createWarrantyClaim(bookingId: string, issueDescription: string, photos: string[] = []) {
+    const claims = getStored<any[]>("warranty_claims", []);
+    const newClaim = {
+      id: `claim-${Date.now()}`,
+      bookingId,
+      issueDescription,
+      photos,
+      status: "UNDER_REVIEW",
+      createdAt: nowIso(),
+    };
+    claims.unshift(newClaim);
+    setStored("warranty_claims", claims);
+    this.addAuditLog("WARRANTY_CLAIM_RAISED", "WARRANTY", newClaim.id, null, { bookingId, issueDescription });
+    return newClaim;
+  },
+
+  getWarrantyClaims() {
+    return getStored<any[]>("warranty_claims", []);
   },
 };

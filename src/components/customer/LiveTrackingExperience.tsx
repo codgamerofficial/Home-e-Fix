@@ -43,8 +43,8 @@ export function LiveTrackingExperience({
   const isArrived = status === "PROFESSIONAL_ARRIVED";
   const isStarted = status === "SERVICE_STARTED";
 
-  const proName = booking.technician_name || "Suresh Reddy";
-  const proPhone = booking.technician_phone || "+91 98765 43210";
+  const proName = booking.technician_name || booking.assigned_technician_name || "Assigned Specialist";
+  const proPhone = booking.technician_phone || "+91 80000 00000";
   const bookingNumber = booking.booking_number || booking.id || "HEF-2026-000000";
   const serviceName = booking.service_name || "Home Service";
 
@@ -113,12 +113,12 @@ export function LiveTrackingExperience({
                 </span>
                 <span className="text-[11px] opacity-80">
                   {isOnTheWay
-                    ? "Dispatched from Salt Lake Hub • ETA: ~18 mins (3.2 km)"
+                    ? "Specialist has departed hub and is en route to your address."
                     : isArrived
                     ? "Technician is at your doorstep. Please share the 4-digit start OTP."
                     : isStarted
-                    ? "Work is currently in progress."
-                    : "Technician will start travel 30 minutes before your appointment."}
+                    ? "Service is currently in progress."
+                    : "Technician is allocated and will begin transit prior to your slot."}
                 </span>
               </div>
             </div>
@@ -153,10 +153,10 @@ export function LiveTrackingExperience({
             </div>
             <div>
               <span className="text-[10px] text-foreground-muted block font-semibold uppercase tracking-wider">
-                Estimated Arrival
+                Scheduled Slot
               </span>
               <span className="font-bold text-accent text-sm">
-                {isOnTheWay ? "~18 mins" : "On Schedule"}
+                {booking.scheduled_time || "Confirmed Slot"}
               </span>
             </div>
             <div>
@@ -180,10 +180,9 @@ export function LiveTrackingExperience({
                   {proName}
                 </h4>
                 <div className="flex items-center gap-1.5 text-[11px] text-foreground-secondary mt-0.5">
-                  <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-emerald-50 text-emerald-700">
-                    Verified Pro
+                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-semibold">
+                    100% Background Verified Pro
                   </Badge>
-                  <span>⭐ 4.9 (42 jobs)</span>
                 </div>
               </div>
             </div>

@@ -5,7 +5,6 @@
 export const MAPMYINDIA_CONFIG = {
   apiKey: import.meta.env.VITE_MAPMYINDIA_MAP_API_KEY || import.meta.env.VITE_MAP_API_KEY || "",
   clientId: import.meta.env.VITE_MAPMYINDIA_CLIENT_ID || "",
-  clientSecret: import.meta.env.VITE_MAPMYINDIA_CLIENT_SECRET || "",
 };
 
 export const mapmyIndiaService = {
@@ -26,15 +25,15 @@ export const mapmyIndiaService = {
   async reverseGeocode(lat: number, lng: number): Promise<string> {
     try {
       const key = MAPMYINDIA_CONFIG.apiKey;
-      if (!key) return "Hitech City, Hyderabad, Telangana 500081";
+      if (!key) return `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E (Kolkata Region)`;
       const res = await fetch(`https://apis.mapmyindia.com/advancedmaps/v1/${key}/rev_geocode?lat=${lat}&lng=${lng}`);
       const data = await res.json();
       if (data.results && data.results[0]) {
-        return data.results[0].formatted_address || data.results[0].subLocality || "Hitech City, Hyderabad, Telangana 500081";
+        return data.results[0].formatted_address || data.results[0].subLocality || `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
       }
-      return "Hitech City, Hyderabad, Telangana 500081";
+      return `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
     } catch {
-      return "Hitech City, Hyderabad, Telangana 500081";
+      return `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
     }
   },
 };
@@ -65,9 +64,9 @@ export const googleMapsService = {
       if (data.results && data.results[0]) {
         return data.results[0].formatted_address;
       }
-      return "Hitech City, Hyderabad, Telangana 500081";
+      return `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
     } catch {
-      return "Hitech City, Hyderabad, Telangana 500081";
+      return `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
     }
   },
 };

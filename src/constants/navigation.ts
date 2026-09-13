@@ -31,6 +31,8 @@ import {
   MessageSquare,
   Activity,
   Briefcase,
+  Server,
+  Database,
   type LucideIcon,
 } from "lucide-react";
 import { ROUTES } from "./routes";
@@ -114,6 +116,8 @@ export const ADMIN_SIDEBAR_LINKS: NavLink[] = [
   { label: "Reports & Audit", href: ROUTES.ADMIN_REPORTS, icon: Activity },
   { label: "Audit Logs", href: ROUTES.ADMIN_AUDIT_LOGS, icon: FolderLock },
   { label: "Platform Settings", href: ROUTES.ADMIN_SETTINGS, icon: Settings },
+  { label: "Integrations & APIs", href: ROUTES.ADMIN_INTEGRATIONS, icon: Server },
+  { label: "Data Quality Matrix", href: ROUTES.ADMIN_DATA_QUALITY, icon: Database },
 ];
 
 /* ─── Footer Links ─── */

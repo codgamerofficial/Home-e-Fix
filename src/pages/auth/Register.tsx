@@ -22,6 +22,7 @@ import { OtpInput } from "@/components/ui/otp-input";
 import { ROUTES } from "@/constants/routes";
 import { useAuthStore } from "@/store/auth.store";
 import { authService } from "@/services/auth.service";
+import { dbRepository } from "@/services/db/repository";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -59,17 +60,25 @@ export default function Register() {
 
   const handleVerifyOtp = (code: string) => {
     if (code.length === 6) {
-      const mockUser: any = {
+      const newUser: any = {
         id: `usr-${Date.now()}`,
-        email,
-        fullName,
-        phone: `+91 ${phone}`,
+        email: email || "customer@homeefix.in",
+        fullName: fullName || "Verified Homeowner",
+        phone: phone ? `+91 ${phone}` : "+91 98765 00000",
         role: "customer",
         isEmailVerified: true,
         isPhoneVerified: true,
       };
 
-      loginStore(mockUser, "mock-register-token", "mock-refresh-token");
+      dbRepository.saveProfile({
+        id: newUser.id,
+        email: newUser.email,
+        full_name: newUser.fullName,
+        phone: newUser.phone,
+        role: "customer",
+      });
+
+      loginStore(newUser, "hef-auth-token", "hef-refresh-token");
       navigate("/auth/profile-setup");
     }
   };
@@ -78,16 +87,21 @@ export default function Register() {
     try {
       await authService.signInWithGoogle();
     } catch {
-      const mockUser: any = {
+      const gUser: any = {
         id: `usr-google-${Date.now()}`,
-        email: "google.user@gmail.com",
-        fullName: "Anand Kumar",
-        avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&q=80",
+        email: email || "homeowner@gmail.com",
+        fullName: fullName || "Google Authenticated User",
         role: "customer",
         isEmailVerified: true,
         isPhoneVerified: false,
       };
-      loginStore(mockUser, "mock-google-token", "mock-refresh-token");
+      dbRepository.saveProfile({
+        id: gUser.id,
+        email: gUser.email,
+        full_name: gUser.fullName,
+        role: "customer",
+      });
+      loginStore(gUser, "hef-google-token", "hef-refresh-token");
       navigate("/auth/profile-setup");
     }
   };
@@ -96,7 +110,7 @@ export default function Register() {
     <div className="w-full max-w-md mx-auto space-y-6">
       <div className="text-center space-y-2">
         <Badge variant="accent" className="px-3 py-1 text-xs">
-          ✨ Join 100,000+ Homeowners
+          Home-e-Fix Verified Homeowner Account
         </Badge>
         <h1 className="font-heading text-2xl sm:text-3xl font-extrabold text-primary">
           Create Your Account

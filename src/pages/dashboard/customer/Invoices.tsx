@@ -7,15 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import { dbRepository } from "@/services/db/repository";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/date";
+import { useAuthStore } from "@/store/auth.store";
 
 export default function Invoices() {
+  const { user } = useAuthStore();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeInvoiceModal, setActiveInvoiceModal] = useState<any | null>(null);
 
   useEffect(() => {
-    setInvoices(dbRepository.getInvoices());
-  }, []);
+    setInvoices(dbRepository.getInvoices(user?.id));
+  }, [user?.id]);
 
   const filtered = invoices.filter(
     (inv) =>

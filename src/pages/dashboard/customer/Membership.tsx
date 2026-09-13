@@ -1,14 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MembershipCard } from "@/components/ui/membership-card";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, Award, ShieldCheck, Check } from "lucide-react";
 import { displayRazorpayCheckout } from "@/lib/razorpay";
 import { useAuthStore } from "@/store/auth.store";
+import { dbRepository } from "@/services/db/repository";
 
 export default function Membership() {
   const { user } = useAuthStore();
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "cancel"; text: string } | null>(null);
+
+  useEffect(() => {
+    if (user?.id) {
+      const active = dbRepository.getMembership(user.id);
+      setIsSubscribed(!!active);
+    }
+  }, [user?.id]);
 
   const handleSubscribeVIP = async () => {
     setNotice(null);
@@ -22,6 +30,14 @@ export default function Membership() {
       customerEmail: user?.email || "customer@homeefix.com",
       customerPhone: user?.phone || "+91 98765 43210",
       onSuccess: (paymentId) => {
+        const expiresAt = new Date(Date.now() + 180 * 24 * 3600 * 1000).toISOString();
+        dbRepository.saveMembership({
+          userId: user?.id || "usr-current",
+          planName: "VIP Pass (6 Months)",
+          amount: 299,
+          paymentId,
+          expiresAt,
+        });
         setIsSubscribed(true);
         setNotice({
           type: "success",
