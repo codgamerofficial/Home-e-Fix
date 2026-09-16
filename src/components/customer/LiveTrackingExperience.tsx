@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router";
 import {
   MapPin,
   Clock,
@@ -57,8 +58,8 @@ export function LiveTrackingExperience({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in">
-      <Card className="w-full max-w-lg border border-border bg-surface overflow-hidden shadow-2xl space-y-0">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in">
+      <Card className="w-full max-w-lg border border-border bg-surface overflow-hidden shadow-2xl space-y-0 rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto pb-safe sm:pb-0">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border bg-primary text-white">
           <div className="flex items-center gap-2">
@@ -220,9 +221,14 @@ export function LiveTrackingExperience({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border bg-surface flex justify-end">
+        <div className="p-4 border-t border-border bg-surface flex items-center justify-between gap-3">
+          <Button asChild variant="accent" size="sm" className="font-bold shadow-glow">
+            <Link to={`/app/bookings/${booking.id}/track`}>
+              <Navigation className="w-3.5 h-3.5 mr-1.5" /> Open Fullscreen Live Map
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" onClick={onClose}>
-            Close Tracking
+            Close
           </Button>
         </div>
       </Card>

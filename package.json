@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "test": "npx tsx --test tests/**/*.test.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "wrangler deploy",
+    "edge:dev": "wrangler dev"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",
@@ -37,6 +39,7 @@
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
-    "vite-tsconfig-paths": "^6.1.1"
+    "vite-tsconfig-paths": "^6.1.1",
+    "wrangler": "^4.132.0"
   }
 }

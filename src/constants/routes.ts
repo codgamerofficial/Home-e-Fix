@@ -42,6 +42,7 @@ export const ROUTES = {
   APP_BOOK_SERVICE: "/app/book/:service",
   APP_BOOKINGS: "/app/bookings",
   APP_BOOKING_DETAIL: "/app/bookings/:id",
+  APP_BOOKING_TRACK: "/app/bookings/:id/track",
   APP_INVOICES: "/app/invoices",
   APP_MEMBERSHIP: "/app/membership",
   APP_WALLET: "/app/wallet",
@@ -103,6 +104,7 @@ export const ROUTES = {
   ADMIN_REPORTS: "/admin/reports",
   ADMIN_AUDIT_LOGS: "/admin/audit-logs",
   ADMIN_SETTINGS: "/admin/settings",
+  ADMIN_LIVE_OPERATIONS: "/admin/operations/live",
   ADMIN_INTEGRATIONS: "/admin/system/integrations",
   ADMIN_DATA_QUALITY: "/admin/system/data-quality",
 

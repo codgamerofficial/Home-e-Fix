@@ -19,52 +19,58 @@ export function useCustomerAddresses() {
   } = useQuery<Address[], Error>({
     queryKey,
     queryFn: async () => {
-      if (!userId) return [];
-      const result = await addressesApi.getCustomerAddresses(userId);
-      // Guarantee array contract to prevent any caller runtime crash
+      // If user is guest or unauthenticated, retrieve locally saved addresses
+      const effectiveId = userId || "usr-guest";
+      const result = await addressesApi.getCustomerAddresses(effectiveId);
       return Array.isArray(result) ? result : [];
     },
-    enabled: Boolean(userId),
     staleTime: 1000 * 60 * 3, // 3 minutes cache
   });
 
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey });
+    queryClient.invalidateQueries({ queryKey: ["customer-addresses"] });
+    queryClient.invalidateQueries({ queryKey: ["saved-addresses"] });
+  };
+
   const createMutation = useMutation({
     mutationFn: (newAddr: Partial<Address>) => {
-      if (!userId) throw new Error("Please log in to save a delivery address.");
-      return addressesApi.createAddress(newAddr, userId);
+      const effectiveId = userId || "usr-guest";
+      return addressesApi.createAddress(newAddr, effectiveId);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
+    onSuccess: (savedAddress) => {
+      invalidateAll();
+      return savedAddress;
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, updates }: { id: string; updates: Partial<Address> }) => {
-      if (!userId) throw new Error("Please log in to update your address.");
-      return addressesApi.updateAddress(id, updates, userId);
+      const effectiveId = userId || "usr-guest";
+      return addressesApi.updateAddress(id, updates, effectiveId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
+      invalidateAll();
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => {
-      if (!userId) throw new Error("Please log in to delete an address.");
-      return addressesApi.deleteAddress(id, userId);
+      const effectiveId = userId || "usr-guest";
+      return addressesApi.deleteAddress(id, effectiveId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
+      invalidateAll();
     },
   });
 
   const setDefaultMutation = useMutation({
     mutationFn: (id: string) => {
-      if (!userId) throw new Error("Please log in to set default address.");
-      return addressesApi.setDefaultAddress(id, userId);
+      const effectiveId = userId || "usr-guest";
+      return addressesApi.setDefaultAddress(id, effectiveId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey });
+      invalidateAll();
     },
   });
 

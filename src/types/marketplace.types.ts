@@ -94,15 +94,33 @@ export interface MarketplaceService {
 }
 
 /* ─── Serviceability & Geolocation ─── */
+export interface ServiceabilityCheckParams {
+  city?: string;
+  state?: string;
+  country?: string;
+  postalCode?: string;
+  pincode?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  serviceId?: string;
+  isEmergencyRequested?: boolean;
+}
+
 export interface ServiceabilityCheckResult {
   isServiceable: boolean;
+  serviceable?: boolean;
   cityName: string;
+  city?: string;
   localityName: string;
-  zoneCode: string;
+  coverage?: "ALL_KOLKATA" | "ALL_CITY" | "ZONE" | "OUT_OF_BOUNDS";
+  zoneCode: string; // Internal dispatch zone
+  internalHubCode?: string;
   pincode: string;
+  postalCode?: string;
   isEmergencySupported: boolean;
   availableCapacityNow: boolean;
   earliestSlot: string;
+  message?: string;
   reason?: string;
 }
 

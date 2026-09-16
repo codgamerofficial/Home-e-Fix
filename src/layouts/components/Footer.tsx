@@ -31,19 +31,29 @@ export function Footer() {
             {/* Contact Info Card */}
             <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3 backdrop-blur-sm">
               <a
-                href={`mailto:${APP_CONFIG.supportEmail}`}
+                href="mailto:support@homeefix.in"
                 className="flex items-center gap-2.5 text-xs sm:text-sm text-white/90 hover:text-accent transition-colors group"
               >
                 <Mail className="h-4 w-4 text-accent shrink-0 group-hover:scale-110 transition-transform" />
-                <span className="truncate">{APP_CONFIG.supportEmail}</span>
+                <span className="truncate">support@homeefix.in</span>
               </a>
-              <a
-                href={`tel:${APP_CONFIG.supportPhone}`}
-                className="flex items-center gap-2.5 text-xs sm:text-sm text-white/90 hover:text-accent transition-colors group"
-              >
-                <Phone className="h-4 w-4 text-accent shrink-0 group-hover:scale-110 transition-transform" />
-                <span>{APP_CONFIG.supportPhone}</span>
-              </a>
+              {import.meta.env.VITE_SUPPORT_PHONE ? (
+                <a
+                  href={`tel:${import.meta.env.VITE_SUPPORT_PHONE}`}
+                  className="flex items-center gap-2.5 text-xs sm:text-sm text-white/90 hover:text-accent transition-colors group"
+                >
+                  <Phone className="h-4 w-4 text-accent shrink-0 group-hover:scale-110 transition-transform" />
+                  <span>{import.meta.env.VITE_SUPPORT_PHONE}</span>
+                </a>
+              ) : (
+                <Link
+                  to="/support"
+                  className="flex items-center gap-2.5 text-xs sm:text-sm text-white/90 hover:text-accent transition-colors group"
+                >
+                  <Phone className="h-4 w-4 text-accent shrink-0 group-hover:scale-110 transition-transform" />
+                  <span>24/7 Online Support Helpdesk</span>
+                </Link>
+              )}
               <div className="flex items-center gap-2.5 text-xs sm:text-sm text-white/80">
                 <MapPin className="h-4 w-4 text-accent shrink-0" />
                 <span>Kolkata, West Bengal (Headquarters)</span>
@@ -76,8 +86,8 @@ export function Footer() {
 
       <Separator className="bg-white/10" />
 
-      {/* Bottom Bar */}
-      <div className="container-app relative flex flex-col items-center justify-between gap-4 py-6 md:flex-row text-xs text-white/70">
+      {/* Bottom Bar — includes mobile bottom navigation clearance */}
+      <div className="container-app relative flex flex-col items-center justify-between gap-4 pt-6 pb-[calc(var(--bottom-nav-height)+2rem)] md:pb-6 md:flex-row text-xs text-white/70">
         <p>
           © {currentYear} <span className="font-semibold text-white">{APP_CONFIG.name}</span>. All rights reserved.
         </p>

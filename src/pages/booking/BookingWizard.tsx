@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -21,6 +21,11 @@ import {
   CheckCircle2,
   Zap,
   HelpCircle,
+  ChevronUp,
+  ChevronDown,
+  X,
+  Info,
+  Edit2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -40,6 +45,12 @@ import { pricingEngine } from "@/services/marketplace/pricing.engine";
 import { serviceabilityEngine } from "@/services/marketplace/serviceability.engine";
 import { slotEngine } from "@/services/marketplace/slot.engine";
 import { paymentOrchestrator } from "@/lib/payments/orchestrator";
+import { catalogueEngine } from "@/services/marketplace/catalogue.engine";
+import { useCustomerAddresses } from "@/hooks/useCustomerAddresses";
+import { AddressFormModal } from "@/components/booking/AddressFormModal";
+import { bookingsApi } from "@/services/api/bookings.api";
+import type { Address, AddressSnapshot } from "@/types/address.types";
+import type { ArchitecturalService, ServiceDiagnosticQuestion, QuestionOption } from "@/types/service-architecture.types";
 
 export default function BookingWizard() {
   const navigate = useNavigate();
@@ -56,6 +67,18 @@ export default function BookingWizard() {
   const primaryService = selectedServices[0] || POPULAR_SERVICES[0];
   const categorySlug = (primaryService.category?.slug || primaryService.category || "ac") as string;
 
+  // Architectural Service lookup
+  const architecturalService: ArchitecturalService = useMemo(() => {
+    const slug = (primaryService as any).slug || "";
+    return (
+      catalogueEngine.getServiceBySlug(slug) ||
+      catalogueEngine.ARCHITECTURAL_SERVICES.find(
+        (s: ArchitecturalService) => s.missionCategory === categorySlug || s.slug.includes(categorySlug)
+      ) ||
+      catalogueEngine.ARCHITECTURAL_SERVICES[0]
+    );
+  }, [primaryService, categorySlug]);
+
   // Category-Specific Questions State
   const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({
     ac_tonnage: "1.5 Ton (Most Common)",
@@ -68,21 +91,29 @@ export default function BookingWizard() {
   // Emergency Option
   const [isEmergencyRequested, setIsEmergencyRequested] = useState(false);
 
-  // Address State (Dynamically loaded from real user repository)
-  const [addresses, setAddresses] = useState<any[]>(() => dbRepository.getAddresses(user?.id));
-  const [selectedAddressId, setSelectedAddressId] = useState<string>(() => {
-    const saved = dbRepository.getAddresses(user?.id);
-    return saved.length > 0 ? (saved.find((a) => a.isDefault)?.id || saved[0].id) : "";
-  });
-  const [showAddAddressModal, setShowAddAddressModal] = useState(false);
-  const [newAddrForm, setNewAddrForm] = useState({
-    title: "Home",
-    type: "home" as "home" | "work" | "other",
-    streetAddress: "",
-    landmark: "",
-    city: "Kolkata",
-    pincode: "700064",
-  });
+  // Address State (Loaded via TanStack Query from Supabase / DB repository)
+  const {
+    addresses: savedAddresses,
+    isLoading: isAddressesLoading,
+    deleteAddress: deleteSavedAddress,
+  } = useCustomerAddresses();
+
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+
+  // Auto-select default or first address when loaded
+  useEffect(() => {
+    if (savedAddresses.length > 0) {
+      const exists = savedAddresses.some((a) => a.id === selectedAddressId);
+      if (!selectedAddressId || !exists) {
+        const def = savedAddresses.find((a) => a.is_default || a.isDefault);
+        setSelectedAddressId(def ? def.id : savedAddresses[0].id);
+      }
+    } else {
+      setSelectedAddressId("");
+    }
+  }, [savedAddresses, selectedAddressId]);
 
   // Schedule State
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -100,11 +131,29 @@ export default function BookingWizard() {
   const [paymentMethod, setPaymentMethod] = useState<"upi" | "card" | "wallet" | "cash">("upi");
   const [paymentErrorNotice, setPaymentErrorNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showMobilePriceSheet, setShowMobilePriceSheet] = useState(false);
 
-  // Active Address & Serviceability Check
-  const currentAddress = addresses.find((a) => a.id === selectedAddressId) || addresses[0];
+  // Active Address & Kolkata-Wide Serviceability Check
+  const currentAddress = savedAddresses.find((a) => a.id === selectedAddressId) || savedAddresses[0];
   const serviceability = useMemo(() => {
-    return serviceabilityEngine.checkPincode(currentAddress?.pincode || "700064", isEmergencyRequested);
+    if (!currentAddress) {
+      return serviceabilityEngine.checkServiceability({
+        city: "Kolkata",
+        state: "West Bengal",
+        postalCode: "700001",
+        isEmergencyRequested,
+      });
+    }
+
+    return serviceabilityEngine.checkServiceability({
+      city: currentAddress.city,
+      state: currentAddress.state,
+      postalCode: currentAddress.postal_code || currentAddress.pincode,
+      pincode: currentAddress.postal_code || currentAddress.pincode,
+      latitude: currentAddress.latitude,
+      longitude: currentAddress.longitude,
+      isEmergencyRequested,
+    });
   }, [currentAddress, isEmergencyRequested]);
 
   // Dynamic Available Slots
@@ -148,33 +197,20 @@ export default function BookingWizard() {
     setCouponNotice({ valid: res.valid, message: res.message });
   };
 
-  const handleCreateAddress = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAddrForm.streetAddress || !newAddrForm.pincode) return;
-
-    const newAddr: any = {
-      userId: user?.id || "usr-guest",
-      user_id: user?.id || "usr-guest",
-      title: newAddrForm.title,
-      type: newAddrForm.type,
-      streetAddress: newAddrForm.streetAddress,
-      landmark: newAddrForm.landmark,
-      city: newAddrForm.city,
-      state: "West Bengal",
-      pincode: newAddrForm.pincode,
-      isDefault: addresses.length === 0,
-    };
-
-    const saved = dbRepository.saveAddress(newAddr);
-    const updatedList = dbRepository.getAddresses(user?.id);
-    setAddresses(updatedList);
-    setSelectedAddressId(saved.id || (updatedList.length > 0 ? updatedList[updatedList.length - 1].id : ""));
-    setShowAddAddressModal(false);
+  const handleAddressSaved = (savedAddr: Address) => {
+    setSelectedAddressId(savedAddr.id);
+    setIsAddressModalOpen(false);
+    setEditingAddress(null);
   };
 
   const handleConfirmBooking = async () => {
+    if (!currentAddress) {
+      setPaymentErrorNotice("Please add or select a service delivery address.");
+      return;
+    }
+
     if (!serviceability.isServiceable) {
-      setPaymentErrorNotice("Your selected address is outside active service zones. Please choose a serviceable address.");
+      setPaymentErrorNotice("Your selected address is outside active service zones. Currently available across Kolkata only.");
       return;
     }
 
@@ -185,23 +221,41 @@ export default function BookingWizard() {
       const activeSlot = generatedSlots.find((s) => s.slotId === selectedSlotId);
       const slotLabel = activeSlot ? activeSlot.timeRangeLabel : "09:00 AM - 11:00 AM";
 
-      const createdBooking = dbRepository.createBooking({
+      const addressSnapshot: AddressSnapshot = {
+        id: currentAddress.id,
+        full_name: currentAddress.full_name || currentAddress.recipient_name || user?.fullName || "Valued Customer",
+        phone: currentAddress.phone || currentAddress.recipient_phone || user?.phone || "9830000000",
+        house_flat: currentAddress.house_flat || currentAddress.address_line_1 || currentAddress.streetAddress || "",
+        building: currentAddress.building || null,
+        street: currentAddress.street || currentAddress.address_line_1 || currentAddress.streetAddress || "",
+        area: currentAddress.area || currentAddress.locality || "Kolkata",
+        landmark: currentAddress.landmark || null,
+        city: currentAddress.city || "Kolkata",
+        state: currentAddress.state || "West Bengal",
+        country: currentAddress.country || "India",
+        postal_code: currentAddress.postal_code || currentAddress.pincode || "700001",
+        latitude: currentAddress.latitude || null,
+        longitude: currentAddress.longitude || null,
+        formatted_address:
+          currentAddress.formatted_address ||
+          currentAddress.fullAddress ||
+          `${currentAddress.streetAddress || currentAddress.house_flat || ""}, ${currentAddress.city} - ${currentAddress.pincode}`,
+        label: currentAddress.label || "HOME",
+      };
+
+      const createdBooking = await bookingsApi.createBooking({
+        bookingNumber: `HEF-${Date.now().toString().slice(-6)}`,
         serviceId: primaryService.id,
         serviceName: primaryService.name,
         categorySlug: categorySlug,
-        customerId: user?.id || "usr-guest",
-        customerName: user?.fullName || "Valued Customer",
-        customerPhone: user?.phone || "+91 98300 00000",
-        customerEmail: user?.email || "customer@homeefix.in",
-        address: currentAddress.streetAddress || "Kolkata Hub",
+        customerName: addressSnapshot.full_name,
+        customerPhone: addressSnapshot.phone,
         scheduledDate: formatDate(selectedDate || new Date()),
         scheduledTimeSlot: slotLabel,
-        subtotal: pricingBreakdown.subtotal,
-        safetyFee: pricingBreakdown.safetyFee,
-        taxGst: pricingBreakdown.taxGst,
-        discount: pricingBreakdown.discountCoupon + pricingBreakdown.discountMembership,
         totalAmount: pricingBreakdown.totalPayableInr,
         paymentMethod: paymentMethod.toUpperCase(),
+        address: addressSnapshot.formatted_address,
+        addressSnapshot,
       });
 
       // If Razorpay online payment selected
@@ -256,10 +310,51 @@ export default function BookingWizard() {
     { title: "Payment", status: currentStep === 5 ? "current" : "upcoming" },
   ] as const;
 
+  const stepTitles = [
+    "Select Service Package",
+    "Diagnosis Questions",
+    "Service Address",
+    "Date & Time Slot",
+    "Review & Coupons",
+    "Select Payment",
+  ];
+
   return (
-    <div className="container-app py-8 max-w-4xl space-y-8">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="container-app py-5 sm:py-8 pb-32 lg:pb-12 max-w-4xl space-y-5 sm:space-y-8">
+      {/* Mobile Top Step Indicator Bar (< sm) */}
+      <div className="sm:hidden space-y-2.5">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => (currentStep > 0 ? setCurrentStep(currentStep - 1) : navigate(-1))}
+            className="min-touch-target p-1.5 -ml-1.5 flex items-center gap-1 text-xs font-semibold text-foreground-secondary hover:text-primary"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>{currentStep > 0 ? "Back" : "Exit"}</span>
+          </button>
+          <span className="text-[11px] font-bold text-accent tracking-wider uppercase">
+            Step {currentStep + 1} of 6
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <h1 className="font-heading text-lg font-bold text-primary truncate">
+            {stepTitles[currentStep]}
+          </h1>
+          <Badge variant="secondary" className="bg-[#FF6A00]/10 text-[#FF6A00] font-bold text-[10px] shrink-0">
+            Guaranteed
+          </Badge>
+        </div>
+        {/* Step Progress Bar */}
+        <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-[#FF6A00] transition-all duration-300 rounded-full"
+            style={{ width: `${((currentStep + 1) / 6) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Desktop Top Header (sm and up) */}
+      <div className="hidden sm:flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="font-heading text-2xl font-extrabold text-primary">
@@ -281,8 +376,10 @@ export default function BookingWizard() {
         </Button>
       </div>
 
-      {/* Progress Timeline */}
-      <ProgressTimeline steps={wizardSteps as any} />
+      {/* Desktop Progress Timeline */}
+      <div className="hidden sm:block">
+        <ProgressTimeline steps={wizardSteps as any} />
+      </div>
 
       {/* ERROR / NOTICE BANNER */}
       {paymentErrorNotice && (
@@ -353,56 +450,98 @@ export default function BookingWizard() {
           {currentStep === 1 && (
             <Card className="p-6 border border-border bg-surface space-y-6">
               <div>
-                <h2 className="font-heading text-lg font-bold text-primary flex items-center gap-2">
-                  <HelpCircle className="h-5 w-5 text-accent" /> Service Diagnosis Questions
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="font-heading text-lg font-bold text-primary flex items-center gap-2">
+                    <HelpCircle className="h-5 w-5 text-accent" /> Service Diagnosis Questions
+                  </h2>
+                  <Badge variant="outline" className="text-[10px] font-mono border-primary/20 text-primary">
+                    {architecturalService.deliveryType}
+                  </Badge>
+                </div>
                 <p className="text-xs text-foreground-secondary mt-1">
                   Help the technician arrive with the exact replacement materials and diagnostic equipment
                 </p>
               </div>
 
-              {categorySlug.includes("ac") ? (
+              {architecturalService.questions && architecturalService.questions.length > 0 ? (
                 <div className="space-y-4 text-xs">
-                  <div>
-                    <label className="font-bold text-primary">AC System Type</label>
-                    <select
-                      value={questionAnswers.ac_type}
-                      onChange={(e) => setQuestionAnswers({ ...questionAnswers, ac_type: e.target.value })}
-                      className="w-full mt-1.5 p-2.5 rounded-xl border border-border bg-surface text-xs"
-                    >
-                      <option>Split AC (High-wall mounted)</option>
-                      <option>Window AC</option>
-                      <option>Inverter Split AC (5 Star)</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="font-bold text-primary">Approximate Tonnage</label>
-                    <select
-                      value={questionAnswers.ac_tonnage}
-                      onChange={(e) => setQuestionAnswers({ ...questionAnswers, ac_tonnage: e.target.value })}
-                      className="w-full mt-1.5 p-2.5 rounded-xl border border-border bg-surface text-xs"
-                    >
-                      <option>1.0 Ton</option>
-                      <option>1.5 Ton (Most Common)</option>
-                      <option>2.0 Ton or above</option>
-                    </select>
-                  </div>
-                </div>
-              ) : categorySlug.includes("plumb") ? (
-                <div className="space-y-4 text-xs">
-                  <div>
-                    <label className="font-bold text-primary">Fixture Location</label>
-                    <select
-                      value={questionAnswers.plumbing_fixture}
-                      onChange={(e) => setQuestionAnswers({ ...questionAnswers, plumbing_fixture: e.target.value })}
-                      className="w-full mt-1.5 p-2.5 rounded-xl border border-border bg-surface text-xs"
-                    >
-                      <option>Bathroom washbasin</option>
-                      <option>Kitchen sink</option>
-                      <option>Shower mixer area</option>
-                      <option>Toilet cistern / flush tank</option>
-                    </select>
-                  </div>
+                  {architecturalService.questions.map((q: ServiceDiagnosticQuestion) => (
+                    <div key={q.id} className="space-y-1.5 p-3 rounded-xl bg-muted/20 border border-border">
+                      <label className="font-bold text-primary block">
+                        {q.question}
+                        {q.required && <span className="text-destructive ml-1">*</span>}
+                      </label>
+                      {q.helperText && (
+                        <p className="text-[11px] text-foreground-muted">{q.helperText}</p>
+                      )}
+
+                      {q.type === "SINGLE_CHOICE" && q.options && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                          {q.options.map((opt: QuestionOption) => {
+                            const isSelected = questionAnswers[q.code] === opt.id || questionAnswers[q.code] === opt.label;
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setQuestionAnswers({ ...questionAnswers, [q.code]: opt.id })}
+                                className={`p-2.5 rounded-xl border text-left text-xs transition-all flex items-center justify-between ${
+                                  isSelected
+                                    ? "border-accent bg-accent/5 font-bold text-primary shadow-xs"
+                                    : "border-border bg-surface text-foreground-secondary hover:border-accent/40"
+                                }`}
+                              >
+                                <span>{opt.label}</span>
+                                {opt.priceModifier ? (
+                                  <span className="text-[11px] text-accent font-mono font-bold">
+                                    +{formatCurrency(opt.priceModifier)}
+                                  </span>
+                                ) : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {q.type === "NUMBER_STEPPER" && (
+                        <div className="flex items-center gap-3 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentVal = Number(questionAnswers[q.code]) || q.minNumber || 1;
+                              const nextVal = Math.max(q.minNumber || 1, currentVal - (q.step || 1));
+                              setQuestionAnswers({ ...questionAnswers, [q.code]: String(nextVal) });
+                            }}
+                            className="w-8 h-8 rounded-lg border border-border bg-surface font-bold text-sm hover:bg-muted flex items-center justify-center"
+                          >
+                            -
+                          </button>
+                          <span className="font-mono font-bold text-sm min-w-10 text-center">
+                            {questionAnswers[q.code] || q.minNumber || 1} {q.unitLabel || ""}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentVal = Number(questionAnswers[q.code]) || q.minNumber || 1;
+                              const nextVal = Math.min(q.maxNumber || 20, currentVal + (q.step || 1));
+                              setQuestionAnswers({ ...questionAnswers, [q.code]: String(nextVal) });
+                            }}
+                            className="w-8 h-8 rounded-lg border border-border bg-surface font-bold text-sm hover:bg-muted flex items-center justify-center"
+                          >
+                            +
+                          </button>
+                        </div>
+                      )}
+
+                      {q.type === "TEXT_INPUT" && (
+                        <Input
+                          placeholder={q.helperText || "Enter details..."}
+                          value={questionAnswers[q.code] || ""}
+                          onChange={(e) => setQuestionAnswers({ ...questionAnswers, [q.code]: e.target.value })}
+                          className="text-xs mt-1"
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div className="space-y-4 text-xs">
@@ -436,47 +575,117 @@ export default function BookingWizard() {
                     <MapPin className="h-5 w-5 text-accent" /> Service Location
                   </h2>
                   <p className="text-xs text-foreground-secondary mt-1">
-                    Select delivery address to confirm local serviceability
+                    Select delivery address to confirm Kolkata serviceability & dispatch
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setShowAddAddressModal(true)} className="text-xs gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setEditingAddress(null);
+                    setIsAddressModalOpen(true);
+                  }}
+                  className="text-xs gap-1 font-bold"
+                >
                   <Plus className="h-3.5 w-3.5" /> Add Address
                 </Button>
               </div>
 
               {/* Address Cards */}
-              {addresses.length === 0 ? (
+              {savedAddresses.length === 0 ? (
                 <div className="p-8 rounded-2xl border border-dashed border-border text-center space-y-3 bg-muted/20">
                   <MapPin className="h-8 w-8 text-foreground-muted mx-auto" />
                   <p className="font-bold text-sm text-primary">No saved addresses found</p>
                   <p className="text-xs text-foreground-secondary max-w-sm mx-auto">
                     Please add your service delivery address in Kolkata to verify local serviceability and dispatch slots.
                   </p>
-                  <Button variant="accent" size="sm" onClick={() => setShowAddAddressModal(true)} className="gap-1.5 font-bold">
+                  <Button
+                    variant="accent"
+                    size="sm"
+                    onClick={() => {
+                      setEditingAddress(null);
+                      setIsAddressModalOpen(true);
+                    }}
+                    className="gap-1.5 font-bold"
+                  >
                     <Plus className="h-4 w-4" /> Add Service Address
                   </Button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {addresses.map((addr) => {
+                  {savedAddresses.map((addr) => {
                     const isSelected = selectedAddressId === addr.id;
+                    const tag = (addr.label || addr.title || "HOME").toUpperCase();
                     return (
                       <div
                         key={addr.id}
                         onClick={() => setSelectedAddressId(addr.id)}
-                        className={`p-4 rounded-2xl border text-left cursor-pointer transition-all ${
+                        className={`p-4 rounded-2xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
                           isSelected
-                            ? "border-accent bg-accent/5 ring-2 ring-accent/20"
+                            ? "border-accent bg-accent/5 ring-2 ring-accent/20 shadow-xs"
                             : "border-border bg-surface hover:border-slate-300"
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-xs text-primary">{addr.title}</span>
-                          {isSelected && <CheckCircle2 className="h-4 w-4 text-[#FF6A00]" />}
+                        <div>
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wider uppercase bg-primary/10 text-primary">
+                              {tag}
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {isSelected && <CheckCircle2 className="h-4 w-4 text-[#FF6A00]" />}
+                            </div>
+                          </div>
+
+                          {(addr.full_name || addr.recipient_name) && (
+                            <p className="font-bold text-xs text-primary mt-2">
+                              {addr.full_name || addr.recipient_name}
+                              {addr.phone ? ` • ${addr.phone}` : ""}
+                            </p>
+                          )}
+
+                          <p className="text-xs text-foreground-secondary mt-1 leading-relaxed">
+                            {addr.house_flat || addr.streetAddress || ""}
+                            {addr.building ? `, ${addr.building}` : ""}
+                            {addr.street && addr.street !== addr.house_flat ? `, ${addr.street}` : ""}
+                          </p>
+                          <p className="text-xs text-foreground-secondary font-medium">
+                            {addr.area || addr.locality || ""}, {addr.city} - {addr.postal_code || addr.pincode}
+                          </p>
+                          {addr.landmark && (
+                            <p className="text-[11px] text-foreground-muted mt-0.5">
+                              Landmark: {addr.landmark}
+                            </p>
+                          )}
                         </div>
-                        <p className="text-xs text-foreground-secondary mt-1 leading-relaxed">
-                          {addr.streetAddress}, {addr.city} - {addr.pincode}
-                        </p>
+
+                        <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/60">
+                          <span className="text-[11px] text-foreground-muted font-medium">
+                            {addr.is_default || addr.isDefault ? "Default Address" : ""}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingAddress(addr);
+                                setIsAddressModalOpen(true);
+                              }}
+                              className="text-[11px] font-bold text-primary hover:text-accent flex items-center gap-1 min-touch-target px-1.5 py-1 cursor-pointer"
+                            >
+                              <Edit2 className="h-3 w-3" /> Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                await deleteSavedAddress(addr.id);
+                              }}
+                              className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 min-touch-target px-1.5 py-1 cursor-pointer"
+                            >
+                              <Trash2 className="h-3 w-3" /> Delete
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -497,13 +706,13 @@ export default function BookingWizard() {
                   <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
                 )}
                 <div>
-                  <p className="font-bold">
+                  <p className="font-bold text-sm">
                     {serviceability.isServiceable ? "Service Available" : "Out of Service Zone"}
                   </p>
-                  <p className="mt-0.5 leading-relaxed">
+                  <p className="mt-0.5 leading-relaxed font-medium">
                     {serviceability.isServiceable
-                      ? `Your location is served by the ${serviceability.zoneCode} operational hub.`
-                      : serviceability.reason}
+                      ? "Home-e-Fix currently serves all areas across Kolkata."
+                      : (serviceability.reason || "Currently available in Kolkata only.")}
                   </p>
                 </div>
               </div>
@@ -512,9 +721,9 @@ export default function BookingWizard() {
                 <Button variant="outline" onClick={() => setCurrentStep(1)}>Back</Button>
                 <Button
                   variant="accent"
-                  disabled={!serviceability.isServiceable}
+                  disabled={!serviceability.isServiceable || !currentAddress}
                   onClick={() => setCurrentStep(3)}
-                  className="gap-2"
+                  className="gap-2 font-bold"
                 >
                   Choose Time Slot <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -697,8 +906,8 @@ export default function BookingWizard() {
           )}
         </div>
 
-        {/* Right 1 Column: Authoritative Bill Breakdown */}
-        <div className="lg:col-span-1">
+        {/* Right 1 Column: Authoritative Bill Breakdown (Desktop) */}
+        <div className="hidden lg:block lg:col-span-1">
           <div className="sticky top-24 rounded-3xl border border-border bg-surface p-6 shadow-sm space-y-4">
             <h3 className="font-heading text-sm font-bold text-primary uppercase tracking-wider">
               Payment Breakdown
@@ -760,6 +969,193 @@ export default function BookingWizard() {
           </div>
         </div>
       </div>
+
+      {/* Persistent Mobile Bottom CTA Bar (lg:hidden) */}
+      <aside aria-label="Booking step action bar" className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#071525]/95 backdrop-blur-md border-t border-border p-3 px-4 flex items-center justify-between pb-safe shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:hidden">
+        <button
+          type="button"
+          onClick={() => setShowMobilePriceSheet(true)}
+          className="flex flex-col text-left cursor-pointer min-touch-target -ml-1 pr-2"
+        >
+          <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-foreground-muted">
+            <span>Payable</span>
+            <ChevronUp className="h-3 w-3 text-accent" />
+          </div>
+          <span className="text-xl font-extrabold text-primary font-mono leading-tight">
+            {formatCurrency(pricingBreakdown.totalPayableInr)}
+          </span>
+          <span className="text-[10px] text-accent font-semibold underline underline-offset-2">
+            View detailed bill
+          </span>
+        </button>
+
+        <div className="flex items-center gap-2">
+          {currentStep === 0 && (
+            <Button
+              variant="accent"
+              size="lg"
+              onClick={() => setCurrentStep(1)}
+              className="min-touch-target px-5 font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl shadow-md gap-1.5 cursor-pointer text-sm"
+            >
+              Continue <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
+          {currentStep === 1 && (
+            <Button
+              variant="accent"
+              size="lg"
+              onClick={() => setCurrentStep(2)}
+              className="min-touch-target px-5 font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl shadow-md gap-1.5 cursor-pointer text-sm"
+            >
+              Address <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
+          {currentStep === 2 && (
+            <Button
+              variant="accent"
+              size="lg"
+              disabled={!serviceability.isServiceable}
+              onClick={() => setCurrentStep(3)}
+              className="min-touch-target px-5 font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl shadow-md gap-1.5 cursor-pointer text-sm"
+            >
+              Time Slot <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
+          {currentStep === 3 && (
+            <Button
+              variant="accent"
+              size="lg"
+              disabled={!selectedSlotId}
+              onClick={() => setCurrentStep(4)}
+              className="min-touch-target px-5 font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl shadow-md gap-1.5 cursor-pointer text-sm"
+            >
+              Review <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
+          {currentStep === 4 && (
+            <Button
+              variant="accent"
+              size="lg"
+              onClick={() => setCurrentStep(5)}
+              className="min-touch-target px-5 font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl shadow-md gap-1.5 cursor-pointer text-sm"
+            >
+              Payment <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
+          {currentStep === 5 && (
+            <Button
+              variant="accent"
+              size="lg"
+              disabled={isSubmitting}
+              onClick={handleConfirmBooking}
+              className="min-touch-target px-5 font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl shadow-md gap-1.5 cursor-pointer text-sm"
+            >
+              {isSubmitting ? "Placing..." : "Confirm Booking"}
+            </Button>
+          )}
+        </div>
+      </aside>
+
+      {/* Mobile Price Breakdown Bottom Sheet */}
+      <AnimatePresence>
+        {showMobilePriceSheet && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center lg:hidden">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowMobilePriceSheet(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 26, stiffness: 320 }}
+              className="relative w-full max-w-lg bg-surface border-t border-border rounded-t-3xl shadow-2xl p-6 pb-safe space-y-4 max-h-[85vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <h3 className="font-heading font-bold text-base text-primary">Itemized Price Breakdown</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowMobilePriceSheet(false)}
+                  className="min-touch-target p-1.5 -mr-1.5 text-foreground-muted hover:text-primary"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs text-foreground-secondary">
+                <div className="flex justify-between">
+                  <span>Base Service Labour ({primaryService.name})</span>
+                  <span className="font-mono text-primary font-bold">{formatCurrency(pricingBreakdown.baseAmount)}</span>
+                </div>
+
+                {isEmergencyRequested && (
+                  <div className="flex justify-between text-amber-700 dark:text-amber-400 font-semibold">
+                    <span>Emergency 2-Hr Surcharge</span>
+                    <span className="font-mono">+₹499</span>
+                  </div>
+                )}
+
+                {pricingBreakdown.discountMembership > 0 && (
+                  <div className="flex justify-between text-emerald-700 dark:text-emerald-400 font-semibold">
+                    <span>PLUS Membership (20% Off)</span>
+                    <span className="font-mono">-₹{pricingBreakdown.discountMembership}</span>
+                  </div>
+                )}
+
+                {pricingBreakdown.discountCoupon > 0 && (
+                  <div className="flex justify-between text-emerald-700 dark:text-emerald-400 font-semibold">
+                    <span>Coupon Discount ({pricingBreakdown.couponCode})</span>
+                    <span className="font-mono">-₹{pricingBreakdown.discountCoupon}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between">
+                  <span>Safety & Sanitation Fee</span>
+                  <span className="font-mono text-primary">
+                    {pricingBreakdown.safetyFee === 0 ? "FREE" : formatCurrency(pricingBreakdown.safetyFee)}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span>Taxes & GST (18%)</span>
+                  <span className="font-mono text-primary font-bold">{formatCurrency(pricingBreakdown.taxGst)}</span>
+                </div>
+
+                <div className="flex justify-between pt-3 border-t border-border text-base font-extrabold text-primary">
+                  <span>Total Amount Payable</span>
+                  <span className="font-mono text-xl text-[#FF6A00]">
+                    {formatCurrency(pricingBreakdown.totalPayableInr)}
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                variant="accent"
+                className="w-full min-touch-target font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl"
+                onClick={() => setShowMobilePriceSheet(false)}
+              >
+                Close & Continue
+              </Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Authoritative Kolkata-Wide Address Modal */}
+      <AddressFormModal
+        isOpen={isAddressModalOpen}
+        onClose={() => {
+          setIsAddressModalOpen(false);
+          setEditingAddress(null);
+        }}
+        initialData={editingAddress}
+        onSuccess={handleAddressSaved}
+        defaultFullName={user?.fullName || ""}
+        defaultPhone={user?.phone || ""}
+      />
     </div>
   );
 }

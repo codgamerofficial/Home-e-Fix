@@ -37,14 +37,11 @@ This document defines the authoritative environment variables, security boundari
 | `RAZORPAY_KEY_ID` | Server | Razorpay Key ID for REST API calls | Required | Razorpay Dashboard > Settings > API Keys |
 | `RAZORPAY_KEY_SECRET` | Server | Razorpay Secret Key for HMAC verification | Required | Razorpay Dashboard > Settings > API Keys |
 | `RAZORPAY_WEBHOOK_SECRET` | Server | Secret for validating webhook HMAC signatures | Required | Razorpay Dashboard > Settings > Webhooks |
-| **Cashfree Integration** | | | | |
-| `CASHFREE_ENV` | Server | Environment: `sandbox` or `production` | Optional | Cashfree Merchant Dashboard |
-| `CASHFREE_CLIENT_ID` | Server | Cashfree App ID | Optional | Cashfree Merchant Dashboard > Developers |
-| `CASHFREE_CLIENT_SECRET` | Server | Cashfree Secret Key | Optional | Cashfree Merchant Dashboard > Developers |
-| `CASHFREE_WEBHOOK_SECRET` | Server | Webhook HMAC signature key | Optional | Cashfree Merchant Dashboard > Webhooks |
-| `CASHFREE_API_VERSION` | Server | API version (`2025-01-01`) | Optional | Cashfree Documentation |
+| **Bot Protection (Cloudflare Turnstile)** | | | | |
+| `VITE_TURNSTILE_SITE_KEY` | Client | Cloudflare Turnstile public site key | Optional | Cloudflare Dashboard > Turnstile |
+| `TURNSTILE_SECRET_KEY` | Server | Cloudflare Turnstile secret key | Optional | Cloudflare Dashboard > Turnstile |
 | **Google Maps Platform** | | | | |
-| `VITE_MAP_API_KEY` / `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Client | Restricted browser key (Places, Maps JS) | Required | Google Cloud Console > Credentials |
+| `VITE_MAP_API_KEY` | Client | Restricted browser key (Places, Maps JS) | Required | Google Cloud Console > Credentials |
 | `GOOGLE_MAPS_SERVER_API_KEY` | Server | Restricted server key (Geocoding, Routes) | Optional | Google Cloud Console > Credentials |
 | `GOOGLE_MAPS_MAP_ID` | Client | Vector map ID for custom styling | Optional | Google Cloud Console > Map Management |
 | **Google Authentication** | | | | |
@@ -55,20 +52,13 @@ This document defines the authoritative environment variables, security boundari
 | `RESEND_WEBHOOK_SECRET` | Server | Webhook validation key for delivery events | Optional | Resend Dashboard > Webhooks |
 | `EMAIL_FROM_NAME` | Server | Sender display name ("Home-e-Fix") | Optional | Resend Dashboard > Domains |
 | `EMAIL_FROM_ADDRESS` | Server | Verified sender address | Optional | Resend Dashboard > Domains |
-| **Push Notifications** | | | | |
-| `NEXT_PUBLIC_FIREBASE_*` | Client | Firebase public config for web push (FCM) | Optional | Firebase Console > Project Settings |
-| `FIREBASE_CLIENT_EMAIL` | Server | Firebase Admin service account email | Optional | Firebase Console > Service Accounts |
-| `FIREBASE_PRIVATE_KEY` | Server | Firebase Admin private key | Optional | Firebase Console > Service Accounts |
 | **AI Assistants** | | | | |
 | `AI_PROVIDER` | Server | AI provider: `gemini` or `openrouter` | Optional | Static config |
 | `GEMINI_API_KEY` | Server | Google AI Studio API key | Optional | Google AI Studio |
 | `OPENROUTER_API_KEY` | Server | OpenRouter API key | Optional | OpenRouter Dashboard |
-| **Bot Protection** | | | | |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Client | Cloudflare Turnstile public site key | Optional | Cloudflare Dashboard > Turnstile |
-| `TURNSTILE_SECRET_KEY` | Server | Cloudflare Turnstile secret key | Optional | Cloudflare Dashboard > Turnstile |
 | **Observability** | | | | |
 | `SENTRY_DSN` | Server | Sentry DSN for backend error logging | Optional | Sentry Dashboard > Project Settings |
-| `NEXT_PUBLIC_SENTRY_DSN` | Client | Sentry DSN for frontend telemetry | Optional | Sentry Dashboard > Project Settings |
+| `VITE_SENTRY_DSN` | Client | Sentry DSN for frontend telemetry | Optional | Sentry Dashboard > Project Settings |
 
 ---
 

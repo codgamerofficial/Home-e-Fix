@@ -1,80 +1,198 @@
-import type { ServiceabilityCheckResult } from "@/types/marketplace.types";
+import type {
+  ServiceabilityCheckParams,
+  ServiceabilityCheckResult,
+} from "@/types/marketplace.types";
 
-interface OperationalPincodeInfo {
-  pincode: string;
-  city: string;
-  locality: string;
-  zoneCode: string;
+/**
+ * Internal Dispatch Regions (Used strictly for backend professional routing)
+ * NEVER exposed as a customer booking restriction.
+ */
+export interface InternalDispatchRegion {
+  code: string;
+  name: string;
+  pincodePrefixes: string[];
+  samplePincodes: string[];
   emergencySupported: boolean;
 }
 
-const OPERATIONAL_PINCODES: Record<string, OperationalPincodeInfo> = {
-  // Salt Lake & Sector 5
-  "700064": { pincode: "700064", city: "Kolkata", locality: "Salt Lake Sector 1 & 2", zoneCode: "KOL_EAST_SL", emergencySupported: true },
-  "700091": { pincode: "700091", city: "Kolkata", locality: "Salt Lake Sector 5 (IT Hub)", zoneCode: "KOL_EAST_SL", emergencySupported: true },
-  "700098": { pincode: "700098", city: "Kolkata", locality: "Salt Lake Sector 3", zoneCode: "KOL_EAST_SL", emergencySupported: true },
-  "700106": { pincode: "700106", city: "Kolkata", locality: "Salt Lake Sector 4", zoneCode: "KOL_EAST_SL", emergencySupported: true },
-
-  // New Town & Rajarhat
-  "700156": { pincode: "700156", city: "New Town", locality: "Action Area 1 / Eco Park", zoneCode: "KOL_NEWTOWN", emergencySupported: true },
-  "700160": { pincode: "700160", city: "New Town", locality: "Action Area 2 / Akankha", zoneCode: "KOL_NEWTOWN", emergencySupported: true },
-  "700135": { pincode: "700135", city: "New Town", locality: "Action Area 3 / Unitech", zoneCode: "KOL_NEWTOWN", emergencySupported: true },
-  "700136": { pincode: "700136", city: "Kolkata", locality: "Rajarhat Chowmatha", zoneCode: "KOL_NEWTOWN", emergencySupported: false },
-
-  // South Kolkata
-  "700019": { pincode: "700019", city: "Kolkata", locality: "Ballygunge / Gariahat", zoneCode: "KOL_SOUTH", emergencySupported: true },
-  "700027": { pincode: "700027", city: "Kolkata", locality: "Alipore / New Alipore", zoneCode: "KOL_SOUTH", emergencySupported: true },
-  "700032": { pincode: "700032", city: "Kolkata", locality: "Jadavpur / Sulekha", zoneCode: "KOL_SOUTH", emergencySupported: true },
-  "700047": { pincode: "700047", city: "Kolkata", locality: "Naktala / Garia", zoneCode: "KOL_SOUTH", emergencySupported: true },
-  "700029": { pincode: "700029", city: "Kolkata", locality: "Southern Avenue / Kalighat", zoneCode: "KOL_SOUTH", emergencySupported: true },
-
-  // Central & North Kolkata
-  "700016": { pincode: "700016", city: "Kolkata", locality: "Park Street / Camac Street", zoneCode: "KOL_CENTRAL", emergencySupported: true },
-  "700071": { pincode: "700071", city: "Kolkata", locality: "Maidan / Shakespeare Sarani", zoneCode: "KOL_CENTRAL", emergencySupported: true },
-  "700001": { pincode: "700001", city: "Kolkata", locality: "Dalhousie / BBD Bagh", zoneCode: "KOL_CENTRAL", emergencySupported: true },
-  "700004": { pincode: "700004", city: "Kolkata", locality: "Shyambazar / Hatibagan", zoneCode: "KOL_NORTH", emergencySupported: false },
-  "700006": { pincode: "700006", city: "Kolkata", locality: "Beadon Street / Girish Park", zoneCode: "KOL_NORTH", emergencySupported: false },
+export const INTERNAL_DISPATCH_REGIONS: Record<string, InternalDispatchRegion> = {
+  KOL_EAST_SL: {
+    code: "KOL_EAST_SL",
+    name: "East Kolkata & Salt Lake",
+    pincodePrefixes: ["700064", "700091", "700098", "700106"],
+    samplePincodes: ["700064", "700091", "700098", "700106"],
+    emergencySupported: true,
+  },
+  KOL_NEWTOWN: {
+    code: "KOL_NEWTOWN",
+    name: "New Town & Rajarhat",
+    pincodePrefixes: ["700156", "700160", "700135", "700136"],
+    samplePincodes: ["700156", "700160", "700135", "700136"],
+    emergencySupported: true,
+  },
+  KOL_SOUTH: {
+    code: "KOL_SOUTH",
+    name: "South Kolkata",
+    pincodePrefixes: [
+      "700019", "700026", "700027", "700029", "700031", "700032",
+      "700033", "700034", "700040", "700047", "700068", "700084", "700092"
+    ],
+    samplePincodes: ["700019", "700027", "700032", "700034", "700047", "700084"],
+    emergencySupported: true,
+  },
+  KOL_CENTRAL: {
+    code: "KOL_CENTRAL",
+    name: "Central Kolkata",
+    pincodePrefixes: ["700001", "700012", "700013", "700016", "700017", "700071", "700072", "700073"],
+    samplePincodes: ["700001", "700016", "700071"],
+    emergencySupported: true,
+  },
+  KOL_NORTH: {
+    code: "KOL_NORTH",
+    name: "North Kolkata",
+    pincodePrefixes: ["700002", "700003", "700004", "700005", "700006", "700028", "700037", "700050"],
+    samplePincodes: ["700004", "700006", "700028", "700037"],
+    emergencySupported: true,
+  },
 };
 
 /**
- * Serviceability Engine
- * Performs real postal and operational hub capacity checks.
- * Under no circumstances does it fake coverage.
+ * Determine internal dispatch hub based on pincode or locality.
+ * Used internally for professional matching and capacity routing.
+ */
+function resolveInternalDispatchHub(pincode: string): string {
+  const cleanPin = pincode.replace(/\D/g, "").slice(0, 6);
+  for (const [code, region] of Object.entries(INTERNAL_DISPATCH_REGIONS)) {
+    if (region.pincodePrefixes.includes(cleanPin)) {
+      return code;
+    }
+  }
+
+  // Fallback internal routing based on standard Kolkata postal series
+  if (cleanPin.startsWith("7000") || cleanPin.startsWith("7001")) {
+    const last3 = parseInt(cleanPin.slice(3), 10);
+    if (last3 >= 64 && last3 <= 110) return "KOL_EAST_SL";
+    if (last3 >= 130 && last3 <= 165) return "KOL_NEWTOWN";
+    if (last3 >= 19 && last3 <= 48) return "KOL_SOUTH";
+    if (last3 <= 18) return "KOL_CENTRAL";
+    return "KOL_NORTH";
+  }
+
+  return "KOL_GENERAL";
+}
+
+/**
+ * Known Kolkata locality keywords to support flexible address checking
+ */
+const KOLKATA_LOCALITY_KEYWORDS = [
+  "kolkata", "calcutta", "salt lake", "saltlake", "bidhannagar", "new town", "newtown",
+  "rajarhat", "ballygunge", "alipore", "behala", "jadavpur", "tollygunge",
+  "park street", "garia", "dum dum", "dumdum", "lake gardens", "gariahat",
+  "shyambazar", "bowbazar", "dalhousie", "kasba", "naktala", "kankurgachi",
+  "maniktala", "ultadanga", "barasat", "sonarpur", "howrah"
+];
+
+/**
+ * Centralized Serviceability Engine
+ *
+ * CRITICAL BUSINESS RULE:
+ * Home-e-Fix currently serves ALL OF KOLKATA.
+ * Operational hubs (KOL_EAST_SL, KOL_SOUTH, etc.) are strictly internal dispatch infrastructure
+ * and MUST NEVER be used to restrict customer booking eligibility.
  */
 export const serviceabilityEngine = {
-  checkPincode(pincode: string, isEmergencyRequested = false): ServiceabilityCheckResult {
-    const cleanPin = pincode.replace(/\D/g, "").slice(0, 6);
-    const info = OPERATIONAL_PINCODES[cleanPin];
+  /**
+   * Primary serviceability validation function.
+   * Checks whether the target address is within Kolkata's active coverage.
+   */
+  checkServiceability(params: ServiceabilityCheckParams): ServiceabilityCheckResult {
+    const rawPin = params.pincode || params.postalCode || "";
+    const cleanPin = rawPin.replace(/\D/g, "").slice(0, 6);
 
-    if (!info) {
+    const rawCity = (params.city || "").trim().toLowerCase();
+    const rawState = (params.state || "").trim().toLowerCase();
+
+    // 1. PIN code check: 700xxx is the authoritative Kolkata Postal Division
+    const isKolkataPin = cleanPin.startsWith("700");
+
+    // 2. City name check
+    const isKolkataCity =
+      rawCity === "kolkata" ||
+      rawCity === "calcutta" ||
+      rawCity === "new town" ||
+      rawCity === "newtown" ||
+      rawCity === "bidhannagar" ||
+      rawCity === "salt lake" ||
+      KOLKATA_LOCALITY_KEYWORDS.some((kw) => rawCity.includes(kw));
+
+    // 3. State check: West Bengal
+    const isWestBengalState =
+      rawState === "west bengal" ||
+      rawState === "wb" ||
+      rawState === ""; // Default to true if unstated in localized form
+
+    // Decision: Address is serviceable if PIN starts with 700 OR city/locality is Kolkata
+    const isServiceable = isKolkataPin || (isKolkataCity && (isWestBengalState || !params.state));
+
+    const internalHub = resolveInternalDispatchHub(cleanPin || "700001");
+
+    if (!isServiceable) {
       return {
         isServiceable: false,
-        cityName: "Outside Active Coverage",
+        serviceable: false,
+        cityName: params.city || "Outside Kolkata",
+        city: params.city || "Outside Kolkata",
         localityName: "Area not yet serviceable",
+        coverage: "OUT_OF_BOUNDS",
         zoneCode: "OUT_OF_BOUNDS",
+        internalHubCode: "OUT_OF_BOUNDS",
         pincode: cleanPin,
+        postalCode: cleanPin,
         isEmergencySupported: false,
         availableCapacityNow: false,
         earliestSlot: "None",
-        reason: `Pincode ${cleanPin} is outside our current operational service zones. Expansion to your neighborhood is coming soon!`,
+        message: "Currently available in Kolkata only.",
+        reason: "Home-e-Fix is currently available in Kolkata only. Expansion to your city is coming soon!",
       };
     }
 
-    const isEmergencyEligible = isEmergencyRequested && info.emergencySupported;
+    const isEmergencyEligible = Boolean(params.isEmergencyRequested);
 
     return {
       isServiceable: true,
-      cityName: info.city,
-      localityName: info.locality,
-      zoneCode: info.zoneCode,
-      pincode: cleanPin,
-      isEmergencySupported: info.emergencySupported,
+      serviceable: true,
+      cityName: "Kolkata",
+      city: "Kolkata",
+      localityName: params.city || "Kolkata",
+      coverage: "ALL_KOLKATA",
+      zoneCode: internalHub, // Internal dispatch zone
+      internalHubCode: internalHub,
+      pincode: cleanPin || "700001",
+      postalCode: cleanPin || "700001",
+      isEmergencySupported: true,
       availableCapacityNow: true,
       earliestSlot: isEmergencyEligible ? "Within 2 Hours" : "Tomorrow, 09:00 AM - 11:00 AM",
+      message: "Home-e-Fix currently serves all areas across Kolkata.",
     };
   },
 
-  getAllOperationalPincodes(): OperationalPincodeInfo[] {
-    return Object.values(OPERATIONAL_PINCODES);
+  /**
+   * Convenience backward-compatible wrapper for pincode lookups.
+   */
+  checkPincode(pincode: string, isEmergencyRequested = false): ServiceabilityCheckResult {
+    return this.checkServiceability({
+      pincode,
+      postalCode: pincode,
+      city: "Kolkata",
+      state: "West Bengal",
+      isEmergencyRequested,
+    });
+  },
+
+  /**
+   * Internal inspection helper for admin dispatch monitoring.
+   */
+  getAllDispatchRegions(): InternalDispatchRegion[] {
+    return Object.values(INTERNAL_DISPATCH_REGIONS);
   },
 };

@@ -13,17 +13,10 @@ export const serverEnvSchema = z.object({
   SUPABASE_SECRET_KEY: z.string().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
 
-  // Razorpay Gateway (Server-side)
+  // Razorpay Gateway (Primary & Only Payment Gateway)
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
-
-  // Cashfree Gateway (Secondary)
-  CASHFREE_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
-  CASHFREE_CLIENT_ID: z.string().optional(),
-  CASHFREE_CLIENT_SECRET: z.string().optional(),
-  CASHFREE_WEBHOOK_SECRET: z.string().optional(),
-  CASHFREE_API_VERSION: z.string().default("2025-01-01"),
 
   // Google OAuth (Server-side)
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -48,7 +41,7 @@ export const serverEnvSchema = z.object({
   OPENROUTER_MODEL: z.string().optional(),
 
   // Bot Protection (Cloudflare Turnstile)
-  NEXT_PUBLIC_TURNSTILE_SITE_KEY: z.string().optional(),
+  VITE_TURNSTILE_SITE_KEY: z.string().optional(),
   TURNSTILE_SECRET_KEY: z.string().optional(),
 
   // Observability (Sentry)
@@ -63,9 +56,8 @@ export const serverEnvSchema = z.object({
 
   // Feature Flags
   FEATURE_RAZORPAY: z.coerce.boolean().default(true),
-  FEATURE_CASHFREE: z.coerce.boolean().default(false),
   FEATURE_GOOGLE_AUTH: z.coerce.boolean().default(true),
-  FEATURE_PHONE_OTP: z.coerce.boolean().default(true),
+  FEATURE_PHONE_OTP: z.coerce.boolean().default(false),
   FEATURE_PUSH_NOTIFICATIONS: z.coerce.boolean().default(true),
   FEATURE_AI: z.coerce.boolean().default(true),
   FEATURE_EMERGENCY_BOOKING: z.coerce.boolean().default(true),
@@ -112,10 +104,6 @@ export function validateServerEnv(envMap: Record<string, string | undefined>): {
         errors.push("Production environment cannot use Razorpay test key (rzp_test_*). Use live credentials.");
       }
     }
-
-    if (data.FEATURE_CASHFREE && data.CASHFREE_ENV === "sandbox") {
-      warnings.push("Cashfree is enabled in sandbox mode while NODE_ENV=production.");
-    }
   } else {
     // Development alerts
     if (data.RAZORPAY_KEY_ID && !data.RAZORPAY_KEY_ID.startsWith("rzp_test_")) {
@@ -130,3 +118,4 @@ export function validateServerEnv(envMap: Record<string, string | undefined>): {
     errors,
   };
 }
+

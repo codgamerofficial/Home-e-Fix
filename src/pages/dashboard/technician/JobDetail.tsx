@@ -26,6 +26,8 @@ import { dbRepository, type MaterialRequest } from "@/services/db/repository";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate, formatTime } from "@/lib/date";
 import { getStatusConfig } from "@/lib/status";
+import { LiveLocationTransmitter } from "@/components/professional/LiveLocationTransmitter";
+import { trackingEngine } from "@/services/tracking/tracking.engine";
 
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>();
@@ -121,6 +123,7 @@ export default function JobDetail() {
   };
 
   const handleMarkArrived = () => {
+    trackingEngine.endLocationSession(booking.id, "ARRIVED");
     const updated = dbRepository.updateBookingStatus(
       booking.id,
       "PROFESSIONAL_ARRIVED",
@@ -214,7 +217,7 @@ export default function JobDetail() {
       : `${booking.address?.street || ""}, ${booking.address?.landmark ? booking.address.landmark + ", " : ""}${booking.address?.city || "Kolkata"} ${booking.address?.pincode || ""}`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-28 lg:pb-8">
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -486,9 +489,20 @@ export default function JobDetail() {
               )}
 
               {isOnTheWay && (
-                <div className="space-y-2">
+                <div className="space-y-3">
+                  <LiveLocationTransmitter
+                    bookingId={booking.id}
+                    professionalId={booking.technician_id || "pro-current"}
+                    destination={{
+                      latitude: booking.address?.coordinates?.lat || 22.5855,
+                      longitude: booking.address?.coordinates?.lng || 88.4239,
+                      address: addressText,
+                    }}
+                    isActive={true}
+                    onSessionEnded={handleMarkArrived}
+                  />
                   <p className="text-xs text-foreground-secondary">
-                    Customer is tracking your transit. Click below once you arrive at the doorstep.
+                    Customer is tracking your transit live on their map. Click below once you arrive at the doorstep.
                   </p>
                   <Button
                     variant="accent"
@@ -755,6 +769,80 @@ export default function JobDetail() {
           </Card>
         </div>
       )}
+
+      {/* Persistent Mobile Bottom Action Bar (lg:hidden) */}
+      <aside aria-label="Technician job action bar" className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#071525]/95 backdrop-blur-md border-t border-border p-3 px-4 flex items-center justify-between pb-safe shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:hidden">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="min-touch-target rounded-xl h-11 w-11 p-0 flex items-center justify-center shrink-0 border-border"
+            asChild
+          >
+            <a href={`tel:${booking.customer_phone || "+919830123456"}`} title="Call Customer">
+              <Phone className="h-5 w-5 text-accent" />
+            </a>
+          </Button>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted">Technician Payout</span>
+            <span className="text-sm font-extrabold text-accent font-mono leading-tight">
+              {formatCurrency(totalPartnerPayout)}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {isConfirmedOrAccepted && (
+            <Button
+              variant="accent"
+              size="lg"
+              className="min-touch-target px-5 font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl shadow-md text-sm"
+              onClick={handleMarkOnTheWay}
+            >
+              Start Trip (On The Way)
+            </Button>
+          )}
+
+          {isOnTheWay && (
+            <Button
+              variant="accent"
+              size="lg"
+              className="min-touch-target px-5 font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl shadow-md text-sm"
+              onClick={handleMarkArrived}
+            >
+              Mark Arrived
+            </Button>
+          )}
+
+          {isArrived && (
+            <Button
+              variant="accent"
+              size="lg"
+              className="min-touch-target px-5 font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl shadow-md text-sm"
+              onClick={() => setShowOtpModal(true)}
+            >
+              Enter Start OTP
+            </Button>
+          )}
+
+          {isInProgress && (
+            <Button
+              variant="accent"
+              size="lg"
+              className="min-touch-target px-5 font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl shadow-md text-sm"
+              onClick={() => setShowCompleteModal(true)}
+            >
+              Complete Job
+            </Button>
+          )}
+
+          {isCompleted && (
+            <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 font-bold px-3 py-1.5 text-xs">
+              ✓ Service Signed Off
+            </Badge>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }

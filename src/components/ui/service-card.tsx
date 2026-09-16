@@ -196,13 +196,13 @@ export function ServiceCard({
         </div>
 
         {/* Content */}
-        <CardContent className="p-6 flex-1 flex flex-col justify-between space-y-4">
-          <div className="space-y-2.5">
+        <CardContent className="p-4 sm:p-6 flex-1 flex flex-col justify-between space-y-3 sm:space-y-4">
+          <div className="space-y-2 sm:space-y-2.5">
             {/* Rating & Duration */}
             <div className="flex items-center justify-between text-xs">
               <Rating value={rating} reviewCount={reviewCount} size="sm" />
-              <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400">
-                <Clock className="h-3.5 w-3.5 text-[#FF6A00]" />
+              <span className="flex items-center gap-1 font-medium text-slate-500 dark:text-slate-400 text-[11px] sm:text-xs">
+                <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-[#FF6A00]" />
                 {formatDuration(duration)}
               </span>
             </div>

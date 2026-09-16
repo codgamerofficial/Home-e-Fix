@@ -122,46 +122,46 @@ export default function ServiceDetail() {
   ];
 
   return (
-    <div className="py-8 md:py-14">
-      <div className="container-app space-y-10">
+    <div className="py-6 md:py-14 pb-28 lg:pb-14">
+      <div className="container-app space-y-6 md:space-y-10">
         {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-          <Link to={ROUTES.SERVICES} className="hover:text-accent flex items-center gap-1">
-            <ArrowLeft className="h-4 w-4" /> All Services
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-foreground-secondary overflow-x-auto scrollbar-hide py-1">
+          <Link to={ROUTES.SERVICES} className="hover:text-accent flex items-center gap-1 shrink-0">
+            <ArrowLeft className="h-3.5 w-3.5" /> All Services
           </Link>
-          <span>/</span>
-          <Link to={`/services/${category?.slug || categoryKey}`} className="hover:text-accent">
+          <span className="shrink-0">/</span>
+          <Link to={`/services/${category?.slug || categoryKey}`} className="hover:text-accent shrink-0">
             {category?.name || "Services"}
           </Link>
-          <span>/</span>
-          <span className="text-primary font-semibold">{service.name}</span>
+          <span className="shrink-0">/</span>
+          <span className="text-primary font-semibold truncate">{service.name}</span>
         </div>
 
         {/* Main Content & Sticky Sidebar */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Left 2 Columns */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="lg:col-span-2 space-y-6">
             {/* Hero Card */}
-            <div className="rounded-3xl border border-border bg-surface p-6 md:p-8 space-y-6 shadow-sm">
-              <div className="flex flex-wrap items-center gap-3">
+            <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 md:p-8 space-y-5 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <span className="px-3 py-1 rounded-full bg-accent/10 text-accent font-bold text-xs uppercase tracking-wider">
                   {category?.name || "Home Service"}
                 </span>
-                <div className="flex items-center gap-1 text-amber-500 text-sm font-bold">
-                  <Star className="h-4 w-4 fill-amber-500" />
+                <div className="flex items-center gap-1 text-amber-500 text-xs sm:text-sm font-bold">
+                  <Star className="h-3.5 w-3.5 fill-amber-500" />
                   <span>{service.rating || 4.9} ({service.reviewCount || 420}+ verified reviews)</span>
                 </div>
-                <div className="flex items-center gap-1 text-foreground-muted text-sm">
-                  <Clock className="h-4 w-4" />
+                <div className="flex items-center gap-1 text-foreground-muted text-xs sm:text-sm">
+                  <Clock className="h-3.5 w-3.5" />
                   <span>{activeVariant.duration}</span>
                 </div>
               </div>
 
-              <h1 className="text-3xl md:text-4xl font-extrabold text-primary">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-primary leading-tight">
                 {service.name}
               </h1>
 
-              <p className="text-foreground-secondary text-base leading-relaxed">
+              <p className="text-foreground-secondary text-sm sm:text-base leading-relaxed">
                 {service.shortDescription ||
                   "Professional installation, precision repair, and thorough quality inspection performed by police-verified master technicians."}
               </p>
@@ -171,7 +171,7 @@ export default function ServiceDetail() {
                 <label className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
                   <Layers className="h-4 w-4 text-accent" /> Select Variant / Package
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {variants.map((v) => {
                     const price = Math.round(basePrice * v.priceMultiplier);
                     const isSelected = selectedVariantId === v.id;
@@ -180,10 +180,10 @@ export default function ServiceDetail() {
                         key={v.id}
                         type="button"
                         onClick={() => setSelectedVariantId(v.id)}
-                        className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                        className={`min-touch-target p-3 sm:p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
                           isSelected
                             ? "border-accent bg-accent/5 ring-2 ring-accent/20"
-                            : "border-border bg-surface hover:border-slate-300"
+                            : "border-border bg-surface hover:border-slate-300 dark:hover:border-slate-700"
                         }`}
                       >
                         <div className="text-xs font-bold text-primary">{v.name}</div>
@@ -195,9 +195,44 @@ export default function ServiceDetail() {
                 </div>
               </div>
 
+              {/* Quick Mobile Pincode Check */}
+              <div className="p-3.5 rounded-2xl bg-muted/30 border border-border space-y-2 lg:hidden">
+                <label className="text-xs font-bold text-primary flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-accent" /> Check Service Availability in Kolkata
+                </label>
+                <form onSubmit={handleCheckPincode} className="flex gap-2">
+                  <Input
+                    placeholder="Enter Pincode (e.g. 700064)"
+                    value={pincodeInput}
+                    onChange={(e) => setPincodeInput(e.target.value)}
+                    maxLength={6}
+                    className="h-10 bg-surface text-base md:text-xs"
+                  />
+                  <Button type="submit" size="sm" variant="outline" className="min-touch-target text-xs shrink-0 font-bold">
+                    Check
+                  </Button>
+                </form>
+                {pincodeResult.checked && (
+                  <div
+                    className={`text-xs p-2.5 rounded-xl mt-2 flex items-start gap-1.5 ${
+                      pincodeResult.serviceable
+                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
+                        : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30"
+                    }`}
+                  >
+                    {pincodeResult.serviceable ? (
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                    )}
+                    <span>{pincodeResult.message}</span>
+                  </div>
+                )}
+              </div>
+
               {/* What is Included / Excluded */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-border">
-                <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-4 border-t border-border">
+                <div className="space-y-3 bg-muted/20 md:bg-transparent p-4 md:p-0 rounded-2xl">
                   <h4 className="font-bold text-sm text-primary flex items-center gap-1.5">
                     <Check className="h-4 w-4 text-success" /> What's Included
                   </h4>
@@ -217,7 +252,7 @@ export default function ServiceDetail() {
                   </ul>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-3 bg-muted/20 md:bg-transparent p-4 md:p-0 rounded-2xl">
                   <h4 className="font-bold text-sm text-primary flex items-center gap-1.5">
                     <X className="h-4 w-4 text-error" /> What's Excluded
                   </h4>
@@ -237,40 +272,40 @@ export default function ServiceDetail() {
             </div>
 
             {/* Service Process Checklist */}
-            <div className="rounded-3xl border border-border bg-surface p-6 md:p-8 space-y-6">
-              <h3 className="font-heading text-lg font-bold text-primary flex items-center gap-2">
+            <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 md:p-8 space-y-5">
+              <h3 className="font-heading text-base sm:text-lg font-bold text-primary flex items-center gap-2">
                 <Wrench className="h-5 w-5 text-accent" /> Standard Operating Process
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-                <div className="p-4 rounded-2xl bg-muted/30 border border-border space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3.5 rounded-2xl bg-muted/30 border border-border space-y-1.5">
                   <span className="h-6 w-6 rounded-full bg-primary text-white font-bold flex items-center justify-center text-[11px]">1</span>
                   <p className="font-bold text-primary">Arrival & OTP</p>
-                  <p className="text-foreground-secondary">Technician arrives in uniform, presents ID, verifies start OTP.</p>
+                  <p className="text-foreground-secondary text-[11px] leading-relaxed">Technician arrives in uniform, presents ID, verifies start OTP.</p>
                 </div>
-                <div className="p-4 rounded-2xl bg-muted/30 border border-border space-y-2">
+                <div className="p-3.5 rounded-2xl bg-muted/30 border border-border space-y-1.5">
                   <span className="h-6 w-6 rounded-full bg-primary text-white font-bold flex items-center justify-center text-[11px]">2</span>
                   <p className="font-bold text-primary">Diagnosis</p>
-                  <p className="text-foreground-secondary">Inspection using diagnostic equipment to pinpoint exact fault.</p>
+                  <p className="text-foreground-secondary text-[11px] leading-relaxed">Inspection using diagnostic equipment to pinpoint exact fault.</p>
                 </div>
-                <div className="p-4 rounded-2xl bg-muted/30 border border-border space-y-2">
+                <div className="p-3.5 rounded-2xl bg-muted/30 border border-border space-y-1.5">
                   <span className="h-6 w-6 rounded-full bg-primary text-white font-bold flex items-center justify-center text-[11px]">3</span>
                   <p className="font-bold text-primary">Pre-Approval</p>
-                  <p className="text-foreground-secondary">Any extra spares require digital customer confirmation first.</p>
+                  <p className="text-foreground-secondary text-[11px] leading-relaxed">Any extra spares require digital customer confirmation first.</p>
                 </div>
-                <div className="p-4 rounded-2xl bg-muted/30 border border-border space-y-2">
+                <div className="p-3.5 rounded-2xl bg-muted/30 border border-border space-y-1.5">
                   <span className="h-6 w-6 rounded-full bg-primary text-white font-bold flex items-center justify-center text-[11px]">4</span>
                   <p className="font-bold text-primary">Quality Test</p>
-                  <p className="text-foreground-secondary">Full operational test, cleanup, and 30-day warranty activation.</p>
+                  <p className="text-foreground-secondary text-[11px] leading-relaxed">Full operational test, cleanup, and 30-day warranty activation.</p>
                 </div>
               </div>
             </div>
 
             {/* FAQs Accordion */}
-            <div className="rounded-3xl border border-border bg-surface p-6 md:p-8 space-y-4">
-              <h3 className="font-heading text-lg font-bold text-primary flex items-center gap-2">
+            <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 md:p-8 space-y-4">
+              <h3 className="font-heading text-base sm:text-lg font-bold text-primary flex items-center gap-2">
                 <HelpCircle className="h-5 w-5 text-accent" /> Frequently Asked Questions
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {faqs.map((faq: any, idx: number) => {
                   const isOpen = openFaq === idx;
                   return (
@@ -278,13 +313,13 @@ export default function ServiceDetail() {
                       <button
                         type="button"
                         onClick={() => setOpenFaq(isOpen ? null : idx)}
-                        className="w-full p-4 text-left flex items-center justify-between text-xs sm:text-sm font-bold text-primary hover:bg-muted/20"
+                        className="w-full min-touch-target p-3.5 sm:p-4 text-left flex items-center justify-between text-xs sm:text-sm font-bold text-primary hover:bg-muted/20"
                       >
-                        <span>{faq.question}</span>
-                        <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                        <span className="pr-2">{faq.question}</span>
+                        <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                       </button>
                       {isOpen && (
-                        <div className="p-4 pt-0 text-xs text-foreground-secondary leading-relaxed">
+                        <div className="p-3.5 sm:p-4 pt-0 text-xs text-foreground-secondary leading-relaxed">
                           {faq.answer}
                         </div>
                       )}
@@ -295,8 +330,8 @@ export default function ServiceDetail() {
             </div>
           </div>
 
-          {/* Right Column: Sticky Booking & Serviceability Card */}
-          <div className="lg:col-span-1">
+          {/* Right Column: Desktop Sticky Booking & Serviceability Card */}
+          <div className="hidden lg:block lg:col-span-1">
             <div className="sticky top-24 rounded-3xl border-2 border-border bg-surface p-6 shadow-lg space-y-6">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted">
@@ -312,20 +347,20 @@ export default function ServiceDetail() {
                 </div>
               </div>
 
-              {/* Serviceability Check */}
+              {/* Serviceability Check (Desktop) */}
               <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-2">
                 <label className="text-[11px] font-bold text-primary flex items-center gap-1.5">
                   <MapPin className="h-3.5 w-3.5 text-accent" /> Check Service Availability
                 </label>
                 <form onSubmit={handleCheckPincode} className="flex gap-2">
                   <Input
-                    placeholder="Enter 6-digit Pincode (e.g. 700064)"
+                    placeholder="Enter 6-digit Pincode"
                     value={pincodeInput}
                     onChange={(e) => setPincodeInput(e.target.value)}
                     maxLength={6}
-                    className="text-xs h-9"
+                    className="text-xs h-9 bg-surface"
                   />
-                  <Button type="submit" size="sm" variant="outline" className="text-xs shrink-0">
+                  <Button type="submit" size="sm" variant="outline" className="text-xs shrink-0 font-bold">
                     Check
                   </Button>
                 </form>
@@ -333,8 +368,8 @@ export default function ServiceDetail() {
                   <div
                     className={`text-[11px] p-2 rounded-xl mt-2 flex items-start gap-1.5 ${
                       pincodeResult.serviceable
-                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                        : "bg-rose-50 text-rose-800 border border-rose-200"
+                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
+                        : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30"
                     }`}
                   >
                     {pincodeResult.serviceable ? (
@@ -371,7 +406,7 @@ export default function ServiceDetail() {
                 variant="accent"
                 size="lg"
                 onClick={handleBookNow}
-                className="w-full shadow-glow gap-2 cursor-pointer"
+                className="w-full shadow-glow gap-2 cursor-pointer font-bold"
               >
                 Book This Service Now <ArrowRight className="h-4 w-4" />
               </Button>
@@ -383,6 +418,27 @@ export default function ServiceDetail() {
           </div>
         </div>
       </div>
+
+      {/* Persistent Mobile Bottom CTA Bar */}
+      <aside aria-label="Book service action bar" className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-[#071525]/95 backdrop-blur-md border-t border-border p-3 px-4 flex items-center justify-between pb-safe shadow-[0_-8px_30px_rgba(0,0,0,0.12)] lg:hidden">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted">Total Estimate</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-xl font-extrabold text-primary font-mono">{formatCurrency(effectivePrice)}</span>
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">30D Warranty</span>
+          </div>
+          <span className="text-[10px] text-foreground-muted truncate max-w-42.5">{activeVariant.name}</span>
+        </div>
+
+        <Button
+          variant="accent"
+          size="lg"
+          onClick={handleBookNow}
+          className="min-touch-target px-6 bg-[#FF6A00] hover:bg-accent-dark text-white font-bold rounded-2xl shadow-lg shadow-accent/25 flex items-center gap-1.5 cursor-pointer text-sm"
+        >
+          Book Now <ArrowRight className="h-4 w-4" />
+        </Button>
+      </aside>
     </div>
   );
 }

@@ -4,9 +4,12 @@ import { Search, X, Wrench, Calendar, User, Shield, ArrowRight } from "lucide-re
 import { SERVICE_CATEGORIES } from "@/constants/services";
 import { ROUTES } from "@/constants/routes";
 import { useSearch } from "@/context/SearchContext";
+import { useIsMobile } from "@/hooks/useMediaQuery";
+import { MobileSearchModal } from "@/components/shared/MobileSearchModal";
 
 export function CommandMenu() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { isSearchOpen, closeSearch } = useSearch();
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -36,6 +39,11 @@ export function CommandMenu() {
   };
 
   if (!isSearchOpen) return null;
+
+  // On mobile smartphones, render the dedicated full-screen MobileSearchModal (Section 6)
+  if (isMobile) {
+    return <MobileSearchModal />;
+  }
 
   return (
     <div

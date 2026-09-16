@@ -99,17 +99,18 @@ export default function JobList() {
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex p-1 rounded-xl bg-surface border border-border text-xs font-semibold">
+        {/* Tab Switcher */}
+        <div className="w-full sm:w-auto grid grid-cols-3 sm:flex p-1 rounded-2xl bg-surface border border-border text-xs font-semibold">
           <button
             type="button"
             onClick={() => setTab("new")}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`min-touch-target px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               tab === "new"
                 ? "bg-primary text-white shadow-xs"
                 : "text-foreground-secondary hover:text-primary"
             }`}
           >
-            <span>New Requests</span>
+            <span>New</span>
             {pendingAssignments.length > 0 && (
               <span className="h-4 min-w-4 px-1 rounded-full bg-accent text-[10px] font-bold text-white flex items-center justify-center">
                 {pendingAssignments.length}
@@ -120,13 +121,13 @@ export default function JobList() {
           <button
             type="button"
             onClick={() => setTab("active")}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`min-touch-target px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
               tab === "active"
                 ? "bg-primary text-white shadow-xs"
                 : "text-foreground-secondary hover:text-primary"
             }`}
           >
-            <span>Active Jobs</span>
+            <span>Active</span>
             {activeJobs.length > 0 && (
               <span className="h-4 min-w-4 px-1 rounded-full bg-blue-500 text-[10px] font-bold text-white flex items-center justify-center">
                 {activeJobs.length}
@@ -137,13 +138,13 @@ export default function JobList() {
           <button
             type="button"
             onClick={() => setTab("completed")}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+            className={`min-touch-target px-3 py-2 rounded-xl transition-all cursor-pointer flex items-center justify-center ${
               tab === "completed"
                 ? "bg-primary text-white shadow-xs"
                 : "text-foreground-secondary hover:text-primary"
             }`}
           >
-            Completed ({completedJobs.length})
+            <span>Done ({completedJobs.length})</span>
           </button>
         </div>
       </div>

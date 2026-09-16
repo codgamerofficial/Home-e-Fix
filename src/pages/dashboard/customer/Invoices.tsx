@@ -167,43 +167,45 @@ export default function Invoices() {
               </div>
 
               {/* Table */}
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500 font-semibold">
-                    <th className="py-2">Description</th>
-                    <th className="py-2">SAC Code</th>
-                    <th className="py-2 text-right">Taxable Value</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  <tr>
-                    <td className="py-2.5 font-medium text-slate-900">{activeInvoiceModal.serviceName}</td>
-                    <td className="py-2.5 font-mono text-slate-600">998719</td>
-                    <td className="py-2.5 text-right font-medium">{formatCurrency(activeInvoiceModal.subtotal)}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 font-medium text-slate-900">Safety, Sanitation & Convenience Fee</td>
-                    <td className="py-2 font-mono text-slate-600">998719</td>
-                    <td className="py-2 text-right font-medium">{formatCurrency(activeInvoiceModal.safetyFee || 49)}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 text-slate-600">Central GST (CGST 9%)</td>
-                    <td className="py-2 font-mono text-slate-600">—</td>
-                    <td className="py-2 text-right font-medium">{formatCurrency(Math.round((activeInvoiceModal.taxGst || 53.82) / 2))}</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 text-slate-600">State GST (SGST 9%)</td>
-                    <td className="py-2 font-mono text-slate-600">—</td>
-                    <td className="py-2 text-right font-medium">{formatCurrency(Math.round((activeInvoiceModal.taxGst || 53.82) / 2))}</td>
-                  </tr>
-                </tbody>
-                <tfoot>
-                  <tr className="border-t border-slate-300 font-bold text-sm">
-                    <td colSpan={2} className="py-3 text-slate-900">Total Invoice Amount (INR):</td>
-                    <td className="py-3 text-right text-slate-900">{formatCurrency(activeInvoiceModal.totalAmount)}</td>
-                  </tr>
-                </tfoot>
-              </table>
+              <div className="overflow-x-auto -mx-2 sm:mx-0">
+                <table className="w-full text-left text-xs min-w-[320px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500 font-semibold">
+                      <th className="py-2">Description</th>
+                      <th className="py-2">SAC Code</th>
+                      <th className="py-2 text-right">Taxable Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    <tr>
+                      <td className="py-2.5 font-medium text-slate-900">{activeInvoiceModal.serviceName}</td>
+                      <td className="py-2.5 font-mono text-slate-600">998719</td>
+                      <td className="py-2.5 text-right font-medium">{formatCurrency(activeInvoiceModal.subtotal)}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 font-medium text-slate-900">Safety, Sanitation & Convenience Fee</td>
+                      <td className="py-2 font-mono text-slate-600">998719</td>
+                      <td className="py-2 text-right font-medium">{formatCurrency(activeInvoiceModal.safetyFee || 49)}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 text-slate-600">Central GST (CGST 9%)</td>
+                      <td className="py-2 font-mono text-slate-600">—</td>
+                      <td className="py-2 text-right font-medium">{formatCurrency(Math.round((activeInvoiceModal.taxGst || 53.82) / 2))}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 text-slate-600">State GST (SGST 9%)</td>
+                      <td className="py-2 font-mono text-slate-600">—</td>
+                      <td className="py-2 text-right font-medium">{formatCurrency(Math.round((activeInvoiceModal.taxGst || 53.82) / 2))}</td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-slate-300 font-bold text-sm">
+                      <td colSpan={2} className="py-3 text-slate-900">Total Invoice Amount (INR):</td>
+                      <td className="py-3 text-right text-slate-900">{formatCurrency(activeInvoiceModal.totalAmount)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
 
               <div className="pt-3 border-t border-slate-200 text-[10px] text-slate-500 space-y-1">
                 <p>• This is a computer-generated tax invoice issued in accordance with GST Law and does not require physical signature.</p>

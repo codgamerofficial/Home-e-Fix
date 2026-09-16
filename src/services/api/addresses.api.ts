@@ -13,21 +13,29 @@ export function normalizeAddress(raw: any, fallbackUserId = "usr-current"): Addr
   if (!raw || typeof raw !== "object") {
     return {
       id: generateAddressId(),
+      customer_id: fallbackUserId,
       user_id: fallbackUserId,
       userId: fallbackUserId,
-      label: "Home",
-      title: "Home",
+      label: "HOME",
+      title: "HOME",
       type: "home",
-      recipient_name: null,
+      full_name: "Valued Customer",
+      recipient_name: "Valued Customer",
       phone: null,
       recipient_phone: null,
+      house_flat: "",
+      building: null,
+      street: "",
       address_line_1: "",
       streetAddress: "",
+      street_area: "",
       address_line_2: null,
-      locality: null,
+      area: "Salt Lake",
+      locality: "Salt Lake",
       landmark: null,
       city: "Kolkata",
       state: "West Bengal",
+      postal_code: "700064",
       pincode: "700064",
       country: "India",
       latitude: null,
@@ -35,57 +43,80 @@ export function normalizeAddress(raw: any, fallbackUserId = "usr-current"): Addr
       place_id: null,
       is_default: false,
       isDefault: false,
+      formatted_address: "Kolkata, West Bengal - 700064",
       fullAddress: "Kolkata, West Bengal - 700064",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
   }
 
-  const userId = String(raw.user_id || raw.userId || fallbackUserId);
+  const userId = String(raw.customer_id || raw.user_id || raw.userId || fallbackUserId);
   const isDefault = Boolean(raw.is_default ?? raw.isDefault);
-  const street = String(
-    raw.address_line_1 || raw.streetAddress || raw.flat_house_building || raw.street_address || raw.house_flat || ""
-  ).trim();
+
+  const fullName = String(raw.full_name || raw.recipient_name || raw.customerName || "Valued Customer").trim();
+  const phone = raw.phone || raw.recipient_phone || raw.customerPhone || null;
+
+  const houseFlat = String(raw.house_flat || raw.flat_house_building || raw.flat_no || "").trim();
+  const building = raw.building || raw.apartment_name || null;
+  const street = String(raw.street || raw.street_address || raw.address_line_1 || raw.streetAddress || houseFlat || "").trim();
+  const area = String(raw.area || raw.locality || raw.street_area || "Kolkata").trim();
   const landmark = raw.landmark ? String(raw.landmark).trim() : null;
   const city = String(raw.city || "Kolkata").trim();
   const state = String(raw.state || "West Bengal").trim();
-  const pincode = String(raw.pincode || "700064").trim();
-  const title = String(raw.title || raw.label || "Home").trim();
-  const recipientName = raw.recipient_name || raw.customerName || null;
-  const phone = raw.phone || raw.recipient_phone || raw.customerPhone || null;
+  const postalCode = String(raw.postal_code || raw.pincode || "700064").trim();
+  const country = String(raw.country || "India").trim();
 
-  const full =
-    raw.fullAddress ||
-    [street, landmark ? `Near ${landmark}` : null, city, pincode].filter(Boolean).join(", ") ||
-    `${city}, ${state} - ${pincode}`;
+  const rawTitle = String(raw.title || raw.label || raw.tag || "Home").trim();
+  const label = rawTitle;
+  const title = rawTitle;
+  const type = (raw.type || raw.address_type || rawTitle).toLowerCase();
+
+  // Construct readable formatted address
+  const addressParts = [
+    houseFlat,
+    building,
+    street !== houseFlat ? street : null,
+    area,
+    landmark ? `Near ${landmark}` : null,
+    `${city}, ${state} - ${postalCode}`,
+  ].filter(Boolean);
+
+  const formattedAddress = raw.formatted_address || raw.fullAddress || addressParts.join(", ") || `${city}, ${state} - ${postalCode}`;
 
   return {
     id: String(raw.id || generateAddressId()),
+    customer_id: userId,
     user_id: userId,
     userId,
-    label: title,
+    label,
     title,
-    type: (raw.type || raw.address_type || title).toLowerCase(),
-    recipient_name: recipientName,
+    type,
+    full_name: fullName,
+    recipient_name: fullName,
     recipient_phone: phone,
     phone,
-    address_line_1: street,
-    streetAddress: street,
-    house_flat: raw.house_flat || street,
-    street_area: raw.street_area || street,
+    house_flat: houseFlat,
+    building,
+    street,
+    address_line_1: street || houseFlat,
+    streetAddress: street || houseFlat,
+    street_area: area,
     address_line_2: raw.address_line_2 || null,
-    locality: raw.locality || null,
+    area,
+    locality: area,
     landmark,
     city,
     state,
-    pincode,
-    country: raw.country || "India",
+    postal_code: postalCode,
+    pincode: postalCode,
+    country,
     latitude: typeof raw.latitude === "number" ? raw.latitude : null,
     longitude: typeof raw.longitude === "number" ? raw.longitude : null,
     place_id: raw.place_id || null,
     is_default: isDefault,
     isDefault,
-    fullAddress: full,
+    formatted_address: formattedAddress,
+    fullAddress: formattedAddress,
     created_at: raw.created_at || new Date().toISOString(),
     updated_at: raw.updated_at || new Date().toISOString(),
   };
@@ -93,7 +124,8 @@ export function normalizeAddress(raw: any, fallbackUserId = "usr-current"): Addr
 
 /**
  * Authoritative Customer Addresses API.
- * Never returns raw Supabase responses or undefined shapes to the UI.
+ * Communicates with Supabase PostgreSQL `saved_addresses` table with strict customer isolation.
+ * Automatically fails over to `dbRepository` if network or credentials are unavailable.
  * Guaranteed return contract: Promise<Address[]>
  */
 export const addressesApi = {
@@ -105,15 +137,30 @@ export const addressesApi = {
 
     try {
       assertServiceConfigured("supabase");
+      // Query primary saved_addresses table
       const { data, error } = await supabase
-        .from("customer_addresses")
+        .from("saved_addresses")
         .select("*")
-        .eq("user_id", userId)
+        .eq("customer_id", userId)
         .order("is_default", { ascending: false })
         .order("created_at", { ascending: false });
 
-      if (!error && data && Array.isArray(data)) {
+      if (!error && data && Array.isArray(data) && data.length > 0) {
         return data.map((item) => normalizeAddress(item, userId));
+      }
+
+      // Fallback query to legacy customer_addresses table if saved_addresses is empty
+      if (!data || data.length === 0) {
+        const legacyRes = await supabase
+          .from("customer_addresses")
+          .select("*")
+          .eq("user_id", userId)
+          .order("is_default", { ascending: false })
+          .order("created_at", { ascending: false });
+
+        if (!legacyRes.error && legacyRes.data && Array.isArray(legacyRes.data) && legacyRes.data.length > 0) {
+          return legacyRes.data.map((item) => normalizeAddress(item, userId));
+        }
       }
     } catch {
       // Fall back to authoritative local database repository
@@ -128,7 +175,7 @@ export const addressesApi = {
   },
 
   /**
-   * Insert a new customer address.
+   * Insert a new customer address into Supabase `saved_addresses`.
    */
   async createAddress(addressData: Partial<Address>, userId: string): Promise<Address> {
     if (!userId) {
@@ -139,6 +186,7 @@ export const addressesApi = {
       {
         ...addressData,
         id: addressData.id || generateAddressId(),
+        customer_id: userId,
         user_id: userId,
         userId,
       },
@@ -147,30 +195,29 @@ export const addressesApi = {
 
     try {
       assertServiceConfigured("supabase");
-      if (normalized.is_default) {
-        // Unset other defaults for this user
-        await supabase
-          .from("customer_addresses")
-          .update({ is_default: false })
-          .eq("user_id", userId);
-      }
 
+      // Insert into saved_addresses
       const { data, error } = await supabase
-        .from("customer_addresses")
+        .from("saved_addresses")
         .insert([
           {
             id: normalized.id.startsWith("addr-") ? undefined : normalized.id,
-            user_id: userId,
-            title: normalized.title,
-            address_type: normalized.type,
-            recipient_name: normalized.recipient_name,
-            recipient_phone: normalized.phone,
-            flat_house_building: normalized.address_line_1,
-            street_address: normalized.address_line_1,
+            customer_id: userId,
+            label: normalized.label,
+            full_name: normalized.full_name || normalized.recipient_name || "Customer",
+            phone: normalized.phone || "9830000000",
+            house_flat: normalized.house_flat || normalized.address_line_1,
+            building: normalized.building,
+            street: normalized.street || normalized.address_line_1,
+            area: normalized.area || normalized.locality || "Kolkata",
             landmark: normalized.landmark,
-            city: normalized.city,
-            state: normalized.state,
-            pincode: normalized.pincode,
+            city: normalized.city || "Kolkata",
+            state: normalized.state || "West Bengal",
+            country: normalized.country || "India",
+            postal_code: normalized.postal_code || normalized.pincode || "700064",
+            latitude: normalized.latitude,
+            longitude: normalized.longitude,
+            formatted_address: normalized.formatted_address || normalized.fullAddress,
             is_default: normalized.is_default,
           },
         ])
@@ -184,6 +231,16 @@ export const addressesApi = {
       }
     } catch {
       // Fallback
+    }
+
+    // Local repository handling
+    if (normalized.is_default) {
+      const list = dbRepository.getAddresses(userId);
+      list.forEach((a) => {
+        a.is_default = false;
+        a.isDefault = false;
+        dbRepository.saveAddress(a, userId);
+      });
     }
 
     dbRepository.saveAddress(normalized, userId);
@@ -200,27 +257,32 @@ export const addressesApi = {
 
     try {
       assertServiceConfigured("supabase");
-      if (updates.is_default || updates.isDefault) {
-        await supabase
-          .from("customer_addresses")
-          .update({ is_default: false })
-          .eq("user_id", userId);
+
+      const updatePayload: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.label || updates.title) updatePayload.label = updates.label || updates.title;
+      if (updates.full_name || updates.recipient_name) updatePayload.full_name = updates.full_name || updates.recipient_name;
+      if (updates.phone) updatePayload.phone = updates.phone;
+      if (updates.house_flat) updatePayload.house_flat = updates.house_flat;
+      if (updates.building !== undefined) updatePayload.building = updates.building;
+      if (updates.street || updates.address_line_1) updatePayload.street = updates.street || updates.address_line_1;
+      if (updates.area || updates.locality) updatePayload.area = updates.area || updates.locality;
+      if (updates.landmark !== undefined) updatePayload.landmark = updates.landmark;
+      if (updates.city) updatePayload.city = updates.city;
+      if (updates.state) updatePayload.state = updates.state;
+      if (updates.postal_code || updates.pincode) updatePayload.postal_code = updates.postal_code || updates.pincode;
+      if (updates.formatted_address || updates.fullAddress) updatePayload.formatted_address = updates.formatted_address || updates.fullAddress;
+      if (updates.is_default !== undefined || updates.isDefault !== undefined) {
+        updatePayload.is_default = updates.is_default ?? updates.isDefault;
       }
 
       const { data, error } = await supabase
-        .from("customer_addresses")
-        .update({
-          title: updates.title || updates.label,
-          street_address: updates.streetAddress || updates.address_line_1,
-          landmark: updates.landmark,
-          city: updates.city,
-          state: updates.state,
-          pincode: updates.pincode,
-          is_default: updates.is_default ?? updates.isDefault,
-          updated_at: new Date().toISOString(),
-        })
+        .from("saved_addresses")
+        .update(updatePayload)
         .eq("id", id)
-        .eq("user_id", userId)
+        .eq("customer_id", userId)
         .select()
         .single();
 
@@ -238,23 +300,36 @@ export const addressesApi = {
     if (!existing) {
       throw new Error("Address not found or access denied.");
     }
+
     const merged = normalizeAddress(
       {
         ...existing,
         ...updates,
         id,
+        customer_id: userId,
         user_id: userId,
         userId,
         updated_at: new Date().toISOString(),
       },
       userId
     );
+
+    if (merged.is_default) {
+      currentList.forEach((a) => {
+        if (a.id !== id) {
+          a.is_default = false;
+          a.isDefault = false;
+          dbRepository.saveAddress(a, userId);
+        }
+      });
+    }
+
     dbRepository.saveAddress(merged, userId);
     return merged;
   },
 
   /**
-   * Delete a saved address.
+   * Delete a saved address safely.
    */
   async deleteAddress(id: string, userId: string): Promise<void> {
     if (!userId) return;
@@ -262,10 +337,10 @@ export const addressesApi = {
     try {
       assertServiceConfigured("supabase");
       await supabase
-        .from("customer_addresses")
+        .from("saved_addresses")
         .delete()
         .eq("id", id)
-        .eq("user_id", userId);
+        .eq("customer_id", userId);
     } catch {
       // Fallback
     }
@@ -282,15 +357,15 @@ export const addressesApi = {
     try {
       assertServiceConfigured("supabase");
       await supabase
-        .from("customer_addresses")
+        .from("saved_addresses")
         .update({ is_default: false })
-        .eq("user_id", userId);
+        .eq("customer_id", userId);
 
       await supabase
-        .from("customer_addresses")
+        .from("saved_addresses")
         .update({ is_default: true, updated_at: new Date().toISOString() })
         .eq("id", id)
-        .eq("user_id", userId);
+        .eq("customer_id", userId);
     } catch {
       // Fallback
     }

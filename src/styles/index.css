@@ -111,7 +111,7 @@
   --navbar-height: 4rem;
   --sidebar-width: 16rem;
   --sidebar-collapsed-width: 4.5rem;
-  --bottom-nav-height: 4rem;
+  --bottom-nav-height: 4.25rem;
   --container-max: 80rem;
 }
 
@@ -131,6 +131,8 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    overflow-x: clip;
+    max-width: 100vw;
   }
 
   body {
@@ -139,6 +141,17 @@
     background-color: var(--color-background);
     line-height: 1.6;
     min-height: 100dvh;
+    overflow-x: clip;
+    max-width: 100vw;
+  }
+
+  /* Prevent automatic iOS zoom on focus by ensuring minimum 16px font size on inputs */
+  @media (max-width: 767px) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
   }
 
   h1,
@@ -413,6 +426,21 @@
       padding-inline: 2rem;
     }
   }
+
+  /* Safe-area insets utilities */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .min-touch-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 /* ─── Dark Mode Overrides (Dark #071525 + Deep Navy #0B2341 + Orange #FF6A00) ─── */
@@ -448,5 +476,28 @@
 .dark span,
 .dark label {
   color: var(--color-foreground);
+}
+
+/* ─── Print Stylesheet for Invoices ─── */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #invoice-printable-document, #invoice-printable-document * {
+    visibility: visible;
+  }
+  #invoice-printable-document {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 24px;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+  .no-print {
+    display: none !important;
+  }
 }
 

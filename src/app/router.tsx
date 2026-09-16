@@ -48,6 +48,7 @@ const ProfileSetup = lazy(() => import("../pages/auth/ProfileSetup"));
 const BookingWizard = lazy(() => import("../pages/booking/BookingWizard"));
 const BookingConfirmed = lazy(() => import("../pages/booking/BookingConfirmed"));
 const BookingDetail = lazy(() => import("../pages/booking/BookingDetail"));
+const LiveTrackingView = lazy(() => import("../pages/booking/LiveTrackingView"));
 const Orders = lazy(() => import("../pages/dashboard/customer/Orders"));
 const Invoices = lazy(() => import("../pages/dashboard/customer/Invoices"));
 const Wallet = lazy(() => import("../pages/dashboard/customer/Wallet"));
@@ -94,6 +95,7 @@ const AdminContentCMS = lazy(() => import("../pages/dashboard/admin/ContentCMS")
 const AdminReports = lazy(() => import("../pages/dashboard/admin/Reports"));
 const AdminAuditLogsCMS = lazy(() => import("../pages/dashboard/admin/AuditLogsCMS"));
 const AdminSettingsCMS = lazy(() => import("../pages/dashboard/admin/SettingsCMS"));
+const AdminLiveOperations = lazy(() => import("../pages/dashboard/admin/LiveOperations"));
 const AdminSystemIntegrations = lazy(() => import("../pages/dashboard/admin/SystemIntegrations"));
 const AdminDataQualityCMS = lazy(() => import("../pages/dashboard/admin/DataQualityCMS"));
 
@@ -250,6 +252,14 @@ export const router = createBrowserRouter([
           </LazyPage>
         ),
       },
+      {
+        path: "/bookings/:id/track",
+        element: (
+          <LazyPage>
+            <LiveTrackingView />
+          </LazyPage>
+        ),
+      },
 
       // 404 Catch-all
       {
@@ -358,6 +368,14 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <BookingDetail />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "bookings/:id/track",
+        element: (
+          <LazyPage>
+            <LiveTrackingView />
           </LazyPage>
         ),
       },
@@ -779,6 +797,22 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <AdminSystemIntegrations />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "operations/live",
+        element: (
+          <LazyPage>
+            <AdminLiveOperations />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "live-operations",
+        element: (
+          <LazyPage>
+            <AdminLiveOperations />
           </LazyPage>
         ),
       },

@@ -134,6 +134,7 @@ Deno.serve(async (req: Request) => {
         .update({
           status: "COMPLETED",
           gateway_refund_id: refundId,
+          gateway_payment_id: paymentId,
           processed_at: nowIso,
         })
         .eq("gateway_refund_id", refundId);

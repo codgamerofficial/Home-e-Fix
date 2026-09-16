@@ -240,13 +240,15 @@ export default function BookingDetail() {
                 </Button>
                 {["PROFESSIONAL_ON_THE_WAY", "PROFESSIONAL_ARRIVED", "SERVICE_STARTED"].includes(status) && (
                   <Button
+                    asChild
                     variant="accent"
                     size="sm"
-                    leftIcon={<Truck className="h-3.5 w-3.5" />}
-                    onClick={() => setIsTrackingOpen(true)}
-                    className="font-bold"
+                    className="font-bold shadow-glow"
                   >
-                    Track Dispatch
+                    <Link to={`/app/bookings/${booking.id}/track`}>
+                      <Truck className="h-3.5 w-3.5 mr-1.5" />
+                      Track Live Map
+                    </Link>
                   </Button>
                 )}
               </div>

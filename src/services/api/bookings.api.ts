@@ -17,6 +17,7 @@ export interface BookingPayload {
   totalAmount: number;
   paymentMethod: string;
   address: string;
+  addressSnapshot?: any;
 }
 
 /**
@@ -66,6 +67,7 @@ export const bookingsApi = {
             total_amount: payload.totalAmount,
             payment_method: payload.paymentMethod,
             address: payload.address,
+            address_snapshot: payload.addressSnapshot || null,
             status: "CONFIRMED",
           },
         ])
@@ -88,6 +90,7 @@ export const bookingsApi = {
       scheduledDate: payload.scheduledDate,
       scheduledTimeSlot: payload.scheduledTimeSlot,
       address: payload.address,
+      addressSnapshot: payload.addressSnapshot,
       subtotal: payload.totalAmount,
       safetyFee: 49,
       taxGst: Math.round(payload.totalAmount * 0.18),
@@ -95,6 +98,31 @@ export const bookingsApi = {
       totalAmount: payload.totalAmount,
       paymentMethod: payload.paymentMethod,
     }) as unknown as DbBooking;
+  },
+
+  /**
+   * Get booking by either UUID id or booking_number (e.g. HEF-123456).
+   */
+  async getBooking(idOrNumber: string): Promise<DbBooking | null> {
+    if (!idOrNumber) return null;
+    try {
+      assertServiceConfigured("supabase");
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("*")
+        .or(`id.eq.${idOrNumber},booking_number.eq.${idOrNumber}`)
+        .maybeSingle();
+
+      if (!error && data) {
+        return data as unknown as DbBooking;
+      }
+    } catch {
+      // Fallback to local authoritative repository
+    }
+
+    const local =
+      dbRepository.getBookingById(idOrNumber) || dbRepository.getBookingByReference(idOrNumber);
+    return (local as unknown as DbBooking) || null;
   },
 
   /**

@@ -1,6 +1,6 @@
 /**
  * Universal Payment Provider Contract for Home-e-Fix
- * Standardizes multi-gateway routing (Razorpay, Cashfree) and webhook processing.
+ * Standardizes payment gateway routing (Razorpay) and webhook processing.
  */
 
 export interface CreateOrderParams {
@@ -52,9 +52,10 @@ export interface WebhookResult {
 }
 
 export interface PaymentProvider {
-  name: "RAZORPAY" | "CASHFREE";
+  name: "RAZORPAY";
   createOrder(params: CreateOrderParams): Promise<OrderResult>;
   verifyPayment(params: VerifyPaymentParams): Promise<VerifyResult>;
   verifyWebhookSignature(rawBody: string, signature: string): boolean;
   handleWebhook(rawBody: string, signature: string): Promise<WebhookResult>;
 }
+

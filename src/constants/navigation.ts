@@ -56,12 +56,22 @@ export const MAIN_NAV_LINKS: NavLink[] = [
   { label: "Support", href: ROUTES.SUPPORT, icon: HelpCircle },
 ];
 
-/* ─── Mobile Bottom Navigation ─── */
+/* ─── Customer Mobile Bottom Navigation (Section 3: Home, Services, Bookings, PLUS, Account) ─── */
 export const MOBILE_NAV_LINKS: NavLink[] = [
   { label: "Home", href: ROUTES.HOME, icon: Home },
   { label: "Services", href: ROUTES.SERVICES, icon: Wrench },
   { label: "Bookings", href: ROUTES.APP_BOOKINGS, icon: CalendarCheck },
+  { label: "PLUS", href: ROUTES.APP_MEMBERSHIP, icon: Award },
   { label: "Account", href: ROUTES.APP_PROFILE, icon: User },
+];
+
+/* ─── Professional Mobile Bottom Navigation (Section 32: Jobs, Calendar, Earnings, Support, Profile) ─── */
+export const PROFESSIONAL_MOBILE_NAV_LINKS: NavLink[] = [
+  { label: "Jobs", href: ROUTES.PROFESSIONAL_JOBS, icon: ClipboardList },
+  { label: "Calendar", href: ROUTES.PROFESSIONAL_CALENDAR, icon: Calendar },
+  { label: "Earnings", href: ROUTES.PROFESSIONAL_EARNINGS, icon: DollarSign },
+  { label: "Support", href: ROUTES.PROFESSIONAL_SUPPORT, icon: Headphones },
+  { label: "Profile", href: ROUTES.PROFESSIONAL_PROFILE, icon: UserCog },
 ];
 
 /* ─── Customer Sidebar Navigation (/app/* - Section 44) ─── */

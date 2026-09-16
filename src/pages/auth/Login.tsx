@@ -19,6 +19,7 @@ import { OtpInput } from "@/components/ui/otp-input";
 import { ROUTES } from "@/constants/routes";
 import { useAuthStore } from "@/store/auth.store";
 import { authService } from "@/services/auth.service";
+import { TurnstileWidget } from "@/components/shared/TurnstileWidget";
 
 type AuthTab = "phone" | "email";
 
@@ -319,6 +320,8 @@ export default function Login() {
                   </p>
                 </div>
 
+                <TurnstileWidget onSuccess={() => {}} className="py-1" />
+
                 <Button
                   type="submit"
                   disabled={loading || phone.replace(/\D/g, "").length < 10}
@@ -472,6 +475,8 @@ export default function Login() {
                     We will email you a secure, passwordless sign-in link directly to your inbox.
                   </p>
                 )}
+
+                <TurnstileWidget onSuccess={() => {}} className="py-1" />
 
                 <Button
                   type="submit"

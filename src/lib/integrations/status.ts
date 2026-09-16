@@ -49,9 +49,9 @@ export const INTEGRATION_SERVICES: Record<string, ServiceStatus> = {
     name: "SMS OTP Provider",
     key: "otp",
     isConfigured: isServiceConfigured("otp"),
-    requiredEnvVars: ["VITE_SUPABASE_URL", "TWILIO_OR_MSG91_CONFIG"],
-    description: "Transactional SMS OTP dispatch for two-factor verification.",
-    unconfiguredMessage: "OTP provider is not configured. Production SMS verification is unavailable.",
+    requiredEnvVars: ["VITE_SUPABASE_URL", "SUPABASE_AUTH_SMS_CONFIG"],
+    description: "Transactional SMS OTP dispatch for phone verification via Supabase Auth SMS.",
+    unconfiguredMessage: "SMS OTP is currently not configured. Please use Email/Password or Google OAuth.",
   },
 };
 

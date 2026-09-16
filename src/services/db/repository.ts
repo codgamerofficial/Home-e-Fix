@@ -390,6 +390,7 @@ export const dbRepository = {
     customerNotes?: string;
     customerEmail?: string;
     startOtp?: string;
+    addressSnapshot?: any;
   }): any {
     const all = getStored<any[]>("bookings", []);
     const bookingNumber = generateReference("HEF");
@@ -409,6 +410,7 @@ export const dbRepository = {
       scheduled_date: payload.scheduledDate,
       scheduled_time_slot: payload.scheduledTimeSlot,
       address: payload.address,
+      address_snapshot: payload.addressSnapshot || (typeof payload.address === "object" ? payload.address : null),
       subtotal: payload.subtotal,
       safety_fee: payload.safetyFee,
       tax_gst: payload.taxGst,

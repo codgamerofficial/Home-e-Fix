@@ -47,15 +47,21 @@ import { useCartStore } from "@/store/cart.store";
 import { useSearch } from "@/context/SearchContext";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 
+import { MobileHeader } from "@/components/shared/MobileHeader";
+import { MobileLocationSheet } from "@/components/shared/MobileLocationSheet";
+import { useLocationStore } from "@/store/location.store";
+
 export function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useIsMobile();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
   const { user, isAuthenticated, logout } = useAuthStore();
   const { theme, toggleTheme } = useUIStore();
+  const { locality, city } = useLocationStore();
   const { openSearch } = useSearch();
   const { unreadCount } = useNotificationStore();
   const { getItemCount } = useCartStore();
@@ -72,9 +78,13 @@ export function Navbar() {
 
   return (
     <>
+      {/* ─── DEDICATED MOBILE SMARTPHONE HEADER (< md) ─── */}
+      <MobileHeader onOpenLocation={() => setShowLocationModal(true)} />
+
+      {/* ─── DESKTOP & TABLET HEADER (hidden md:block) ─── */}
       <header
         className={cn(
-          "sticky top-0 z-(--z-sticky) w-full transition-all duration-300",
+          "sticky top-0 z-(--z-sticky) w-full transition-all duration-300 hidden md:block",
           scrolled
             ? "bg-white/95 dark:bg-[#07172E]/95 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 shadow-sm shadow-slate-900/5"
             : "bg-white/80 dark:bg-[#07172E]/80 backdrop-blur-md border-b border-slate-200/40 dark:border-white/10"
@@ -83,17 +93,17 @@ export function Navbar() {
         <nav className="container-app relative flex h-(--navbar-height) items-center justify-between gap-4">
           {/* Left: Logo + Location (Desktop) + Desktop Nav */}
           <div className="flex items-center gap-6 lg:gap-8">
-            <Logo size={isMobile ? "sm" : "md"} textColor="auto" />
+            <Logo size="md" textColor="auto" />
 
             {/* Desktop Location Selector Indicator */}
             <button
               type="button"
-              onClick={() => navigate(ROUTES.SERVICES)}
-              className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200/60 dark:border-slate-700/60"
-              title="Operational Hub: Kolkata"
+              onClick={() => setShowLocationModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer border border-slate-200/60 dark:border-slate-700/60"
+              title="Select Service Location Hub"
             >
               <MapPin className="w-3.5 h-3.5 text-[#FF6A00] shrink-0" />
-              <span className="truncate max-w-27.5">Kolkata, WB</span>
+              <span className="truncate max-w-36 font-bold">{locality ? `${locality}, ${city}` : "Kolkata"}</span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
 
@@ -523,6 +533,12 @@ export function Navbar() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Mobile Location Bottom Sheet */}
+      <MobileLocationSheet
+        isOpen={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+      />
     </>
   );
 }

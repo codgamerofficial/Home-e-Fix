@@ -79,6 +79,16 @@ export function paymentServerPlugin(): Plugin {
         const keyId = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "";
         const keySecret = process.env.RAZORPAY_KEY_SECRET || "";
 
+        // ── 0. SYSTEM HEALTH CHECK ──
+        if (pathname === "/api/system/health" && req.method === "GET") {
+          return sendJson(200, {
+            status: "healthy",
+            timestamp: new Date().toISOString(),
+            edge: "vite-dev-proxy",
+            environment: process.env.NODE_ENV || "development",
+          });
+        }
+
         // ── 1. SYSTEM INTEGRATIONS HEALTH CHECK ──
         if (pathname === "/api/system/integrations" && req.method === "GET") {
           const getStatus = (configured: boolean, isTest?: boolean, disabled?: boolean) => {
@@ -90,16 +100,11 @@ export function paymentServerPlugin(): Plugin {
           const isRzpConfigured = Boolean(keyId && keySecret);
           const isRzpTest = keyId.startsWith("rzp_test_");
 
-          const cfId = process.env.CASHFREE_CLIENT_ID;
-          const cfSecret = process.env.CASHFREE_CLIENT_SECRET;
-          const cfEnv = process.env.CASHFREE_ENV || "sandbox";
-
           const suUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
           const suKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_SECRET_KEY;
 
           const mapKey = process.env.MAPMYINDIA_MAP_API_KEY || process.env.GOOGLE_MAPS_SERVER_API_KEY || process.env.VITE_MAP_API_KEY;
           const resendKey = process.env.RESEND_API_KEY;
-          const firebaseKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_PRIVATE_KEY;
           const aiKey = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY;
           const turnstileKey = process.env.TURNSTILE_SECRET_KEY;
           const sentryKey = process.env.SENTRY_DSN;
@@ -110,18 +115,13 @@ export function paymentServerPlugin(): Plugin {
               supabase: {
                 name: "Supabase Database & Auth",
                 status: suUrl && suKey ? "CONNECTED" : "CONFIGURATION_REQUIRED",
-                type: "Core Database & Realtime",
+                type: "Core PostgreSQL Database & Realtime",
               },
               razorpay: {
                 name: "Razorpay Payment Gateway",
                 status: getStatus(isRzpConfigured, isRzpTest),
                 keyPrefix: keyId ? keyId.slice(0, 8) + "..." : "Not Set",
                 type: "Primary Payment Provider",
-              },
-              cashfree: {
-                name: "Cashfree Payment Gateway",
-                status: getStatus(Boolean(cfId && cfSecret), cfEnv === "sandbox", process.env.FEATURE_CASHFREE !== "true"),
-                type: "Secondary Payment Provider",
               },
               maps: {
                 name: "Geolocation & Maps (Google / Mappls)",
@@ -132,11 +132,6 @@ export function paymentServerPlugin(): Plugin {
                 name: "Resend Transactional Email",
                 status: resendKey ? "CONNECTED" : "CONFIGURATION_REQUIRED",
                 type: "Transactional Email Engine",
-              },
-              firebase: {
-                name: "Firebase Cloud Messaging (FCM)",
-                status: firebaseKey ? "CONNECTED" : "CONFIGURATION_REQUIRED",
-                type: "Web Push Notifications",
               },
               ai: {
                 name: "Home-e-Fix AI Assistant (Gemini)",
@@ -158,8 +153,8 @@ export function paymentServerPlugin(): Plugin {
           });
         }
 
-        // ── 2. CREATE ORDER ENDPOINT ──
-        if (pathname === "/api/payment/create-order" && req.method === "POST") {
+        // ── 2. CREATE ORDER ENDPOINT (RAZORPAY ONLY) ──
+        if ((pathname === "/api/payment/create-order" || pathname === "/api/payments/razorpay/create-order") && req.method === "POST") {
           const { booking_id, purpose = "BOOKING", topup_amount, total_amount, customer_name, customer_email } = body;
 
           let amountInr = 0;
@@ -235,8 +230,8 @@ export function paymentServerPlugin(): Plugin {
           }
         }
 
-        // ── 3. VERIFY PAYMENT ENDPOINT ──
-        if (pathname === "/api/payment/verify" && req.method === "POST") {
+        // ── 3. VERIFY PAYMENT ENDPOINT (RAZORPAY ONLY) ──
+        if ((pathname === "/api/payment/verify" || pathname === "/api/payments/razorpay/verify-payment") && req.method === "POST") {
           const { razorpay_order_id, razorpay_payment_id, razorpay_signature, booking_id, purpose } = body;
 
           if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
@@ -302,15 +297,34 @@ export function paymentServerPlugin(): Plugin {
           return sendJson(200, { status: "ok", received: true, event: body.event });
         }
 
-        // ── 5. CASHFREE WEBHOOK ENDPOINT ──
-        if (pathname === "/api/webhooks/cashfree" && req.method === "POST") {
-          const eventId = body.data?.order?.order_id || `${Date.now()}`;
-          if (PROCESSED_WEBHOOK_IDS.has(eventId)) {
-            return sendJson(200, { status: "already_processed", idempotent: true });
+        // ── 5. CLOUDFLARE TURNSTILE BOT PROTECTION ENDPOINT ──
+        if (pathname === "/api/turnstile/verify" && req.method === "POST") {
+          const { token } = body;
+          if (!token) {
+            return sendJson(400, { success: false, error: "Turnstile token is required." });
           }
-          PROCESSED_WEBHOOK_IDS.add(eventId);
 
-          return sendJson(200, { status: "ok", received: true, event: body.type || "CASHFREE_EVENT" });
+          const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
+          if (!turnstileSecret) {
+            return sendJson(200, { success: true, verified: true, bypass: true });
+          }
+
+          try {
+            const formData = new URLSearchParams();
+            formData.append("secret", turnstileSecret);
+            formData.append("response", token);
+
+            const cfRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: formData.toString(),
+            });
+
+            const cfData: any = await cfRes.json();
+            return sendJson(200, { success: Boolean(cfData.success), data: cfData });
+          } catch (err: any) {
+            return sendJson(500, { success: false, error: "Turnstile verification failed", details: err.message });
+          }
         }
 
         // ── 6. AI SERVICE ASSISTANT WITH STRICT GUARDRAILS ──

@@ -33,6 +33,7 @@ import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "
 import { ServiceCard } from "@/components/ui/service-card";
 import { useCartStore } from "@/store/cart.store";
 import { useAuthStore } from "@/store/auth.store";
+import { useLocationStore } from "@/store/location.store";
 import { ROUTES } from "@/constants/routes";
 import {
   SERVICE_CATEGORIES,
@@ -74,11 +75,12 @@ export default function Home() {
   const navigate = useNavigate();
   const { items, addItem, removeItem } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
+  const { locality, city, setLocation } = useLocationStore();
+  const locationLabel = locality ? `${locality}, ${city}` : "Kolkata";
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
-  const [location, setLocation] = useState("Salt Lake, Kolkata");
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [customPincode, setCustomPincode] = useState("");
   const [selectedUpcomingCity, setSelectedUpcomingCity] = useState<string | null>(null);
@@ -156,115 +158,105 @@ export default function Home() {
   return (
     <div className="overflow-hidden bg-background text-foreground font-sans">
       {/* ─────────────────────────────────────────────────────────────
-          1. HERO SECTION (Cinematic Video, Height 680-780px Desktop)
+          1. HERO SECTION (Compact Mobile, Cinematic Video on Desktop)
          ───────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-160 md:min-h-180 lg:h-185 flex items-center bg-primary text-white overflow-hidden">
-        {/* Background Cinematic Video */}
+      <section className="relative py-6 sm:py-12 md:py-16 lg:py-20 flex items-center bg-primary text-white overflow-hidden">
+        {/* Background Cinematic Video (Desktop Only to save mobile bandwidth & performance) */}
         <video
           autoPlay
           loop
           muted
           playsInline
-          className="absolute inset-0 w-full h-full object-cover object-center pointer-events-none opacity-40 mix-blend-screen scale-105 transition-opacity duration-1000"
+          className="hidden md:block absolute inset-0 w-full h-full object-cover object-center pointer-events-none opacity-40 mix-blend-screen scale-105 transition-opacity duration-1000"
           src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4"
         />
 
-        {/* Localized High-Contrast Lighting (No opaque dark overlay) */}
+        {/* Localized High-Contrast Lighting */}
         <div className="absolute inset-0 bg-linear-to-r from-primary/95 via-primary/85 to-transparent pointer-events-none" />
         <div className="absolute inset-0 bg-linear-to-t from-primary via-transparent to-transparent pointer-events-none" />
         <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-[#FF6A00]/15 blur-3xl pointer-events-none" />
 
-        <div className="container-app relative z-10 py-12 md:py-16 lg:py-20">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+        <div className="container-app relative z-10 py-2 sm:py-6 lg:py-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12 items-center">
             {/* Left Column: Commercial Value Proposition */}
             <motion.div
               initial="hidden"
               animate="visible"
               variants={stagger}
-              className="lg:col-span-7 space-y-6 text-left"
+              className="lg:col-span-7 space-y-3.5 sm:space-y-6 text-left"
             >
               {/* Eyebrow */}
-              <motion.div variants={fadeUp} custom={0} className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-xs font-bold tracking-wider uppercase text-orange-400">
+              <motion.div variants={fadeUp} custom={0} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/15 backdrop-blur-md text-[10px] sm:text-xs font-bold tracking-wider uppercase text-orange-400">
                 <Shield className="w-3.5 h-3.5 text-[#FF6A00]" />
-                <span>HOME SERVICES, DONE RIGHT.</span>
+                <span>FIXING HOMES. EARNING TRUST.</span>
               </motion.div>
 
               {/* Main Headline */}
               <motion.h1
                 variants={fadeUp}
                 custom={1}
-                className="font-heading text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.1] text-white"
+                className="font-heading text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-[1.2] text-white"
               >
-                Your Home.
+                Everything your home needs.
                 <br />
-                <span className="text-[#FF6A00]">Fixed Right.</span>
+                <span className="text-[#FF6A00]">Fixed by trusted professionals.</span>
               </motion.h1>
 
               {/* Supporting Text */}
               <motion.p
                 variants={fadeUp}
                 custom={2}
-                className="text-base sm:text-lg text-slate-200 font-normal leading-relaxed max-w-xl"
+                className="text-xs sm:text-base text-slate-200 font-normal leading-relaxed max-w-xl"
               >
-                Book verified professionals for repairs, maintenance, cleaning and more—with transparent pricing, digital invoices and dependable service.
+                Book verified professionals for repairs, maintenance, cleaning and more with transparent pricing, digital invoices and dependable service.
               </motion.p>
 
               {/* CTA Buttons */}
               <motion.div
                 variants={fadeUp}
                 custom={3}
-                className="pt-2 flex flex-wrap items-center gap-3 sm:gap-4"
+                className="pt-1 sm:pt-2 flex flex-row items-center gap-2.5 sm:gap-4"
               >
                 <Button
                   size="lg"
-                  className="bg-[#FF6A00] hover:bg-[#E55F00] text-white font-bold text-base px-8 py-3.5 rounded-xl shadow-lg shadow-orange-500/25 active:scale-98 transition-all cursor-pointer"
+                  className="flex-1 sm:flex-initial min-h-11 bg-[#FF6A00] hover:bg-[#E55F00] text-white font-bold text-xs sm:text-sm px-6 py-3 rounded-xl shadow-lg shadow-orange-500/25 active:scale-98 transition-all cursor-pointer"
                   onClick={() => navigate(ROUTES.APP_BOOK)}
                 >
                   <span>Book a Service</span>
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  <ArrowRight className="w-4 h-4 ml-1.5" />
                 </Button>
 
                 <Button
                   size="lg"
                   variant="outline"
-                  className="border-white/20 bg-white/5 hover:bg-white/15 text-white font-semibold text-base px-6 py-3.5 rounded-xl backdrop-blur-md cursor-pointer"
-                  onClick={() => {
-                    const el = document.getElementById("categories-section");
-                    el ? el.scrollIntoView({ behavior: "smooth" }) : navigate(ROUTES.SERVICES);
-                  }}
+                  className="flex-1 sm:flex-initial min-h-11 border-orange-500/40 bg-orange-500/10 hover:bg-orange-500/20 text-white font-bold text-xs sm:text-sm px-4 py-3 rounded-xl backdrop-blur-md cursor-pointer"
+                  onClick={() => navigate(`${ROUTES.APP_BOOK}?emergency=true`)}
                 >
-                  Explore Services
+                  <Zap className="w-3.5 h-3.5 mr-1 text-[#FF6A00]" />
+                  <span>Emergency Help</span>
                 </Button>
-
-                <a
-                  href="#emergency-section"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-300 hover:text-white px-3 py-2 rounded-lg transition-colors"
-                >
-                  <Zap className="w-3.5 h-3.5 text-[#FF6A00]" />
-                  Emergency Service &rarr;
-                </a>
               </motion.div>
 
-              {/* Compact Trust Indicators (Icons with concise labels) */}
+              {/* Compact Trust Indicators */}
               <motion.div
                 variants={fadeUp}
                 custom={4}
-                className="pt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-white/10"
+                className="pt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 border-t border-white/10"
               >
                 {[
-                  { label: "Verified Professionals", icon: Shield },
-                  { label: "Transparent Pricing", icon: FileText },
-                  { label: "Service Warranty", icon: Sparkles },
-                  { label: "Digital Invoice", icon: CheckCircle2 },
+                  { label: "Verified Pros", icon: Shield },
+                  { label: "Transparent Rates", icon: FileText },
+                  { label: "30-Day Warranty", icon: Sparkles },
+                  { label: "Digital Invoices", icon: CheckCircle2 },
                 ].map((pill, idx) => {
                   const Icon = pill.icon;
                   return (
                     <div
                       key={idx}
-                      className="flex items-center gap-2 p-2 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm"
+                      className="flex items-center gap-1.5 p-1.5 sm:p-2 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm"
                     >
-                      <Icon className="w-4 h-4 text-[#FF6A00] shrink-0" />
-                      <span className="text-xs font-semibold text-slate-200 leading-tight">
+                      <Icon className="w-3.5 h-3.5 text-[#FF6A00] shrink-0" />
+                      <span className="text-[10px] sm:text-xs font-semibold text-slate-200 leading-tight truncate">
                         {pill.label}
                       </span>
                     </div>
@@ -384,9 +376,9 @@ export default function Home() {
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          2. LOCATION SELECTOR & LIVE SEARCH
+          2. LOCATION SELECTOR & SEARCH (Desktop Bar)
          ───────────────────────────────────────────────────────────── */}
-      <section className="relative -mt-6 z-20 container-app">
+      <section className="hidden md:block relative -mt-6 z-20 container-app">
         <div className="bg-surface border border-border/80 rounded-3xl shadow-xl p-4 sm:p-5">
           <div className="flex items-center justify-between gap-4 mb-3">
             <h2 className="text-sm font-bold uppercase tracking-wider text-[#FF6A00]">
@@ -403,7 +395,7 @@ export default function Home() {
             >
               <div className="flex items-center gap-1.5">
                 <MapPin className="w-4 h-4 text-[#FF6A00] shrink-0" />
-                <span className="truncate max-w-32.5">{location}</span>
+                <span className="truncate max-w-32.5">{locationLabel}</span>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
@@ -473,103 +465,98 @@ export default function Home() {
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          3. SERVICE CATEGORIES (All 17 Categories, Larger Cards)
+          3. SERVICE CATEGORIES (Mobile 4-Column Compact Grid)
          ───────────────────────────────────────────────────────────── */}
-      <section id="categories-section" className="container-app py-16 sm:py-24">
-        <div className="text-center space-y-3 mb-12">
-          <Badge variant="accent" className="px-3 py-1 text-xs uppercase font-bold tracking-wider">
-            Explore Home Services
-          </Badge>
-          <h2 className="font-heading text-3xl sm:text-4xl font-extrabold text-primary dark:text-white">
-            Professional Help for Every Corner of Your Home
-          </h2>
-          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">
-            17 specialized trade categories with standard rate cards, vetted technicians, and transparent digital billing.
-          </p>
+      <section id="categories-section" className="container-app py-8 sm:py-16 md:py-20">
+        <div className="flex items-center justify-between gap-4 mb-5 sm:mb-8">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 text-[#FF6A00] text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">
+              <span>Categories</span>
+            </div>
+            <h2 className="font-heading text-lg sm:text-2xl lg:text-3xl font-extrabold text-primary dark:text-white">
+              Explore Home Services
+            </h2>
+          </div>
+          <Link
+            to={ROUTES.SERVICES}
+            className="text-xs font-bold text-[#FF6A00] hover:underline flex items-center gap-1 shrink-0"
+          >
+            See All ({SERVICE_CATEGORIES.length}) &rarr;
+          </Link>
         </div>
 
-        {/* 17 Categories Grid (Desktop Grid, Mobile Horizontal Carousel) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-4 lg:gap-5">
+        {/* 4-column compact grid on smartphone, adaptive grid on tablet/desktop */}
+        <div className="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2 sm:gap-4 lg:gap-5">
           {SERVICE_CATEGORIES.map((category) => (
             <Link
               key={category.id}
               to={`${ROUTES.SERVICES}/${category.slug}`}
-              className="group block"
+              className="group flex flex-col items-center justify-between text-center p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl border border-slate-200/80 dark:border-slate-800 hover:border-[#FF6A00] transition-all hover:shadow-md bg-white dark:bg-slate-900/60 min-touch-target"
             >
-              <Card
-                hover
-                className="p-5 h-full flex flex-col items-center justify-between text-center border-slate-200/80 dark:border-slate-800 hover:border-[#FF6A00] rounded-3xl transition-all duration-300 hover:shadow-lg bg-white dark:bg-slate-900/60"
-              >
-                <div className="space-y-3 flex flex-col items-center w-full">
-                  <div
-                    className="flex h-16 w-16 items-center justify-center rounded-2xl text-3xl transition-transform duration-300 group-hover:scale-110 shadow-xs"
-                    style={{ backgroundColor: `${category.color}15` }}
-                  >
-                    {category.icon}
-                  </div>
-
-                  <div>
-                    <h3 className="font-heading text-sm sm:text-base font-bold text-slate-900 dark:text-white group-hover:text-[#FF6A00] transition-colors leading-tight">
-                      {category.name}
-                    </h3>
-                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-snug">
-                      {category.description}
-                    </p>
-                  </div>
+              <div className="flex flex-col items-center w-full">
+                <div
+                  className="flex h-12 w-12 sm:h-16 sm:w-16 items-center justify-center rounded-2xl text-2xl sm:text-3xl transition-transform duration-300 group-hover:scale-110 shadow-xs mb-1.5 sm:mb-2.5"
+                  style={{ backgroundColor: `${category.color}15` }}
+                >
+                  {category.icon}
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 w-full flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                  <span>{category.count} services</span>
-                  <span className="text-[#FF6A00]">From ₹{category.startingPrice}</span>
-                </div>
-              </Card>
+                <h3 className="font-heading text-[11px] sm:text-sm font-bold text-slate-900 dark:text-white group-hover:text-[#FF6A00] transition-colors leading-tight line-clamp-1">
+                  {category.name}
+                </h3>
+              </div>
+
+              <span className="text-[10px] text-[#FF6A00] font-semibold mt-1">
+                ₹{category.startingPrice}+
+              </span>
             </Link>
           ))}
         </div>
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          4. POPULAR SERVICES NEAR YOU (High Visual Hierarchy)
+          4. POPULAR SERVICES (Mobile Horizontal Carousel / Desktop Grid)
          ───────────────────────────────────────────────────────────── */}
-      <section className="bg-slate-50 dark:bg-slate-900/40 py-16 sm:py-24 border-y border-slate-200/60 dark:border-slate-800">
+      <section className="bg-slate-50 dark:bg-slate-900/40 py-10 sm:py-16 md:py-20 border-y border-slate-200/60 dark:border-slate-800">
         <div className="container-app">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-12">
+          <div className="flex items-end justify-between gap-4 mb-6 sm:mb-10">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 text-[#FF6A00] text-xs font-bold uppercase tracking-wider mb-2">
-                <span>Most Requested</span>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 text-[#FF6A00] text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">
+                <span>Top Rated</span>
               </div>
-              <h2 className="font-heading text-2xl sm:text-3xl lg:text-4xl font-extrabold text-primary dark:text-white">
+              <h2 className="font-heading text-lg sm:text-2xl lg:text-3xl font-extrabold text-primary dark:text-white">
                 Popular Services Near You
               </h2>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1">
-                Transparent rates with guaranteed service warranty and background-checked technicians.
-              </p>
             </div>
 
             <Button
               variant="outline"
               size="sm"
-              className="border-slate-300 dark:border-slate-700 text-xs sm:text-sm font-semibold self-start sm:self-auto"
+              className="text-xs font-semibold shrink-0"
               asChild
             >
               <Link to={ROUTES.SERVICES}>
-                <span>Browse All Services</span>
-                <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                <span>View All</span>
+                <ArrowRight className="w-3 h-3 ml-1" />
               </Link>
             </Button>
           </div>
 
-          {/* Cards Grid (3 or 4 per row desktop) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Horizontal Scroll Carousel on Mobile (< md) | Grid on Desktop (>= md) */}
+          <div className="flex overflow-x-auto pb-4 gap-3.5 scrollbar-hide snap-x md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-6 md:pb-0">
             {POPULAR_SERVICES.map((service) => (
-              <ServiceCard
+              <div
                 key={service.id}
-                service={service}
-                isAdded={items.some((i) => i.id === service.id)}
-                onAdd={handleToggleAddService}
-                onRemove={handleToggleAddService}
-                onBookNow={handleDirectBook}
-              />
+                className="min-w-66.25 max-w-71.25 shrink-0 snap-start md:min-w-0 md:max-w-none md:shrink"
+              >
+                <ServiceCard
+                  service={service}
+                  isAdded={items.some((i) => i.id === service.id)}
+                  onAdd={handleToggleAddService}
+                  onRemove={handleToggleAddService}
+                  onBookNow={handleDirectBook}
+                />
+              </div>
             ))}
           </div>
         </div>
@@ -1187,13 +1174,13 @@ export default function Home() {
                   key={hub.id}
                   type="button"
                   onClick={() => {
-                    setLocation(`${hub.name}, Kolkata`);
+                    setLocation(hub.name, hub.pincode);
                     setShowLocationModal(false);
                     setSelectedUpcomingCity(null);
                   }}
                   className={cn(
                     "p-2.5 rounded-xl border text-xs font-medium text-left transition-all cursor-pointer flex items-center gap-1.5",
-                    location.startsWith(hub.name)
+                    locality === hub.name
                       ? "border-[#FF6A00] bg-orange-500/10 text-[#FF6A00] font-bold"
                       : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:border-orange-300"
                   )}
@@ -1284,7 +1271,7 @@ export default function Home() {
                 className="bg-primary hover:bg-[#143560] text-white text-xs font-bold rounded-xl shrink-0"
                 onClick={() => {
                   if (customPincode.trim()) {
-                    setLocation(`${customPincode.trim()}, Kolkata`);
+                    setLocation(customPincode.trim(), customPincode.trim());
                     setCustomPincode("");
                     setShowLocationModal(false);
                   }

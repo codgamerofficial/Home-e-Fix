@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { TurnstileWidget } from "@/components/shared/TurnstileWidget";
 import { APP_CONFIG, HOMEPAGE_FAQS } from "@/constants/services";
 
 export default function Contact() {
@@ -131,6 +132,8 @@ export default function Contact() {
                 />
               </div>
 
+              <TurnstileWidget onSuccess={() => {}} className="py-1" />
+
               <Button variant="accent" size="lg" type="submit" leftIcon={<Send className="h-4 w-4" />} className="w-full font-bold shadow-glow">
                 Submit Inquiry
               </Button>
@@ -142,15 +145,15 @@ export default function Contact() {
         <div className="space-y-6">
           <Card className="p-6 border border-border space-y-4">
             <h3 className="font-heading text-lg font-bold text-primary pb-2 border-b border-border">
-              Regional Operations Hubs
+              Kolkata Operations & Dispatch Hubs
             </h3>
 
             <div className="space-y-4 text-xs">
               {[
-                { city: "Hyderabad (HQ)", address: "Building 12B, Mindspace IT Park, Hitech City, Hyderabad - 500081" },
-                { city: "Bangalore Hub", address: "Indiranagar 100ft Road, Stage 2, Bangalore - 560038" },
-                { city: "Mumbai Hub", address: "BKC Commercial Complex, Bandra East, Mumbai - 400051" },
-                { city: "Delhi-NCR Hub", address: "Cyber City Phase 2, Sector 24, Gurugram - 122002" },
+                { city: "Kolkata Central (HQ)", address: "Camac Street, Park Street Area, Kolkata - 700016" },
+                { city: "Salt Lake & Sector V Hub", address: "Sector V, Salt Lake Electronics Complex, Kolkata - 700091" },
+                { city: "New Town Hub", address: "Action Area 1, Major Arterial Road, New Town, Kolkata - 700156" },
+                { city: "South Kolkata Hub", address: "Gariahat Road, Ballygunge, Kolkata - 700019" },
               ].map((hub, idx) => (
                 <div key={idx} className="p-3.5 rounded-xl border border-border bg-surface flex items-start gap-3">
                   <MapPin className="h-4 w-4 text-accent shrink-0 mt-0.5" />

@@ -9,6 +9,17 @@ export function RoleSwitcherWidget() {
   const { user, login } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
 
+  // Strictly gate: Only show if explicitly enabled via dev mode or logged-in admin
+  const isExplicitDev = typeof window !== "undefined" && (
+    window.location.search.includes("dev_tools=true") ||
+    localStorage.getItem("hef_dev_mode") === "true"
+  );
+  const isAdmin = user?.role === "admin";
+
+  if (!isExplicitDev && !isAdmin) {
+    return null;
+  }
+
   const currentRole = user?.role || "customer";
 
   const handleRoleSwitch = (role: "customer" | "technician" | "admin" | "public") => {
@@ -38,7 +49,7 @@ export function RoleSwitcherWidget() {
   };
 
   return (
-    <div className="fixed bottom-5 left-5 z-50">
+    <div className="fixed bottom-24 left-4 z-40 hidden md:block">
       {isOpen && (
         <div className="mb-2 p-2 rounded-2xl bg-slate-900/90 backdrop-blur-md text-white border border-slate-700/80 shadow-2xl space-y-1 w-56 animate-in fade-in slide-in-from-bottom-3 duration-200">
           <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 flex items-center gap-1">

@@ -35,11 +35,12 @@ export const notificationsService = {
   },
 
   /**
-   * Send SMS notification via Fast2SMS / Twilio backend API.
+   * SMS alerts require configured SMS provider credentials.
+   * In zero-cost development or when unconfigured, logs a no-op advisory.
    */
   async sendSmsAlert(phone: string, message: string) {
-    // Simulated SMS gateway call
-    console.log(`[SMS DISPATCHED] To: ${phone} | Content: ${message}`);
-    return { success: true, timestamp: new Date().toISOString() };
+    console.info(`[SMS Notice]: Provider not configured. SMS not sent to ${phone}.`);
+    return { success: false, reason: "SMS_NOT_CONFIGURED", timestamp: new Date().toISOString() };
   },
 };
+

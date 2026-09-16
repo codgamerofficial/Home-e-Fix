@@ -23,6 +23,7 @@ import { ROUTES } from "@/constants/routes";
 import { useAuthStore } from "@/store/auth.store";
 import { authService } from "@/services/auth.service";
 import { dbRepository } from "@/services/db/repository";
+import { TurnstileWidget } from "@/components/shared/TurnstileWidget";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -209,6 +210,8 @@ export default function Register() {
                 <Link to={ROUTES.PRIVACY} className="text-accent underline font-semibold">Privacy Policy</Link>.
               </label>
             </div>
+
+            <TurnstileWidget onSuccess={() => {}} className="py-1" />
 
             <div className="space-y-3 pt-2">
               <Button
