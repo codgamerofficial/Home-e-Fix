@@ -81,13 +81,13 @@ export default function About() {
             },
             {
               icon: Sparkles,
-              title: "30-Day Service Guarantee",
-              desc: "Complete peace of mind. If anything goes wrong within 30 days of service, we revisit and fix it for free.",
+              title: "Transparent Service Terms",
+              desc: "Complete clarity before work starts. Itemized quotes, configured warranties by service type, and no surprise charges.",
             },
             {
               icon: Heart,
-              title: "30-Min Express Dispatch",
-              desc: "Urgent leaks or electrical trips? Our nearest verified professional arrives at your doorstep in under 30 mins.",
+              title: "Reliable Slot Scheduling",
+              desc: "Choose convenient arrival time slots that fit your daily schedule with real-time status updates.",
             },
           ].map((pillar, idx) => (
             <Card key={idx} className="p-6 border border-border space-y-3 shadow-xs hover:shadow-md transition-all">

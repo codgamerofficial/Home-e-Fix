@@ -26,19 +26,7 @@ interface CartStore {
 export const useCartStore = create<CartStore>()(
   persist(
     (set, get) => ({
-      items: [
-        {
-          id: "pop-ac-clean",
-          name: "Split AC Foam Deep Jet Servicing",
-          slug: "split-ac-foam-servicing",
-          basePrice: 699,
-          discountedPrice: 499,
-          duration: 45,
-          thumbnail: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=500&q=80",
-          quantity: 1,
-          category: { slug: "ac", name: "AC Repair & Service" },
-        },
-      ],
+      items: [],
       addItem: (service: any) => {
         const currentItems = get().items;
         const existingIndex = currentItems.findIndex((i) => i.id === service.id);

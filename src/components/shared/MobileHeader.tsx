@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/shared/Logo";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useLocationStore } from "@/store/location.store";
+import { useLocationStore, formatLocationLabel, formatHeaderLocation } from "@/store/location.store";
 import { useSearch } from "@/context/SearchContext";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
@@ -36,6 +36,7 @@ export function MobileHeader({ onOpenLocation }: MobileHeaderProps) {
   const { user, isAuthenticated } = useAuthStore();
   const { theme, toggleTheme } = useUIStore();
   const { unreadCount } = useNotificationStore();
+  const headerLoc = formatHeaderLocation({ locality, city });
 
   return (
     <header className="sticky top-0 z-(--z-sticky) md:hidden bg-white/95 dark:bg-[#071525]/95 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800/80 shadow-xs pt-safe">
@@ -98,11 +99,12 @@ export function MobileHeader({ onOpenLocation }: MobileHeaderProps) {
             type="button"
             onClick={onOpenLocation}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 border border-slate-200/70 dark:border-slate-700/70 transition-colors cursor-pointer max-w-full"
-            aria-label="Select service location"
+            title={headerLoc.full}
+            aria-label={`Select service location. Current: ${headerLoc.full}`}
           >
             <MapPin className="h-3.5 w-3.5 text-[#FF6A00] shrink-0" />
             <span className="truncate max-w-56 font-bold text-slate-800 dark:text-white">
-              {locality ? `${locality}, ${city}` : "Kolkata"}
+              {headerLoc.display}
             </span>
             <ChevronDown className="h-3 w-3 text-slate-400 shrink-0" />
           </button>

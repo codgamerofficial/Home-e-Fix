@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router";
 import { Heart, Mail, Phone, MapPin } from "lucide-react";
 import { Logo } from "@/components/shared/Logo";
@@ -6,6 +7,14 @@ import { FOOTER_SECTIONS, APP_CONFIG } from "@/constants";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+
+  const toggleSection = (title: string) => {
+    setOpenSections((prev) => ({
+      ...prev,
+      [title]: !prev[title],
+    }));
+  };
 
   return (
     <footer className="relative border-t border-white/10 bg-linear-to-b from-primary-dark to-[#02060E] text-white overflow-hidden">
@@ -17,19 +26,19 @@ export function Footer() {
 
       {/* Main Footer */}
       <div className="container-app relative py-12 lg:py-16">
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-5">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-[minmax(260px,1.4fr)_repeat(5,minmax(110px,1fr))] gap-8 xl:gap-10">
           {/* Brand Column */}
-          <div className="lg:col-span-1 space-y-3">
+          <div className="col-span-1 md:col-span-3 lg:col-span-1 space-y-4">
             <Logo size="md" textColor="light" linkToHome={false} />
             <p className="text-xs font-bold uppercase tracking-wider text-[#FF6A00]">
               Fixing Homes. Earning Trust.
             </p>
-            <p className="text-xs sm:text-sm leading-relaxed text-slate-300 font-normal">
-              Book verified professionals for repairs, maintenance, cleaning and more—with transparent pricing, digital invoices and dependable service.
+            <p className="text-xs sm:text-sm leading-relaxed text-slate-300 font-normal max-w-sm">
+              Book verified professionals for repairs, maintenance, and home upgrades—with transparent pricing, digital invoices and dependable service.
             </p>
 
             {/* Contact Info Card */}
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3 backdrop-blur-sm">
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3 backdrop-blur-sm max-w-sm">
               <a
                 href="mailto:support@homeefix.in"
                 className="flex items-center gap-2.5 text-xs sm:text-sm text-white/90 hover:text-accent transition-colors group"
@@ -51,36 +60,73 @@ export function Footer() {
                   className="flex items-center gap-2.5 text-xs sm:text-sm text-white/90 hover:text-accent transition-colors group"
                 >
                   <Phone className="h-4 w-4 text-accent shrink-0 group-hover:scale-110 transition-transform" />
-                  <span>24/7 Online Support Helpdesk</span>
+                  <span>Online Helpdesk & Support</span>
                 </Link>
               )}
               <div className="flex items-center gap-2.5 text-xs sm:text-sm text-white/80">
                 <MapPin className="h-4 w-4 text-accent shrink-0" />
-                <span>Kolkata, West Bengal (Headquarters)</span>
+                <span>Kolkata, West Bengal</span>
               </div>
             </div>
           </div>
 
-          {/* Link Columns */}
-          {FOOTER_SECTIONS.map((section) => (
-            <div key={section.title} className="space-y-4">
-              <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-white border-b border-white/10 pb-2 inline-block">
-                {section.title}
-              </h3>
-              <ul className="space-y-2.5">
-                {section.links.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      to={link.href}
-                      className="text-xs sm:text-sm text-white/80 transition-all hover:text-accent hover:translate-x-1 inline-block"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {/* Desktop Link Columns (Visible on md and up) */}
+          <div className="hidden md:contents">
+            {FOOTER_SECTIONS.map((section) => (
+              <div key={section.title} className="space-y-3.5">
+                <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-white border-b border-white/10 pb-2 inline-block">
+                  {section.title}
+                </h3>
+                <ul className="space-y-2">
+                  {section.links.map((link) => (
+                    <li key={link.label}>
+                      <Link
+                        to={link.href}
+                        className="text-xs sm:text-sm text-white/80 transition-all hover:text-accent hover:translate-x-1 inline-block"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          {/* Mobile Accordion Link Groups (< md) */}
+          <div className="col-span-2 sm:col-span-3 md:hidden space-y-1 pt-2">
+            {FOOTER_SECTIONS.map((section) => {
+              const isOpen = openSections[section.title];
+              return (
+                <div key={section.title} className="border-b border-white/10 py-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(section.title)}
+                    className="flex w-full items-center justify-between py-2 text-xs font-bold uppercase tracking-wider text-white hover:text-accent transition-colors"
+                  >
+                    <span>{section.title}</span>
+                    <span className="text-sm font-bold text-accent px-1">
+                      {isOpen ? "−" : "+"}
+                    </span>
+                  </button>
+                  {isOpen && (
+                    <ul className="space-y-2.5 py-2 pl-2">
+                      {section.links.map((link) => (
+                        <li key={link.label}>
+                          <Link
+                            to={link.href}
+                            className="text-xs text-slate-300 hover:text-accent transition-colors block py-0.5"
+                          >
+                            {link.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 

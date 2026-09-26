@@ -1,14 +1,29 @@
 import type { PricingCalculationResult } from "@/types/marketplace.types";
+import { RATE_CARD_POLICIES } from "@/constants/services";
+import { DEFAULT_PRICING_CONFIG, dbRepository, type PricingConfig } from "@/services/db/repository";
 
-export interface PricingInput {
+export interface PricingItemInput {
   basePrice: number;
   variantPrice?: number;
   quantity?: number;
+  materialsTotal?: number;
+  isEligibleForPlusDiscount?: boolean;
+  serviceId?: string;
+  serviceName?: string;
+}
+
+export interface PricingInput {
+  basePrice?: number;
+  variantPrice?: number;
+  quantity?: number;
+  items?: PricingItemInput[];
   addonsTotal?: number;
   materialsTotal?: number;
   isEmergency?: boolean;
+  isNightSlot?: boolean;
   couponCode?: string;
   isPlusMember?: boolean;
+  configOverride?: Partial<PricingConfig>;
 }
 
 const VERIFIED_COUPONS: Record<
@@ -27,18 +42,46 @@ const VERIFIED_COUPONS: Record<
  */
 export const pricingEngine = {
   calculate(input: PricingInput): PricingCalculationResult {
-    const qty = Math.max(1, input.quantity || 1);
-    const unitPrice = input.variantPrice !== undefined && input.variantPrice > 0
-      ? input.variantPrice
-      : input.basePrice;
+    let baseAmount = 0;
+    let qty = 1;
+    let unitPrice = 0;
+    let itemsMaterialsAmount = 0;
 
-    const baseAmount = unitPrice * qty;
+    if (input.items && input.items.length > 0) {
+      qty = input.items.reduce((sum, item) => sum + Math.max(1, item.quantity || 1), 0);
+      baseAmount = input.items.reduce((sum, item) => {
+        const itemPrice = item.variantPrice !== undefined && item.variantPrice > 0 ? item.variantPrice : item.basePrice;
+        return sum + itemPrice * Math.max(1, item.quantity || 1);
+      }, 0);
+      unitPrice = input.items.length === 1 ? (input.items[0].variantPrice ?? input.items[0].basePrice) : Math.round(baseAmount / qty);
+      itemsMaterialsAmount = input.items.reduce((sum, item) => sum + (item.materialsTotal || 0), 0);
+    } else {
+      qty = Math.max(1, input.quantity || 1);
+      unitPrice = input.variantPrice !== undefined && input.variantPrice > 0
+        ? input.variantPrice
+        : (input.basePrice ?? 0);
+      baseAmount = unitPrice * qty;
+    }
+
+    let activeConfig: PricingConfig = DEFAULT_PRICING_CONFIG;
+    try {
+      if (typeof window !== "undefined" && typeof localStorage !== "undefined" && dbRepository?.getPricingConfig) {
+        activeConfig = { ...DEFAULT_PRICING_CONFIG, ...dbRepository.getPricingConfig() };
+      }
+    } catch {
+      activeConfig = DEFAULT_PRICING_CONFIG;
+    }
+    if (input.configOverride) {
+      activeConfig = { ...activeConfig, ...input.configOverride };
+    }
+
     const addonsAmount = Math.max(0, input.addonsTotal || 0);
-    const materialsAmount = Math.max(0, input.materialsTotal || 0);
-    const emergencyFee = input.isEmergency ? 499 : 0;
-    const safetyFee = input.isPlusMember ? 0 : 29; // Waived for PLUS members
+    const materialsAmount = Math.max(0, (input.materialsTotal || 0) + itemsMaterialsAmount);
+    const emergencyFee = input.isEmergency ? (activeConfig.emergencySurcharge ?? 499) : 0;
+    const nightFee = input.isNightSlot ? (activeConfig.nightPeakSurcharge ?? RATE_CARD_POLICIES?.nightPeakSurcharge?.fee ?? 150) : 0;
+    const safetyFee = input.isPlusMember ? 0 : (activeConfig.safetyFee ?? 0);
 
-    const grossLabour = baseAmount + addonsAmount + emergencyFee;
+    const grossLabour = baseAmount + addonsAmount + emergencyFee + nightFee;
     let discountMembership = 0;
 
     // Home-e-Fix PLUS: 20% discount on labour
@@ -63,16 +106,18 @@ export const pricingEngine = {
     }
 
     const subtotal = Math.max(0, netLabourAfterPlus - discountCoupon + materialsAmount);
-    // GST: 18% on total taxable services (labour + safety fee)
+    // Dynamic GST: taxable services (labour + safety fee)
     const taxableLabour = Math.max(0, netLabourAfterPlus - discountCoupon + safetyFee);
-    const taxGst = Math.round(taxableLabour * 0.18);
+    const taxRate = activeConfig.taxEnabled !== false ? ((activeConfig.gstRatePercent ?? 18) / 100) : 0;
+    const taxGst = Math.round(taxableLabour * taxRate);
 
     const totalPayableInr = subtotal + safetyFee + taxGst;
     const totalPayablePaise = totalPayableInr * 100;
 
-    // Split: 80% labour to technician, 20% platform fee, 100% materials to technician
-    const partnerLabourShare = Math.round(netLabourAfterPlus * 0.8) + materialsAmount;
-    const platformFee = Math.round(netLabourAfterPlus * 0.2);
+    // Dynamic Split: configured partner split (default 80%), platform remainder, 100% materials to technician
+    const splitRatio = Math.min(0.95, Math.max(0.5, (activeConfig.partnerLabourSplitPercent ?? 80) / 100));
+    const partnerLabourShare = Math.round(netLabourAfterPlus * splitRatio) + materialsAmount;
+    const platformFee = Math.max(0, Math.round(netLabourAfterPlus * (1 - splitRatio)));
 
     return {
       baseAmount,
@@ -81,6 +126,7 @@ export const pricingEngine = {
       addonsAmount,
       materialsAmount,
       emergencyFee,
+      nightFee,
       safetyFee,
       subtotal,
       taxGst,
@@ -121,3 +167,45 @@ export const pricingEngine = {
     return { valid: true, discount, message: `Coupon applied: Saved ₹${discount}!` };
   },
 };
+
+export interface CalculateBookingPriceParams {
+  items: Array<{
+    serviceId?: string;
+    serviceName?: string;
+    basePrice?: number;
+    unitPrice?: number;
+    quantity: number;
+    materialsTotal?: number;
+  }>;
+  membership?: { isActive: boolean; discountPercentage?: number };
+  visitingFee?: number;
+  materials?: number;
+  tax?: { enabled: boolean; ratePercent: number };
+  discount?: number;
+  surcharge?: number;
+  isEmergency?: boolean;
+  isNightSlot?: boolean;
+  couponCode?: string;
+}
+
+export function calculateBookingPrice(params: CalculateBookingPriceParams) {
+  return pricingEngine.calculate({
+    items: params.items.map((i) => ({
+      serviceId: i.serviceId,
+      serviceName: i.serviceName,
+      basePrice: i.basePrice ?? i.unitPrice ?? 0,
+      variantPrice: i.unitPrice,
+      quantity: i.quantity,
+      materialsTotal: i.materialsTotal,
+    })),
+    materialsTotal: params.materials,
+    isPlusMember: Boolean(params.membership?.isActive),
+    isEmergency: params.isEmergency,
+    isNightSlot: params.isNightSlot,
+    couponCode: params.couponCode,
+    configOverride: params.tax
+      ? { taxEnabled: params.tax.enabled, gstRatePercent: params.tax.ratePercent }
+      : undefined,
+  });
+}
+

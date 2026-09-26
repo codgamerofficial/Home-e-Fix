@@ -144,6 +144,7 @@ export interface PricingCalculationResult {
   addonsAmount: number;
   materialsAmount: number;
   emergencyFee: number;
+  nightFee?: number;
   safetyFee: number;
   subtotal: number;
   taxGst: number;

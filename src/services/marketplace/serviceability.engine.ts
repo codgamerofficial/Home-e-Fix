@@ -115,15 +115,25 @@ export const serviceabilityEngine = {
     // 1. PIN code check: 700xxx is the authoritative Kolkata Postal Division
     const isKolkataPin = cleanPin.startsWith("700");
 
+    const isExplicitlyOutside =
+      rawCity.includes("outside") ||
+      rawCity.includes("not serviceable") ||
+      rawCity.includes("delhi") ||
+      rawCity.includes("mumbai") ||
+      rawCity.includes("bangalore");
+
     // 2. City name check
     const isKolkataCity =
-      rawCity === "kolkata" ||
-      rawCity === "calcutta" ||
-      rawCity === "new town" ||
-      rawCity === "newtown" ||
-      rawCity === "bidhannagar" ||
-      rawCity === "salt lake" ||
-      KOLKATA_LOCALITY_KEYWORDS.some((kw) => rawCity.includes(kw));
+      !isExplicitlyOutside &&
+      (rawCity === "kolkata" ||
+        rawCity === "calcutta" ||
+        rawCity === "new town" ||
+        rawCity === "newtown" ||
+        rawCity === "bidhannagar" ||
+        rawCity === "salt lake" ||
+        KOLKATA_LOCALITY_KEYWORDS.some(
+          (kw) => rawCity === kw || (kw.length > 4 && rawCity.includes(kw))
+        ));
 
     // 3. State check: West Bengal
     const isWestBengalState =
@@ -132,7 +142,9 @@ export const serviceabilityEngine = {
       rawState === ""; // Default to true if unstated in localized form
 
     // Decision: Address is serviceable if PIN starts with 700 OR city/locality is Kolkata
-    const isServiceable = isKolkataPin || (isKolkataCity && (isWestBengalState || !params.state));
+    const isServiceable =
+      !isExplicitlyOutside &&
+      (isKolkataPin || (isKolkataCity && (isWestBengalState || !params.state)));
 
     const internalHub = resolveInternalDispatchHub(cleanPin || "700001");
 
@@ -151,8 +163,8 @@ export const serviceabilityEngine = {
         isEmergencySupported: false,
         availableCapacityNow: false,
         earliestSlot: "None",
-        message: "Currently available in Kolkata only.",
-        reason: "Home-e-Fix is currently available in Kolkata only. Expansion to your city is coming soon!",
+        message: "Home-e-Fix is not currently available at this location.",
+        reason: "Home-e-Fix is not currently available at this location. Currently available in Kolkata only.",
       };
     }
 
@@ -180,11 +192,13 @@ export const serviceabilityEngine = {
    * Convenience backward-compatible wrapper for pincode lookups.
    */
   checkPincode(pincode: string, isEmergencyRequested = false): ServiceabilityCheckResult {
+    const cleanPin = (pincode || "").replace(/\D/g, "").slice(0, 6);
+    const isKolkataPin = cleanPin.startsWith("700");
     return this.checkServiceability({
-      pincode,
-      postalCode: pincode,
-      city: "Kolkata",
-      state: "West Bengal",
+      pincode: cleanPin,
+      postalCode: cleanPin,
+      city: isKolkataPin ? "Kolkata" : "Outside Kolkata",
+      state: isKolkataPin ? "West Bengal" : "",
       isEmergencyRequested,
     });
   },

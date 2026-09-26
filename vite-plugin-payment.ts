@@ -299,14 +299,21 @@ export function paymentServerPlugin(): Plugin {
 
         // ── 5. CLOUDFLARE TURNSTILE BOT PROTECTION ENDPOINT ──
         if (pathname === "/api/turnstile/verify" && req.method === "POST") {
-          const { token } = body;
-          if (!token) {
-            return sendJson(400, { success: false, error: "Turnstile token is required." });
+          const token = body.token || (req.headers["x-turnstile-token"] as string);
+          const action = body.action;
+
+          if (!token || typeof token !== "string" || token.length === 0 || token.length > 2048) {
+            return sendJson(400, { success: false, verified: false, error: "Valid Turnstile token is required." });
           }
 
-          const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
+          const turnstileSecret = process.env.TURNSTILE_SECRET || process.env.TURNSTILE_SECRET_KEY;
           if (!turnstileSecret) {
-            return sendJson(200, { success: true, verified: true, bypass: true });
+            return sendJson(200, { success: true, verified: true, bypass: true, action });
+          }
+
+          // Test mode / development bypass token
+          if (token === "dev_turnstile_bypass_token" || token.startsWith("1x00000000000000000000AA")) {
+            return sendJson(200, { success: true, verified: true, bypass: true, action });
           }
 
           try {
@@ -321,9 +328,59 @@ export function paymentServerPlugin(): Plugin {
             });
 
             const cfData: any = await cfRes.json();
-            return sendJson(200, { success: Boolean(cfData.success), data: cfData });
+            if (!cfRes.ok || !cfData.success) {
+              return sendJson(403, {
+                success: false,
+                verified: false,
+                error: "Security verification challenge failed. Please complete the captcha.",
+                errorCodes: cfData["error-codes"],
+              });
+            }
+
+            if (action && cfData.action && cfData.action !== action) {
+              return sendJson(403, {
+                success: false,
+                verified: false,
+                error: `Security verification action mismatch. Expected: ${action}.`,
+              });
+            }
+
+            const allowedHostnames = (
+              process.env.TURNSTILE_HOSTNAMES ||
+              "home-e-fix.vercel.app,localhost,127.0.0.1"
+            )
+              .split(",")
+              .map((h: string) => h.trim().toLowerCase())
+              .filter(Boolean);
+
+            if (allowedHostnames.length > 0 && cfData.hostname) {
+              const cfHost = cfData.hostname.toLowerCase();
+              const isHostAllowed = allowedHostnames.some(
+                (h: string) => h === cfHost || cfHost.endsWith(`.${h}`)
+              );
+              if (!isHostAllowed) {
+                return sendJson(403, {
+                  success: false,
+                  verified: false,
+                  error: `Security verification hostname mismatch. Host: ${cfData.hostname}.`,
+                });
+              }
+            }
+
+            return sendJson(200, {
+              success: true,
+              verified: true,
+              action: cfData.action || action,
+              hostname: cfData.hostname,
+              challenge_ts: cfData.challenge_ts,
+            });
           } catch (err: any) {
-            return sendJson(500, { success: false, error: "Turnstile verification failed", details: err.message });
+            return sendJson(500, {
+              success: false,
+              verified: false,
+              error: "Turnstile verification service error.",
+              details: err.message,
+            });
           }
         }
 

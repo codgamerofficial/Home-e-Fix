@@ -56,13 +56,13 @@ export const MAIN_NAV_LINKS: NavLink[] = [
   { label: "Support", href: ROUTES.SUPPORT, icon: HelpCircle },
 ];
 
-/* ─── Customer Mobile Bottom Navigation (Section 3: Home, Services, Bookings, PLUS, Account) ─── */
+/* ─── Customer Mobile Bottom Navigation (Home, Services, Bookings, Support, Profile) ─── */
 export const MOBILE_NAV_LINKS: NavLink[] = [
   { label: "Home", href: ROUTES.HOME, icon: Home },
   { label: "Services", href: ROUTES.SERVICES, icon: Wrench },
   { label: "Bookings", href: ROUTES.APP_BOOKINGS, icon: CalendarCheck },
-  { label: "PLUS", href: ROUTES.APP_MEMBERSHIP, icon: Award },
-  { label: "Account", href: ROUTES.APP_PROFILE, icon: User },
+  { label: "Support", href: ROUTES.SUPPORT, icon: HelpCircle },
+  { label: "Profile", href: ROUTES.APP_PROFILE, icon: User },
 ];
 
 /* ─── Professional Mobile Bottom Navigation (Section 32: Jobs, Calendar, Earnings, Support, Profile) ─── */
@@ -130,7 +130,7 @@ export const ADMIN_SIDEBAR_LINKS: NavLink[] = [
   { label: "Data Quality Matrix", href: ROUTES.ADMIN_DATA_QUALITY, icon: Database },
 ];
 
-/* ─── Footer Links ─── */
+/* ─── Footer Links (5 Clear Product Groups) ─── */
 export interface FooterSection {
   title: string;
   links: { label: string; href: string }[];
@@ -138,43 +138,50 @@ export interface FooterSection {
 
 export const FOOTER_SECTIONS: FooterSection[] = [
   {
+    title: "Company",
+    links: [
+      { label: "About", href: ROUTES.ABOUT },
+      { label: "How It Works", href: ROUTES.HOW_IT_WORKS },
+      { label: "Careers", href: `${ROUTES.ABOUT}#careers` },
+      { label: "Contact", href: ROUTES.CONTACT },
+    ],
+  },
+  {
     title: "Services",
     links: [
       { label: "Electrical", href: `${ROUTES.SERVICES}/electrical` },
       { label: "Plumbing", href: `${ROUTES.SERVICES}/plumbing` },
-      { label: "AC Services", href: `${ROUTES.SERVICES}/ac` },
-      { label: "Deep Cleaning", href: `${ROUTES.SERVICES}/cleaning` },
-      { label: "Carpentry", href: `${ROUTES.SERVICES}/carpentry` },
-      { label: "View All Services", href: ROUTES.SERVICES },
+      { label: "AC & HVAC", href: `${ROUTES.SERVICES}/ac` },
+      { label: "Cleaning", href: `${ROUTES.SERVICES}/cleaning` },
+      { label: "Appliance Repair", href: `${ROUTES.SERVICES}/appliances` },
+      { label: "More Services", href: ROUTES.SERVICES },
     ],
   },
   {
-    title: "Company",
+    title: "For Professionals",
     links: [
-      { label: "About Us", href: ROUTES.ABOUT },
-      { label: "How It Works", href: ROUTES.HOW_IT_WORKS },
-      { label: "Home-e-Fix PLUS", href: ROUTES.MEMBERSHIP },
       { label: "Become a Professional", href: ROUTES.BECOME_A_PROFESSIONAL },
-      { label: "Careers", href: `${ROUTES.ABOUT}#careers` },
+      { label: "Professional Login", href: ROUTES.LOGIN },
+      { label: "Partner Support", href: ROUTES.SUPPORT },
     ],
   },
   {
     title: "Support",
     links: [
       { label: "Help Center", href: ROUTES.SUPPORT },
-      { label: "Contact Us", href: ROUTES.CONTACT },
-      { label: "Cancellation Policy", href: `${ROUTES.TERMS}#cancellation` },
-      { label: "Refund Policy", href: `${ROUTES.TERMS}#refund` },
-      { label: "Service Warranty", href: `${ROUTES.HOW_IT_WORKS}#warranty` },
+      { label: "Contact Support", href: ROUTES.CONTACT },
+      { label: "Cancellation Policy", href: ROUTES.CANCELLATION },
+      { label: "Terms", href: ROUTES.TERMS },
+      { label: "Privacy", href: ROUTES.PRIVACY },
     ],
   },
   {
-    title: "Legal",
+    title: "Account",
     links: [
-      { label: "Privacy Policy", href: ROUTES.PRIVACY },
-      { label: "Terms of Service", href: ROUTES.TERMS },
-      { label: "Cookie Policy", href: `${ROUTES.PRIVACY}#cookies` },
-      { label: "Professional Agreement", href: `${ROUTES.BECOME_A_PROFESSIONAL}#agreement` },
+      { label: "Login", href: ROUTES.LOGIN },
+      { label: "My Bookings", href: ROUTES.APP_BOOKINGS },
+      { label: "Saved Addresses", href: ROUTES.APP_ADDRESSES },
+      { label: "Home-e-Fix PLUS", href: ROUTES.MEMBERSHIP },
     ],
   },
 ];

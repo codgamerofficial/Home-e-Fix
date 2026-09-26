@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { HOMEPAGE_FAQS, APP_CONFIG } from "@/constants/services";
 import { dbRepository } from "@/services/db/repository";
 import { formatDateTime } from "@/lib/date";
+import { TurnstileWidget } from "@/components/shared/TurnstileWidget";
+import { turnstileService } from "@/services/turnstile/turnstileService";
 
 export default function HelpCenter() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -17,6 +19,10 @@ export default function HelpCenter() {
   const [notice, setNotice] = useState<string | null>(null);
   const [tickets, setTickets] = useState<any[]>([]);
 
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileError, setTurnstileError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const loadTickets = () => {
     setTickets(dbRepository.getSupportTickets());
   };
@@ -25,23 +31,45 @@ export default function HelpCenter() {
     loadTickets();
   }, []);
 
-  const handleSubmitTicket = (e: React.FormEvent) => {
+  const handleSubmitTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!subject || !description) return;
 
-    const t = dbRepository.createSupportTicket({
-      subject,
-      category,
-      description,
-      bookingNumber: bookingNumber || undefined,
-    });
+    setTurnstileError(null);
+    setIsSubmitting(true);
 
-    loadTickets();
-    setSubject("");
-    setDescription("");
-    setBookingNumber("");
-    setNotice(`Ticket #${t.ticketNumber} created successfully! Our senior support engineer will investigate and respond within 2 hours.`);
-    setTimeout(() => setNotice(null), 8000);
+    try {
+      const verification = await turnstileService.verifyToken(
+        turnstileToken,
+        "support_ticket"
+      );
+
+      if (!verification.success) {
+        setTurnstileError(
+          verification.error ||
+            "Please complete the security challenge before submitting a ticket."
+        );
+        return;
+      }
+
+      const t = dbRepository.createSupportTicket({
+        subject,
+        category,
+        description,
+        bookingNumber: bookingNumber || undefined,
+      });
+
+      loadTickets();
+      setSubject("");
+      setDescription("");
+      setBookingNumber("");
+      setNotice(
+        `Ticket #${t.ticketNumber} created successfully! Our senior support engineer will investigate and respond within 2 hours.`
+      );
+      setTimeout(() => setNotice(null), 8000);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -162,9 +190,31 @@ export default function HelpCenter() {
             />
           </div>
 
+          <TurnstileWidget
+            action="support_ticket"
+            onSuccess={(token) => {
+              setTurnstileToken(token);
+              setTurnstileError(null);
+            }}
+            onExpired={() => setTurnstileToken(null)}
+            className="py-1"
+          />
+
+          {turnstileError && (
+            <p className="text-xs text-rose-500 font-medium text-center bg-rose-50 dark:bg-rose-950/30 p-2 rounded-lg border border-rose-200 dark:border-rose-900">
+              {turnstileError}
+            </p>
+          )}
+
           <div className="flex justify-end pt-2 border-t border-border">
-            <Button variant="accent" type="submit" size="default" className="font-bold shadow-xs">
-              Submit Support Ticket
+            <Button
+              variant="accent"
+              type="submit"
+              size="default"
+              disabled={isSubmitting}
+              className="font-bold shadow-xs"
+            >
+              {isSubmitting ? "Verifying..." : "Submit Support Ticket"}
             </Button>
           </div>
         </form>

@@ -10,7 +10,12 @@
     "test": "npx tsx --test tests/**/*.test.ts",
     "preview": "vite preview",
     "deploy": "wrangler deploy",
-    "edge:dev": "wrangler dev"
+    "edge:dev": "wrangler dev",
+    "types:worker": "wrangler types --include-runtime=false",
+    "build:worker": "wrangler deploy --dry-run",
+    "cf:dev": "wrangler dev",
+    "cf:preview": "npm run build && wrangler dev --env preview",
+    "cf:deploy": "npm run build && wrangler deploy --env production"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.7.1",
@@ -40,6 +45,6 @@
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
     "vite-tsconfig-paths": "^6.1.1",
-    "wrangler": "^4.132.0"
+    "wrangler": "^4.140.0"
   }
 }

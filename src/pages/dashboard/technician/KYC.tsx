@@ -1,92 +1,110 @@
-import { useState } from "react";
-import { ShieldCheck, CheckCircle2, Clock, Upload, FileText, AlertCircle, Eye } from "lucide-react";
+import { useState, useEffect } from "react";
+import {
+  ShieldCheck,
+  CheckCircle2,
+  Clock,
+  Upload,
+  FileText,
+  AlertCircle,
+  Eye,
+  AlertTriangle,
+  Lock,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-
-interface KycDocument {
-  id: string;
-  name: string;
-  category: string;
-  status: "VERIFIED" | "PENDING_REVIEW" | "NOT_SUBMITTED";
-  number: string;
-  verifiedDate?: string;
-  fileName?: string;
-}
-
-const INITIAL_DOCS: KycDocument[] = [
-  {
-    id: "doc-aadhaar",
-    name: "Government ID (Aadhaar Card)",
-    category: "Identity & Address Verification",
-    status: "VERIFIED",
-    number: "XXXX-XXXX-4912",
-    verifiedDate: "14 Jan 2026",
-    fileName: "aadhaar_front_back_signed.pdf",
-  },
-  {
-    id: "doc-pan",
-    name: "PAN Card",
-    category: "Tax & Compliance Identification",
-    status: "VERIFIED",
-    number: "ABCDE1234F",
-    verifiedDate: "14 Jan 2026",
-    fileName: "pan_card_copy.pdf",
-  },
-  {
-    id: "doc-bank",
-    name: "Bank Account (Payout Settlement)",
-    category: "Payout Routing & Direct Deposit",
-    status: "VERIFIED",
-    number: "HDFC Bank •••• 8821 (IFSC: HDFC0001092)",
-    verifiedDate: "15 Jan 2026",
-    fileName: "cancelled_cheque.pdf",
-  },
-  {
-    id: "doc-pcc",
-    name: "Police Background Clearance Certificate",
-    category: "Safety & Criminal Record Verification",
-    status: "VERIFIED",
-    number: "PCC-WB-2026-901",
-    verifiedDate: "16 Jan 2026",
-    fileName: "kolkata_police_clearance.pdf",
-  },
-];
+import { useAuthStore } from "@/store/auth.store";
+import { professionalService } from "@/services/professional/professionalService";
+import type {
+  ProfessionalProfile,
+  ProfessionalDocument,
+  KycDocumentType,
+} from "@/services/professional/professional.types";
 
 export default function ProfessionalKYC() {
-  const [documents, setDocuments] = useState<KycDocument[]>(INITIAL_DOCS);
-  const [activeUploadDoc, setActiveUploadDoc] = useState<string | null>(null);
+  const { user } = useAuthStore();
+  const [profile, setProfile] = useState<ProfessionalProfile | null>(null);
+  const [activeUploadDoc, setActiveUploadDoc] = useState<KycDocumentType | null>(null);
   const [docNumberInput, setDocNumberInput] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
+  const [uploadError, setUploadError] = useState("");
 
-  const verifiedCount = documents.filter((d) => d.status === "VERIFIED").length;
-  const overallKycStatus =
-    verifiedCount === documents.length
-      ? "Approved"
-      : verifiedCount > 0
-      ? "Under Review"
-      : "Pending";
+  const loadProfile = () => {
+    if (user?.id) {
+      const pro = professionalService.getProfessionalByUserId(user.id);
+      if (pro) {
+        setProfile(pro);
+        return;
+      }
+    }
+    const all = professionalService.getAllProfessionals();
+    if (all.length > 0) {
+      setProfile(all[0]);
+    }
+  };
 
-  const handleFileUpload = (docId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  useEffect(() => {
+    loadProfile();
+  }, [user?.id]);
+
+  const documents: ProfessionalDocument[] = profile?.documents || [];
+  const verifiedCount = documents.filter((d) => d.status === "APPROVED").length;
+
+  const handleFileUpload = (docType: KycDocumentType, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setDocuments((prev) =>
-      prev.map((d) =>
-        d.id === docId
-          ? {
-              ...d,
-              status: "PENDING_REVIEW",
-              fileName: file.name,
-              number: docNumberInput || d.number,
-            }
-      : d
-      )
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("File size must not exceed 5MB.");
+      return;
+    }
+
+    const maskedNumber = docNumberInput
+      ? professionalService.maskDocumentNumber(docType, docNumberInput)
+      : "XXXX-XXXX";
+
+    const storagePath = professionalService.generateDocumentStoragePath(
+      profile?.id || "temp-pro",
+      docType,
+      file.name
     );
+
+    const nowIso = new Date().toISOString();
+    const newDoc: ProfessionalDocument = {
+      id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      professionalId: profile?.id || "pro-current",
+      documentType: docType,
+      documentNumberMasked: maskedNumber,
+      storagePath,
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+      status: "PENDING",
+      uploadedAt: nowIso,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+
+    if (profile) {
+      const existingDocs = profile.documents || [];
+      const updatedDocs = [
+        ...existingDocs.filter((d) => d.documentType !== docType),
+        newDoc,
+      ];
+      profile.documents = updatedDocs;
+      profile.status = "DOCUMENTS_UNDER_REVIEW";
+
+      const allPros = professionalService.getAllProfessionals();
+      const updatedList = allPros.map((p) => (p.id === profile.id ? profile : p));
+      localStorage.setItem("homeefix_db_professionals", JSON.stringify(updatedList));
+      setProfile({ ...profile });
+    }
+
     setActiveUploadDoc(null);
     setDocNumberInput("");
-    setUploadSuccess(`Document "${file.name}" uploaded successfully for verification!`);
+    setUploadError("");
+    setUploadSuccess(`Document "${file.name}" uploaded successfully for review!`);
     setTimeout(() => setUploadSuccess(""), 4000);
   };
 
@@ -101,7 +119,8 @@ export default function ProfessionalKYC() {
         </div>
 
         <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
-          <ShieldCheck className="h-4 w-4 text-emerald-600" /> Compliance Status: {overallKycStatus}
+          <ShieldCheck className="h-4 w-4 text-emerald-600" />
+          Status: {profile?.status?.replace("_", " ") || "DRAFT"}
         </div>
       </div>
 
@@ -112,113 +131,165 @@ export default function ProfessionalKYC() {
         </div>
       )}
 
+      {uploadError && (
+        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+          {uploadError}
+        </div>
+      )}
+
+      {/* Action Required Banner if CORRECTION_REQUIRED */}
+      {profile?.status === "CORRECTION_REQUIRED" && (
+        <Card className="p-5 border-amber-300 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 space-y-2">
+          <div className="flex items-center gap-2 font-bold text-sm">
+            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+            Action Required: Administrator Requested Document Correction
+          </div>
+          <p className="text-xs text-amber-800 dark:text-amber-300">
+            {profile.correctionNotes || "Please re-upload a clear copy of your identity or bank document."}
+          </p>
+        </Card>
+      )}
+
       {/* COMPLIANCE OVERVIEW BANNER */}
       <Card className="p-5 border border-border bg-surface flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="font-bold text-sm text-primary">Verification Checklist</span>
             <Badge variant="secondary" className="text-xs">
-              {verifiedCount} of {documents.length} Verified
+              {verifiedCount} Verified Documents
             </Badge>
           </div>
           <p className="text-xs text-foreground-secondary">
-            All Home-e-Fix service partners undergo strict identity check and police verification before dispatch.
+            All Home-e-Fix service partners undergo strict identity checks and administrative review before job dispatch.
           </p>
         </div>
         <div className="text-right">
-          <span className="text-[11px] text-foreground-muted block">Background Checked By</span>
-          <span className="text-xs font-bold text-primary">Home-e-Fix Trust & Safety Council</span>
+          <span className="text-[11px] text-foreground-muted block">Protected By</span>
+          <span className="text-xs font-bold text-primary flex items-center gap-1 justify-end">
+            <Lock className="h-3 w-3 text-accent" /> Private Storage Vault
+          </span>
         </div>
       </Card>
 
       {/* DOCUMENT TILES */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {documents.map((doc) => (
-          <div
-            key={doc.id}
-            className="rounded-2xl border border-border bg-surface p-5 shadow-sm space-y-3 flex flex-col justify-between"
-          >
-            <div className="flex items-start justify-between gap-2">
-              <div className="space-y-1">
-                <span className="font-bold text-sm text-primary">{doc.name}</span>
-                <p className="text-[11px] text-foreground-secondary">{doc.category}</p>
-                <p className="text-xs font-mono text-foreground-muted">{doc.number}</p>
-              </div>
-              <span
-                className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 ${
-                  doc.status === "VERIFIED"
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    : "bg-amber-50 text-amber-700 border border-amber-200"
-                }`}
-              >
-                {doc.status === "VERIFIED" ? (
-                  <>
-                    <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Verified
-                  </>
-                ) : (
-                  <>
-                    <Clock className="h-3 w-3 text-amber-600" /> Pending Review
-                  </>
-                )}
-              </span>
-            </div>
+        {[
+          {
+            type: "IDENTITY_DOCUMENT" as KycDocumentType,
+            title: "Government Photo ID (Aadhaar / Voter ID)",
+            desc: "Identity & Residential Address Proof",
+          },
+          {
+            type: "BANK_DOCUMENT" as KycDocumentType,
+            title: "Bank Payout Document (Cancelled Cheque / Passbook)",
+            desc: "Direct Payout Settlement Routing",
+          },
+          {
+            type: "SKILL_CERTIFICATE" as KycDocumentType,
+            title: "Trade Skill Certificate / ITI Diploma",
+            desc: "Technical Qualification & Certifications",
+          },
+          {
+            type: "ADDRESS_DOCUMENT" as KycDocumentType,
+            title: "Secondary Address Document",
+            desc: "Utility Bill / Rental Agreement",
+          },
+        ].map((item) => {
+          const doc = documents.find((d) => d.documentType === item.type);
+          const isUploaded = Boolean(doc);
+          const isApproved = doc?.status === "APPROVED";
 
-            {activeUploadDoc === doc.id ? (
-              <div className="pt-2 border-t border-border space-y-2">
-                <Input
-                  placeholder="Document number / identifier"
-                  value={docNumberInput}
-                  onChange={(e) => setDocNumberInput(e.target.value)}
-                  className="text-xs h-8"
-                />
-                <div className="flex gap-2">
-                  <label className="cursor-pointer flex-1 text-center py-1 px-3 rounded-lg border border-accent bg-accent/5 text-accent text-xs font-bold hover:bg-accent/10">
-                    Choose PDF / Image
-                    <input
-                      type="file"
-                      accept=".pdf,image/*"
-                      className="hidden"
-                      onChange={(e) => handleFileUpload(doc.id, e)}
-                    />
-                  </label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs"
-                    onClick={() => setActiveUploadDoc(null)}
-                  >
-                    Cancel
-                  </Button>
+          return (
+            <div
+              key={item.type}
+              className="rounded-2xl border border-border bg-surface p-5 shadow-sm space-y-3 flex flex-col justify-between"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="space-y-1">
+                  <span className="font-bold text-sm text-primary">{item.title}</span>
+                  <p className="text-[11px] text-foreground-secondary">{item.desc}</p>
+                  {doc && (
+                    <p className="text-xs font-mono text-foreground-muted">
+                      Masked Number: {doc.documentNumberMasked}
+                    </p>
+                  )}
                 </div>
+                <span
+                  className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 ${
+                    isApproved
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : isUploaded
+                      ? "bg-blue-50 text-blue-700 border border-blue-200"
+                      : "bg-slate-100 text-slate-700 border border-slate-200"
+                  }`}
+                >
+                  {isApproved ? (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Verified
+                    </>
+                  ) : isUploaded ? (
+                    <>
+                      <Clock className="h-3 w-3 text-blue-600" /> Under Review
+                    </>
+                  ) : (
+                    "Not Uploaded"
+                  )}
+                </span>
               </div>
-            ) : (
-              <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-foreground-muted">
-                <span>{doc.verifiedDate ? `Verified on ${doc.verifiedDate}` : "File submitted"}</span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs gap-1"
-                    onClick={() => alert(`Viewing on-file copy: ${doc.fileName}`)}
-                  >
-                    <Eye className="h-3 w-3" /> View
-                  </Button>
+
+              {activeUploadDoc === item.type ? (
+                <div className="p-3 rounded-xl bg-muted/40 border border-border space-y-2">
+                  <Input
+                    type="text"
+                    placeholder="Enter document identifier (e.g. Last 4 digits)"
+                    value={docNumberInput}
+                    onChange={(e) => setDocNumberInput(e.target.value)}
+                    className="text-xs"
+                  />
+                  <div className="flex gap-2">
+                    <label className="flex-1 flex items-center justify-center gap-1.5 p-2 rounded-lg bg-accent text-white text-xs font-bold cursor-pointer hover:bg-accent/90 transition-colors">
+                      <Upload className="h-3.5 w-3.5" /> Choose File (PDF/Image)
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp"
+                        className="hidden"
+                        onChange={(e) => handleFileUpload(item.type, e)}
+                      />
+                    </label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setActiveUploadDoc(null)}
+                      className="text-xs"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <span className="text-[11px] text-foreground-muted">
+                    {doc ? `Uploaded: ${doc.fileName}` : "Max size: 5MB"}
+                  </span>
+
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs gap-1"
                     onClick={() => {
-                      setActiveUploadDoc(doc.id);
-                      setDocNumberInput(doc.number);
+                      setActiveUploadDoc(item.type);
+                      setDocNumberInput("");
                     }}
+                    className="text-xs font-bold gap-1"
                   >
-                    <Upload className="h-3 w-3" /> Re-upload
+                    <Upload className="h-3 w-3" />
+                    {doc ? "Replace Document" : "Upload Document"}
                   </Button>
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -9,25 +9,11 @@
  * - Persists state reliably in localStorage when Supabase tables are pending schema migration.
  */
 
-import { supabase } from "@/lib/supabase";
-import { nowIso, parseDate, formatDate } from "@/lib/date";
+import { nowIso, formatDate } from "@/lib/date";
 import { warrantyEngine } from "@/services/marketplace/warranty.engine";
 import { invoiceEngine } from "@/services/marketplace/invoice.engine";
-import type {
-  DbBooking,
-  DbProfile,
-  DbProfessional,
-  DbPayment,
-  DbRefund,
-  DbInvoice,
-  DbWallet,
-  DbWalletTransaction,
-  DbReview,
-  DbSupportTicket,
-  DbAuditLog,
-  BookingStatus,
-  KYCStatus,
-} from "@/types/database.types";
+import type { KYCStatus, BookingStatus } from "@/types/database.types";
+import { SERVICE_CATEGORIES, CATEGORY_SERVICES_MAP } from "@/constants/services";
 
 const STORAGE_KEY_PREFIX = "homeefix_db_v2_";
 
@@ -111,19 +97,64 @@ export interface BookingAssignment {
   isDevSeed?: boolean;
 }
 
+export type VisitFeePolicy = "waived_on_service" | "charged_on_decline" | "fixed" | "free";
+export type MaterialProcurementRule = "customer_provided_allowed" | "technician_can_supply" | "mandatory_customer_provided" | "mandatory_technician_supplied";
+
 export interface PricingConfig {
   standardVisitFee: number;
+  waiverThreshold: number;
   emergencySurcharge: number;
+  nightPeakSurcharge: number;
+  safetyFee?: number;
   partnerLabourSplitPercent: number;
+  taxEnabled: boolean;
   gstRatePercent: number;
+  taxLabel: string;
+  visitFeePolicy: VisitFeePolicy;
 }
 
-const DEFAULT_PRICING_CONFIG: PricingConfig = {
+export const DEFAULT_PRICING_CONFIG: PricingConfig = {
   standardVisitFee: 199,
+  waiverThreshold: 500,
   emergencySurcharge: 499,
+  nightPeakSurcharge: 150,
+  safetyFee: 0,
   partnerLabourSplitPercent: 80,
+  taxEnabled: true,
   gstRatePercent: 18,
+  taxLabel: "GST (18%)",
+  visitFeePolicy: "waived_on_service",
 };
+
+export interface ServicePricingItem {
+  id: string;
+  serviceId: string;
+  serviceSlug: string;
+  serviceName: string;
+  categorySlug: string;
+  subCategory?: string;
+  benchmarkMin: number;
+  benchmarkMax: number;
+  customerPrice: number;
+  partnerPayout: number;
+  discountPercentage?: number;
+  visitingFeePolicy?: VisitFeePolicy;
+  isActive: boolean;
+  updatedAt?: string;
+}
+
+export interface ServiceMaterialRule {
+  id: string;
+  serviceSlug: string;
+  categorySlug: string;
+  serviceName: string;
+  procurementRule: MaterialProcurementRule;
+  markupPercent: number;
+  requiresPreApproval: boolean;
+  warrantyDays: number;
+  notes?: string;
+}
+
 
 /**
  * Clean Initial Seed Records (tagged explicitly as isDevSeed)
@@ -391,10 +422,45 @@ export const dbRepository = {
     customerEmail?: string;
     startOtp?: string;
     addressSnapshot?: any;
+    items?: any[];
+    pricingSnapshot?: any;
+    serviceAnswers?: Record<string, string>;
   }): any {
     const all = getStored<any[]>("bookings", []);
     const bookingNumber = generateReference("HEF");
     const id = `b-${Date.now()}`;
+
+    const bookingItems = (payload.items && payload.items.length > 0)
+      ? payload.items.map((item: any, idx: number) => ({
+          id: item.id || `bi-${Date.now()}-${idx}`,
+          booking_id: id,
+          service_id: item.serviceId || item.service_id || payload.serviceId,
+          service_name_snapshot: item.serviceName || item.service_name || payload.serviceName,
+          unit_price_snapshot: item.unitPrice ?? item.unit_price ?? payload.subtotal,
+          quantity: item.quantity || 1,
+          quantity_unit: item.quantityUnit || "unit",
+          pricing_type: item.pricingType || "fixed",
+          materials_policy_snapshot: item.materialsPolicy || "extra",
+          tax_snapshot: item.taxSnapshot ?? 0,
+          discount_snapshot: item.discountSnapshot ?? 0,
+          subtotal_snapshot: (item.unitPrice ?? item.unit_price ?? payload.subtotal) * (item.quantity || 1),
+        }))
+      : [
+          {
+            id: `bi-${Date.now()}-0`,
+            booking_id: id,
+            service_id: payload.serviceId,
+            service_name_snapshot: payload.serviceName,
+            unit_price_snapshot: payload.subtotal,
+            quantity: 1,
+            quantity_unit: "unit",
+            pricing_type: "fixed",
+            materials_policy_snapshot: "extra",
+            tax_snapshot: payload.taxGst,
+            discount_snapshot: payload.discount,
+            subtotal_snapshot: payload.subtotal,
+          },
+        ];
 
     const newBooking: any = {
       id,
@@ -422,6 +488,9 @@ export const dbRepository = {
       start_otp: payload.startOtp || generateSecureOtp(),
       created_at: nowIso(),
       is_dev_seed: false,
+      booking_items: bookingItems,
+      pricing_snapshot: payload.pricingSnapshot || null,
+      service_answers: payload.serviceAnswers || null,
       timeline: [
         { status: "CONFIRMED", timestamp: nowIso(), label: "Booking Placed Successfully" },
       ],
@@ -836,6 +905,18 @@ export const dbRepository = {
     return isDev ? all : all.filter((p) => !p.isDevSeed);
   },
 
+  saveProfessional(pro: any): any {
+    const all = getStored<any[]>("professionals", []);
+    const idx = all.findIndex((p) => p.id === pro.id);
+    if (idx >= 0) {
+      all[idx] = { ...all[idx], ...pro };
+    } else {
+      all.unshift(pro);
+    }
+    setStored("professionals", all);
+    return pro;
+  },
+
   updateKycStatus(proId: string, status: KYCStatus, reason?: string): void {
     const all = getStored<any[]>("professionals", []);
     const pro = all.find((p) => p.id === proId);
@@ -946,7 +1027,7 @@ export const dbRepository = {
     return this.getAddresses(userId);
   },
 
-  // ─── PRICING CONFIG ───
+  // ─── PRICING CONFIG & MATERIAL RULES ───
   getPricingConfig(): PricingConfig {
     return getStored<PricingConfig>("pricing_config", DEFAULT_PRICING_CONFIG);
   },
@@ -954,6 +1035,157 @@ export const dbRepository = {
   savePricingConfig(config: PricingConfig): void {
     setStored("pricing_config", config);
     this.addAuditLog("PRICING_UPDATED", "CONFIG", "GLOBAL", null, config);
+  },
+
+  getServicePricings(): ServicePricingItem[] {
+    const stored = getStored<ServicePricingItem[]>("service_pricings", []);
+    if (stored.length >= 80) return stored;
+
+    const initial: ServicePricingItem[] = [];
+    Object.entries(CATEGORY_SERVICES_MAP).forEach(([catSlug, list]) => {
+      if (Array.isArray(list)) {
+        list.forEach((svc) => {
+          const base = svc.discountedPrice || svc.basePrice || 199;
+          const min = Math.round(base * 0.85);
+          const max = Math.round(base * 1.35);
+          initial.push({
+            id: `prc-${svc.slug || svc.id}`,
+            serviceId: svc.id,
+            serviceSlug: svc.slug,
+            serviceName: svc.name,
+            categorySlug: svc.categorySlug || svc.category?.slug || catSlug,
+            subCategory: svc.subCategory || "General",
+            benchmarkMin: min,
+            benchmarkMax: max,
+            customerPrice: base,
+            partnerPayout: Math.round(base * 0.8),
+            discountPercentage:
+              svc.discountedPrice && svc.basePrice > svc.discountedPrice
+                ? Math.round(((svc.basePrice - svc.discountedPrice) / svc.basePrice) * 100)
+                : 0,
+            visitingFeePolicy: "waived_on_service",
+            isActive: true,
+            updatedAt: nowIso(),
+          });
+        });
+      }
+    });
+    setStored("service_pricings", initial);
+    return initial;
+  },
+
+  saveServicePricing(item: ServicePricingItem): ServicePricingItem {
+    const list = this.getServicePricings();
+    const updatedItem = { ...item, updatedAt: nowIso() };
+    const idx = list.findIndex((p) => p.id === item.id || p.serviceSlug === item.serviceSlug);
+    if (idx !== -1) {
+      list[idx] = updatedItem;
+    } else {
+      list.push(updatedItem);
+    }
+    setStored("service_pricings", list);
+    this.addAuditLog("SERVICE_PRICING_UPDATED", "PRICING_CMS", item.serviceSlug, null, updatedItem);
+    return updatedItem;
+  },
+
+  resetServicePricings(): ServicePricingItem[] {
+    const initial: ServicePricingItem[] = [];
+    Object.entries(CATEGORY_SERVICES_MAP).forEach(([catSlug, list]) => {
+      if (Array.isArray(list)) {
+        list.forEach((svc) => {
+          const base = svc.discountedPrice || svc.basePrice || 199;
+          const min = Math.round(base * 0.85);
+          const max = Math.round(base * 1.35);
+          initial.push({
+            id: `prc-${svc.slug || svc.id}`,
+            serviceId: svc.id,
+            serviceSlug: svc.slug,
+            serviceName: svc.name,
+            categorySlug: svc.categorySlug || svc.category?.slug || catSlug,
+            subCategory: svc.subCategory || "General",
+            benchmarkMin: min,
+            benchmarkMax: max,
+            customerPrice: base,
+            partnerPayout: Math.round(base * 0.8),
+            discountPercentage:
+              svc.discountedPrice && svc.basePrice > svc.discountedPrice
+                ? Math.round(((svc.basePrice - svc.discountedPrice) / svc.basePrice) * 100)
+                : 0,
+            visitingFeePolicy: "waived_on_service",
+            isActive: true,
+            updatedAt: nowIso(),
+          });
+        });
+      }
+    });
+    setStored("service_pricings", initial);
+    this.addAuditLog("PRICING_RESET_BENCHMARKS", "PRICING_CMS", "ALL", null, { totalServices: initial.length });
+    return initial;
+  },
+
+  getMaterialRules(): ServiceMaterialRule[] {
+    const stored = getStored<ServiceMaterialRule[]>("service_material_rules", []);
+    if (stored.length >= 80) return stored;
+
+    const initial: ServiceMaterialRule[] = [];
+    Object.entries(CATEGORY_SERVICES_MAP).forEach(([catSlug, list]) => {
+      if (Array.isArray(list)) {
+        list.forEach((svc) => {
+          const isPlumbing = (svc.categorySlug || svc.category?.slug || catSlug) === "plumbing";
+          initial.push({
+            id: `mat-${svc.slug || svc.id}`,
+            serviceSlug: svc.slug,
+            categorySlug: svc.categorySlug || svc.category?.slug || catSlug,
+            serviceName: svc.name,
+            procurementRule: isPlumbing ? "technician_can_supply" : "customer_provided_allowed",
+            markupPercent: isPlumbing ? 15 : 10,
+            requiresPreApproval: true,
+            warrantyDays: 90,
+            notes: "Verified genuine spare parts with tax receipt or warranty QR verification.",
+          });
+        });
+      }
+    });
+    setStored("service_material_rules", initial);
+    return initial;
+  },
+
+  saveMaterialRule(rule: ServiceMaterialRule): ServiceMaterialRule {
+    const list = this.getMaterialRules();
+    const idx = list.findIndex((r) => r.id === rule.id || r.serviceSlug === rule.serviceSlug);
+    if (idx !== -1) {
+      list[idx] = rule;
+    } else {
+      list.push(rule);
+    }
+    setStored("service_material_rules", list);
+    this.addAuditLog("MATERIAL_RULE_UPDATED", "PRICING_CMS", rule.serviceSlug, null, rule);
+    return rule;
+  },
+
+  resetMaterialRules(): ServiceMaterialRule[] {
+    const initial: ServiceMaterialRule[] = [];
+    Object.entries(CATEGORY_SERVICES_MAP).forEach(([catSlug, list]) => {
+      if (Array.isArray(list)) {
+        list.forEach((svc) => {
+          const isPlumbing = (svc.categorySlug || svc.category?.slug || catSlug) === "plumbing";
+          initial.push({
+            id: `mat-${svc.slug || svc.id}`,
+            serviceSlug: svc.slug,
+            categorySlug: svc.categorySlug || svc.category?.slug || catSlug,
+            serviceName: svc.name,
+            procurementRule: isPlumbing ? "technician_can_supply" : "customer_provided_allowed",
+            markupPercent: isPlumbing ? 15 : 10,
+            requiresPreApproval: true,
+            warrantyDays: 90,
+            notes: "Verified genuine spare parts with tax receipt or warranty QR verification.",
+          });
+        });
+      }
+    });
+    setStored("service_material_rules", initial);
+    this.addAuditLog("MATERIAL_RULES_RESET", "PRICING_CMS", "ALL", null, { totalRules: initial.length });
+    return initial;
   },
 
   // ─── REVIEWS ───
@@ -1272,4 +1504,107 @@ export const dbRepository = {
   getWarrantyClaims() {
     return getStored<any[]>("warranty_claims", []);
   },
+
+  // ─── Service Categories & Services CMS ───
+  getServiceCategories(): any[] {
+    const categories = getStored<any[]>("service_categories", []);
+    const elec = categories.find((c: any) => c.slug === "electrical");
+    if (categories.length > 0 && elec && elec.startingPrice === 49) return categories;
+    const initial = [...SERVICE_CATEGORIES];
+    setStored("service_categories", initial);
+    return initial;
+  },
+
+  saveServiceCategory(cat: any): any {
+    const categories = this.getServiceCategories();
+    const id = cat.id || cat.slug || generateReference("CAT");
+    const categoryToSave = { ...cat, id };
+    const index = categories.findIndex((c) => c.id === id || (cat.slug && c.slug === cat.slug));
+    if (index >= 0) {
+      categories[index] = { ...categories[index], ...categoryToSave };
+    } else {
+      categories.push(categoryToSave);
+    }
+    setStored("service_categories", categories);
+    this.addAuditLog("CATEGORY_SAVED", "SERVICES_CMS", id, null, { name: categoryToSave.name });
+    return categoryToSave;
+  },
+
+  deleteServiceCategory(idOrSlug: string): void {
+    let categories = this.getServiceCategories();
+    const target = categories.find((c) => c.id === idOrSlug || c.slug === idOrSlug);
+    const targetSlug = target ? target.slug : idOrSlug;
+    categories = categories.filter((c) => c.id !== idOrSlug && c.slug !== idOrSlug);
+    setStored("service_categories", categories);
+
+    // Also remove associated services
+    let services = this.getAllServices();
+    services = services.filter((s) => s.categorySlug !== targetSlug && s.categorySlug !== idOrSlug);
+    setStored("service_items", services);
+
+    this.addAuditLog("CATEGORY_DELETED", "SERVICES_CMS", idOrSlug, null, { slug: targetSlug });
+  },
+
+  getAllServices(): any[] {
+    const services = getStored<any[]>("service_items", []);
+    if (services.length >= 80) return services;
+    const initial: any[] = [];
+    Object.entries(CATEGORY_SERVICES_MAP).forEach(([slug, list]) => {
+      if (Array.isArray(list)) {
+        list.forEach((svc) => {
+          initial.push({
+            ...svc,
+            categorySlug: svc.categorySlug || svc.category?.slug || slug,
+          });
+        });
+      }
+    });
+    setStored("service_items", initial);
+    return initial;
+  },
+
+  resetToStandardRateCards(): { categories: any[]; services: any[] } {
+    const initialCategories = [...SERVICE_CATEGORIES];
+    setStored("service_categories", initialCategories);
+
+    const initialServices: any[] = [];
+    Object.entries(CATEGORY_SERVICES_MAP).forEach(([slug, list]) => {
+      if (Array.isArray(list)) {
+        list.forEach((svc) => {
+          initialServices.push({
+            ...svc,
+            categorySlug: svc.categorySlug || svc.category?.slug || slug,
+          });
+        });
+      }
+    });
+    setStored("service_items", initialServices);
+    this.addAuditLog("RATE_CARD_RESET", "SERVICES_CMS", "ALL", null, { totalServices: initialServices.length });
+    return { categories: initialCategories, services: initialServices };
+  },
+
+  saveService(svc: any): any {
+    const services = this.getAllServices();
+    const id = svc.id || generateReference("SVC");
+    const serviceToSave = { ...svc, id };
+    const index = services.findIndex((s) => s.id === id);
+    if (index >= 0) {
+      services[index] = { ...services[index], ...serviceToSave };
+    } else {
+      services.unshift(serviceToSave);
+    }
+    setStored("service_items", services);
+    this.addAuditLog("SERVICE_SAVED", "SERVICES_CMS", id, null, { name: serviceToSave.name });
+    return serviceToSave;
+  },
+
+  deleteService(id: string): void {
+    let services = this.getAllServices();
+    services = services.filter((s) => s.id !== id);
+    setStored("service_items", services);
+    this.addAuditLog("SERVICE_DELETED", "SERVICES_CMS", id, null, {});
+  },
 };
+
+
+

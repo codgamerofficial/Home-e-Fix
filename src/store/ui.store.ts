@@ -86,6 +86,7 @@ export const useUIStore = create<UIStore>()(
  * Apply theme class to the document root.
  */
 function applyTheme(theme: Theme) {
+  if (typeof document === "undefined") return;
   const root = document.documentElement;
   if (theme === "dark") {
     root.classList.add("dark");
@@ -93,10 +94,12 @@ function applyTheme(theme: Theme) {
     root.classList.remove("dark");
   } else {
     // System preference
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
-    ).matches;
-    root.classList.toggle("dark", prefersDark);
+    if (typeof window !== "undefined" && window.matchMedia) {
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      ).matches;
+      root.classList.toggle("dark", prefersDark);
+    }
   }
 }
 

@@ -18,11 +18,15 @@ export const ROUTES = {
   MEMBERSHIP: "/membership",
   ABOUT: "/about",
   BECOME_A_PROFESSIONAL: "/become-a-professional",
+  PROFESSIONAL_ONBOARDING: "/become-a-professional/onboarding",
   SUPPORT: "/support",
   CONTACT: "/contact",
   BLOG: "/blog",
   PRIVACY: "/privacy",
   TERMS: "/terms",
+  CANCELLATION: "/cancellation",
+  REFUND: "/refund",
+  PROVIDER_TERMS: "/provider-terms",
   DESIGN_SYSTEM: "/design-system",
 
   // ─── Direct Booking Routes ───
@@ -64,6 +68,7 @@ export const ROUTES = {
 
   // ─── Professional Platform (/professional/*) (Section 45) ───
   PROFESSIONAL: "/professional",
+  PROFESSIONAL_ONBOARDING_DASHBOARD: "/professional/onboarding",
   PROFESSIONAL_JOBS: "/professional/jobs",
   PROFESSIONAL_JOB_DETAIL: "/professional/jobs/:id",
   PROFESSIONAL_CALENDAR: "/professional/calendar",
@@ -90,6 +95,7 @@ export const ROUTES = {
   ADMIN_BOOKINGS: "/admin/bookings",
   ADMIN_CUSTOMERS: "/admin/customers",
   ADMIN_PROFESSIONALS: "/admin/professionals",
+  ADMIN_PROFESSIONAL_DETAIL: "/admin/professionals/:id",
   ADMIN_SERVICES: "/admin/services",
   ADMIN_CATEGORIES: "/admin/categories",
   ADMIN_PRICING: "/admin/pricing",

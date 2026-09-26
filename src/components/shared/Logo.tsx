@@ -69,8 +69,8 @@ export function Logo({
 
       {/* Clean Solid Text Branding */}
       {variant === "full" && (
-        <div className="flex flex-col leading-none">
-          <span className={cn("font-heading font-extrabold tracking-tight", config.text)}>
+        <div className="flex flex-col leading-none whitespace-nowrap shrink-0">
+          <span className={cn("font-heading font-extrabold tracking-tight whitespace-nowrap", config.text)}>
             <span className={mainTextColor}>Home-e-</span>
             <span className="text-[#FF6A00] font-black" style={{ color: "#FF6A00" }}>Fix</span>
           </span>

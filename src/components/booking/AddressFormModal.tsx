@@ -20,6 +20,8 @@ import {
   type AddressFormValues,
 } from "@/lib/validations/address.schema";
 import { useCustomerAddresses } from "@/hooks/useCustomerAddresses";
+import { geolocationService } from "@/services/location/geolocationService";
+import { geocodingService } from "@/services/location/geocodingService";
 import type { Address } from "@/types/address.types";
 
 interface AddressFormModalProps {
@@ -108,35 +110,62 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     }
   }, [isOpen, initialData, defaultFullName, defaultPhone, reset]);
 
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setGeoStatus("Geolocation is not supported by your device browser.");
-      return;
-    }
-
+  const handleUseCurrentLocation = async () => {
     setIsLocating(true);
-    setGeoStatus(null);
+    setGeoStatus("Detecting device GPS coordinates...");
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsLocating(false);
-        const { latitude, longitude } = pos.coords;
-        setValue("latitude", latitude);
-        setValue("longitude", longitude);
-        setValue("city", "Kolkata");
-        setValue("state", "West Bengal");
-        setGeoStatus("Location detected (Kolkata region). Please confirm house & street details.");
-      },
-      (err) => {
-        setIsLocating(false);
-        if (err.code === err.PERMISSION_DENIED) {
-          setGeoStatus("Location access was denied. Please enter address manually.");
-        } else {
-          setGeoStatus("Could not detect precise coordinates. Please enter manually.");
-        }
-      },
-      { timeout: 8000, enableHighAccuracy: true }
-    );
+    try {
+      const coords = await geolocationService.getCurrentCoordinates({
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 15000,
+      });
+
+      setValue("latitude", coords.latitude);
+      setValue("longitude", coords.longitude);
+
+      setGeoStatus("Reverse geocoding address...");
+      const geocoded = await geocodingService.reverseGeocode(
+        coords.latitude,
+        coords.longitude,
+        coords.accuracy
+      );
+
+      if (geocoded.houseNumber) {
+        setValue("houseFlat", geocoded.houseNumber);
+      }
+      if (geocoded.road) {
+        setValue("street", geocoded.road);
+      }
+      if (geocoded.locality) {
+        setValue("areaLocality", geocoded.locality);
+      }
+      if (geocoded.city) {
+        setValue("city", geocoded.city);
+      }
+      if (geocoded.state) {
+        setValue("state", geocoded.state);
+      }
+      if (geocoded.pincode) {
+        setValue("pincode", geocoded.pincode);
+      }
+
+      const accuracyNotice = coords.accuracy
+        ? ` (~${Math.round(coords.accuracy)}m accuracy)`
+        : "";
+
+      setGeoStatus(
+        `Address detected${accuracyNotice}: ${geocoded.locality || geocoded.city}. Please confirm or edit details.`
+      );
+    } catch (err: any) {
+      const msg =
+        err?.userFriendlyMessage ||
+        err?.message ||
+        "Could not detect location. Please enter your address manually.";
+      setGeoStatus(msg);
+    } finally {
+      setIsLocating(false);
+    }
   };
 
   const handleSelectLocality = (locality: { name: string; pin: string }) => {

@@ -20,6 +20,7 @@ import { ROUTES } from "@/constants/routes";
 import { useAuthStore } from "@/store/auth.store";
 import { authService } from "@/services/auth.service";
 import { TurnstileWidget } from "@/components/shared/TurnstileWidget";
+import { turnstileService } from "@/services/turnstile/turnstileService";
 
 type AuthTab = "phone" | "email";
 
@@ -36,6 +37,10 @@ export default function Login() {
   const [activeTab, setActiveTab] = useState<AuthTab>("phone");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // ─── Turnstile Bot Protection State ───
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileError, setTurnstileError] = useState<string | null>(null);
 
   // ─── Phone Flow State ───
   const [phone, setPhone] = useState("");
@@ -90,6 +95,7 @@ export default function Login() {
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
+    setTurnstileError(null);
 
     const cleanPhone = phone.replace(/\D/g, "");
     if (cleanPhone.length < 10) {
@@ -100,6 +106,20 @@ export default function Login() {
     setLoading(true);
 
     try {
+      // 1. Verify Turnstile token before triggering OTP dispatch
+      const verification = await turnstileService.verifyToken(
+        turnstileToken,
+        "customer_login_phone"
+      );
+
+      if (!verification.success) {
+        setTurnstileError(
+          verification.error ||
+            "Please complete the security challenge before requesting an OTP."
+        );
+        return;
+      }
+
       await authService.sendPhoneOtp(cleanPhone);
       setIsOtpStep(true);
       setResendTimer(30);
@@ -164,6 +184,7 @@ export default function Login() {
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
+    setTurnstileError(null);
 
     if (!email || !password) {
       setErrorMessage("Please enter both your email address and password.");
@@ -173,6 +194,20 @@ export default function Login() {
     setLoading(true);
 
     try {
+      // 1. Verify Turnstile token before calling Supabase Auth
+      const verification = await turnstileService.verifyToken(
+        turnstileToken,
+        "customer_login_password"
+      );
+
+      if (!verification.success) {
+        setTurnstileError(
+          verification.error ||
+            "Please complete the security challenge before signing in."
+        );
+        return;
+      }
+
       await authService.signInWithEmail(email, password);
       handleAuthSuccess();
     } catch (err: any) {
@@ -196,6 +231,7 @@ export default function Login() {
   const handleSendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage("");
+    setTurnstileError(null);
 
     if (!email) {
       setErrorMessage("Please enter your email address.");
@@ -205,6 +241,20 @@ export default function Login() {
     setLoading(true);
 
     try {
+      // 1. Verify Turnstile token before calling Supabase Auth
+      const verification = await turnstileService.verifyToken(
+        turnstileToken,
+        "customer_login_magic"
+      );
+
+      if (!verification.success) {
+        setTurnstileError(
+          verification.error ||
+            "Please complete the security challenge before requesting a magic link."
+        );
+        return;
+      }
+
       await authService.signInWithMagicLink(email);
       setMagicLinkSent(true);
     } catch (err: any) {
@@ -320,7 +370,21 @@ export default function Login() {
                   </p>
                 </div>
 
-                <TurnstileWidget onSuccess={() => {}} className="py-1" />
+                <TurnstileWidget
+                  action="customer_login_phone"
+                  onSuccess={(token) => {
+                    setTurnstileToken(token);
+                    setTurnstileError(null);
+                  }}
+                  onExpired={() => setTurnstileToken(null)}
+                  className="py-1"
+                />
+
+                {turnstileError && (
+                  <p className="text-xs text-rose-500 font-medium text-center bg-rose-50 dark:bg-rose-950/30 p-2 rounded-lg border border-rose-200 dark:border-rose-900">
+                    {turnstileError}
+                  </p>
+                )}
 
                 <Button
                   type="submit"
@@ -476,7 +540,21 @@ export default function Login() {
                   </p>
                 )}
 
-                <TurnstileWidget onSuccess={() => {}} className="py-1" />
+                <TurnstileWidget
+                  action={isMagicLinkMode ? "customer_login_magic" : "customer_login_password"}
+                  onSuccess={(token) => {
+                    setTurnstileToken(token);
+                    setTurnstileError(null);
+                  }}
+                  onExpired={() => setTurnstileToken(null)}
+                  className="py-1"
+                />
+
+                {turnstileError && (
+                  <p className="text-xs text-rose-500 font-medium text-center bg-rose-50 dark:bg-rose-950/30 p-2 rounded-lg border border-rose-200 dark:border-rose-900">
+                    {turnstileError}
+                  </p>
+                )}
 
                 <Button
                   type="submit"

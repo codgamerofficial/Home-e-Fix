@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { TurnstileWidget } from "@/components/shared/TurnstileWidget";
+import { turnstileService } from "@/services/turnstile/turnstileService";
 import { APP_CONFIG, HOMEPAGE_FAQS } from "@/constants/services";
 
 export default function Contact() {
@@ -15,15 +16,39 @@ export default function Contact() {
   const [message, setMessage] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileError, setTurnstileError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setTurnstileError(null);
+
     if (name && email && message) {
-      setIsSubmitted(true);
-      setName("");
-      setEmail("");
-      setPhone("");
-      setSubject("");
-      setMessage("");
+      setIsSubmitting(true);
+      try {
+        const verification = await turnstileService.verifyToken(
+          turnstileToken,
+          "contact_support"
+        );
+
+        if (!verification.success) {
+          setTurnstileError(
+            verification.error ||
+              "Please complete the security challenge before submitting."
+          );
+          return;
+        }
+
+        setIsSubmitted(true);
+        setName("");
+        setEmail("");
+        setPhone("");
+        setSubject("");
+        setMessage("");
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -132,10 +157,31 @@ export default function Contact() {
                 />
               </div>
 
-              <TurnstileWidget onSuccess={() => {}} className="py-1" />
+              <TurnstileWidget
+                action="contact_support"
+                onSuccess={(token) => {
+                  setTurnstileToken(token);
+                  setTurnstileError(null);
+                }}
+                onExpired={() => setTurnstileToken(null)}
+                className="py-1"
+              />
 
-              <Button variant="accent" size="lg" type="submit" leftIcon={<Send className="h-4 w-4" />} className="w-full font-bold shadow-glow">
-                Submit Inquiry
+              {turnstileError && (
+                <p className="text-xs text-rose-500 font-medium text-center bg-rose-50 dark:bg-rose-950/30 p-2 rounded-lg border border-rose-200 dark:border-rose-900">
+                  {turnstileError}
+                </p>
+              )}
+
+              <Button
+                variant="accent"
+                size="lg"
+                type="submit"
+                disabled={isSubmitting}
+                leftIcon={<Send className="h-4 w-4" />}
+                className="w-full font-bold shadow-glow"
+              >
+                {isSubmitting ? "Verifying & Sending..." : "Submit Inquiry"}
               </Button>
             </form>
           )}

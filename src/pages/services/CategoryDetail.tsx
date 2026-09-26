@@ -1,28 +1,41 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   Clock,
   Shield,
-  Star,
   CheckCircle,
-  Phone,
   Sparkles,
   ChevronDown,
   Wrench,
   Award,
   Zap,
-  ShoppingBag,
   ArrowRight,
+  Search,
+  Receipt,
+  Moon,
+  Droplets,
+  Wind,
+  Hammer,
+  Paintbrush,
+  HardHat,
+  Maximize2,
+  LayoutGrid,
+  Grid,
+  UtensilsCrossed,
+  ShieldAlert,
+  Camera,
+  Cpu,
+  Home as HomeIcon,
+  ClipboardCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { ServiceCard } from "@/components/ui/service-card";
 import { TechnicianCard } from "@/components/ui/technician-card";
-import { ReviewCard } from "@/components/ui/review-card";
 import { ROUTES } from "@/constants/routes";
 import {
   SERVICE_CATEGORIES,
@@ -32,12 +45,37 @@ import {
 import { dbRepository } from "@/services/db/repository";
 import { cn, formatCurrency } from "@/lib/utils";
 
+const CATEGORY_ICON_MAP: Record<string, React.ElementType> = {
+  electrical: Zap,
+  plumbing: Droplets,
+  carpentry: Hammer,
+  ac: Wind,
+  "ac-repair": Wind,
+  hvac: Wind,
+  cleaning: Sparkles,
+  painting: Paintbrush,
+  civil: HardHat,
+  "false-ceiling": Maximize2,
+  flooring: LayoutGrid,
+  glass: Grid,
+  "modular-kitchen": UtensilsCrossed,
+  appliances: Wrench,
+  "pest-control": ShieldAlert,
+  security: Camera,
+  "smart-home": Cpu,
+  "interior-repair": HomeIcon,
+  inspection: ClipboardCheck,
+};
+
 export default function CategoryDetail() {
-  const { categorySlug } = useParams<{ categorySlug: string }>();
+  const { categorySlug, category: paramCategory } = useParams<{ categorySlug?: string; category?: string }>();
+  const activeCategorySlug = categorySlug || paramCategory;
   const navigate = useNavigate();
 
   // Find category details
-  const category = SERVICE_CATEGORIES.find((c) => c.slug === categorySlug) || SERVICE_CATEGORIES[0];
+  const category =
+    SERVICE_CATEGORIES.find((c) => c.slug === activeCategorySlug || c.id === activeCategorySlug) ||
+    SERVICE_CATEGORIES[0];
   const categoryServices = CATEGORY_SERVICES_MAP[category.slug] || CATEGORY_SERVICES_MAP.electrical;
   const categoryFaqs = CATEGORY_FAQS_MAP[category.slug] || CATEGORY_FAQS_MAP.electrical;
 
@@ -46,6 +84,32 @@ export default function CategoryDetail() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [showWarrantyModal, setShowWarrantyModal] = useState(false);
   const [techNotice, setTechNotice] = useState<string | null>(null);
+  const [activeSubCategory, setActiveSubCategory] = useState<string>("ALL");
+  const [serviceSearch, setServiceSearch] = useState<string>("");
+
+  useEffect(() => {
+    setActiveSubCategory("ALL");
+    setServiceSearch("");
+  }, [activeCategorySlug]);
+
+  const subCategories = useMemo(() => {
+    return Array.from(new Set(categoryServices.map((s: any) => s.subCategory).filter(Boolean))) as string[];
+  }, [categoryServices]);
+
+  const displayedServices = useMemo(() => {
+    let list = categoryServices;
+    if (activeSubCategory !== "ALL") {
+      list = list.filter((s: any) => s.subCategory === activeSubCategory);
+    }
+    if (serviceSearch) {
+      const q = serviceSearch.toLowerCase();
+      list = list.filter((s: any) =>
+        s.name.toLowerCase().includes(q) ||
+        (s.shortDescription && s.shortDescription.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [categoryServices, activeSubCategory, serviceSearch]);
 
   useEffect(() => {
     const pros = dbRepository.getProfessionals();
@@ -91,12 +155,17 @@ export default function CategoryDetail() {
           <div className="grid grid-cols-1 gap-8 md:grid-cols-12 md:items-center">
             <div className="md:col-span-8 space-y-4">
               <div className="flex items-center gap-3">
-                <div
-                  className="h-14 w-14 rounded-2xl flex items-center justify-center text-3xl shadow-lg border border-white/20"
-                  style={{ backgroundColor: `${category.color}30` }}
-                >
-                  {category.icon}
-                </div>
+                {(() => {
+                  const IconComp = CATEGORY_ICON_MAP[category.slug] || Wrench;
+                  return (
+                    <div
+                      className="h-14 w-14 rounded-2xl flex items-center justify-center text-3xl shadow-lg border border-white/20"
+                      style={{ backgroundColor: `${category.color}30` }}
+                    >
+                      <IconComp className="h-7 w-7 text-white" />
+                    </div>
+                  );
+                })()}
                 <div>
                   <Badge variant="accent" className="mb-1 text-[11px]">
                     Verified Professionals
@@ -155,32 +224,121 @@ export default function CategoryDetail() {
       </section>
 
       {/* ─── 2. SERVICES LIST UNDER THIS CATEGORY ─── */}
-      <section className="container-app py-12">
-        <div className="mb-8 flex items-center justify-between">
+      <section className="container-app py-12 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h2 className="font-heading text-2xl font-bold text-primary">
               Available {category.name} Services
             </h2>
             <p className="text-xs sm:text-sm text-foreground-secondary">
-              Select items to add to your service booking
+              Select items to add to your service booking • Standard labor pricing with genuine spares
             </p>
           </div>
-          <span className="text-xs font-semibold text-foreground-muted bg-surface border border-border px-3 py-1 rounded-full">
-            {categoryServices.length} Options
-          </span>
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-foreground-muted" />
+              <input
+                type="text"
+                placeholder={`Search ${category.name}...`}
+                value={serviceSearch}
+                onChange={(e) => setServiceSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl border border-border bg-surface text-foreground placeholder:text-foreground-muted focus:outline-hidden focus:ring-2 focus:ring-accent"
+              />
+            </div>
+            <span className="text-xs font-semibold text-foreground-muted bg-surface border border-border px-3 py-1.5 rounded-full shrink-0">
+              {displayedServices.length} Options
+            </span>
+          </div>
         </div>
 
+        {/* SUB-CATEGORY PILLS */}
+        {subCategories.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 text-xs scrollbar-none">
+            <button
+              type="button"
+              onClick={() => setActiveSubCategory("ALL")}
+              className={`px-3.5 py-1.5 rounded-full font-medium transition-all whitespace-nowrap cursor-pointer ${
+                activeSubCategory === "ALL"
+                  ? "bg-primary text-white shadow-xs"
+                  : "bg-surface border border-border text-foreground-secondary hover:border-accent/40"
+              }`}
+            >
+              All Services ({categoryServices.length})
+            </button>
+            {subCategories.map((sub: string) => {
+              const count = categoryServices.filter((s: any) => s.subCategory === sub).length;
+              const isActive = activeSubCategory === sub;
+              return (
+                <button
+                  key={sub}
+                  type="button"
+                  onClick={() => setActiveSubCategory(sub)}
+                  className={`px-3.5 py-1.5 rounded-full font-medium transition-all whitespace-nowrap cursor-pointer ${
+                    isActive
+                      ? "bg-accent text-white shadow-xs"
+                      : "bg-surface border border-border text-foreground-secondary hover:border-accent/40"
+                  }`}
+                >
+                  {sub} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* RATE CARD TRANSPARENCY CARD */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-2xl bg-surface border border-border/70 text-xs">
+          <div className="space-y-0.5">
+            <div className="text-[10px] text-foreground-muted uppercase font-bold flex items-center gap-1">
+              <Zap className="h-3 w-3 text-amber-500" /> Visiting Fee
+            </div>
+            <div className="font-semibold text-primary">₹49–₹99 (Waived)</div>
+            <div className="text-[10px] text-foreground-secondary line-clamp-1">100% waived on service approval</div>
+          </div>
+          <div className="space-y-0.5">
+            <div className="text-[10px] text-foreground-muted uppercase font-bold flex items-center gap-1">
+              <Shield className="h-3 w-3 text-emerald-500" /> Service Warranty
+            </div>
+            <div className="font-semibold text-primary">30-Day Guarantee</div>
+            <div className="text-[10px] text-foreground-secondary line-clamp-1">On eligible completed repairs</div>
+          </div>
+          <div className="space-y-0.5">
+            <div className="text-[10px] text-foreground-muted uppercase font-bold flex items-center gap-1">
+              <Receipt className="h-3 w-3 text-blue-500" /> Taxation
+            </div>
+            <div className="font-semibold text-primary">18% GST Extra</div>
+            <div className="text-[10px] text-foreground-secondary line-clamp-1">Calculated on net labor</div>
+          </div>
+          <div className="space-y-0.5">
+            <div className="text-[10px] text-foreground-muted uppercase font-bold flex items-center gap-1">
+              <Moon className="h-3 w-3 text-purple-500" /> Night Surcharge
+            </div>
+            <div className="font-semibold text-primary">Flat ₹150</div>
+            <div className="text-[10px] text-foreground-secondary line-clamp-1">Applies post 8:00 PM only</div>
+          </div>
+        </div>
+
+        {/* SERVICES GRID */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {categoryServices.map((service: any) => (
+          {displayedServices.map((service: any) => (
             <ServiceCard
               key={service.id}
               service={service}
               isAdded={Boolean(selectedServices[service.id])}
               onAdd={toggleSelectService}
               onRemove={toggleSelectService}
+              onBookNow={(s) => navigate(`${ROUTES.APP_BOOK}?service=${encodeURIComponent(s.slug || s.id)}`)}
             />
           ))}
         </div>
+
+        {displayedServices.length === 0 && (
+          <div className="text-center py-12 border border-dashed border-border rounded-2xl bg-surface/50">
+            <Wrench className="h-8 w-8 text-foreground-muted mx-auto mb-2" />
+            <p className="text-sm font-semibold text-primary">No services found</p>
+            <p className="text-xs text-foreground-secondary mt-1">Try clearing your search or picking another sub-category</p>
+          </div>
+        )}
       </section>
 
       {/* ─── 3. CATEGORY WARRANTY & PROTECTION ─── */}
@@ -233,7 +391,7 @@ export default function CategoryDetail() {
                   displayName: tech.name,
                   status: tech.status || "available",
                   experience: tech.experienceYears || 5,
-                  rating: tech.rating || 4.9,
+                  rating: tech.rating,
                   reviewCount: tech.reviewCount || 0,
                   completedJobs: tech.completedJobsCount || 0,
                   serviceRadius: tech.serviceRadiusKm || 10,

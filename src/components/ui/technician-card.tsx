@@ -23,15 +23,15 @@ export function TechnicianCard({
   className,
 }: TechnicianCardProps) {
   const {
-    displayName = "Rajesh Kumar",
+    displayName = "Verified Specialist",
     avatar,
     status = "available",
     experience = 5,
-    rating = 4.9,
-    reviewCount = 230,
-    completedJobs = 450,
+    rating,
+    reviewCount = 0,
+    completedJobs = 0,
     serviceRadius = 10,
-    specializations = ["AC Repair", "Wiring"],
+    specializations = ["General Repairs"],
     verificationStatus = "verified",
   } = technician;
 
@@ -78,7 +78,13 @@ export function TechnicianCard({
 
         {/* Rating & Distance */}
         <div className="flex items-center justify-between pt-2 border-t border-border/50 text-xs">
-          <Rating value={rating} reviewCount={reviewCount} size="sm" />
+          {rating && reviewCount > 0 ? (
+            <Rating value={rating} reviewCount={reviewCount} size="sm" />
+          ) : (
+            <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              Verified Specialist
+            </span>
+          )}
           <span className="flex items-center gap-1 text-foreground-muted">
             <MapPin className="h-3 w-3 text-foreground-muted" />
             Within {serviceRadius} km

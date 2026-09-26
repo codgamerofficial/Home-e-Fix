@@ -43,7 +43,7 @@ export default function BecomeProfessional() {
           </p>
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button variant="accent" size="lg" asChild>
-              <Link to={ROUTES.REGISTER} className="gap-2">
+              <Link to={ROUTES.PROFESSIONAL_ONBOARDING} className="gap-2">
                 Apply as a Professional <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>

@@ -27,6 +27,8 @@ import { formatCurrency } from "@/lib/currency";
 import { useBookingConfirmation } from "@/hooks/useBookingConfirmation";
 import { useNotificationStore } from "@/store/notification.store";
 import { InvoiceModal } from "@/components/booking/InvoiceModal";
+import { HomeEFixCharacter } from "@/components/character/HomeEFixCharacter";
+import { analyticsService } from "@/services/analytics/analytics.service";
 
 export default function BookingConfirmed() {
   const { bookingId = "" } = useParams<{ bookingId: string }>();
@@ -54,6 +56,14 @@ export default function BookingConfirmed() {
           title: "Booking Confirmed",
           message: `Your Home-e-Fix booking ${confirmation.bookingNumber} is confirmed for ${confirmation.scheduled.date}.`,
           link: `/booking/confirmation/${confirmation.bookingNumber}`,
+        });
+
+        analyticsService.trackEvent("booking_confirmed", {
+          bookingNumber: confirmation.bookingNumber,
+          serviceName: confirmation.service?.name,
+          category: confirmation.service?.categorySlug,
+          amount: confirmation.payment?.totalPayable,
+          paymentMethod: confirmation.payment?.method,
         });
       }
     }
@@ -145,8 +155,8 @@ export default function BookingConfirmed() {
           transition={{ duration: 0.4, ease: "easeOut" }}
           className="text-center space-y-3"
         >
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shadow-md ring-8 ring-emerald-50">
-            <CheckCircle className="h-10 w-10" />
+          <div className="flex justify-center -mb-2">
+            <HomeEFixCharacter state="celebrating" size={170} title="Service Confirmed!" />
           </div>
 
           <div className="space-y-1">
@@ -457,7 +467,7 @@ export default function BookingConfirmed() {
 
                 <div className="pt-3 border-t border-border flex justify-between items-center text-sm font-extrabold text-primary">
                   <span>Total Payable:</span>
-                  <span className="text-lg font-mono text-[#0B2341]">
+                  <span className="text-lg font-mono text-primary">
                     {formatCurrency(payment.totalPayable)}
                   </span>
                 </div>

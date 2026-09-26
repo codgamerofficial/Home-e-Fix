@@ -34,8 +34,12 @@ const Contact = lazy(() => import("../pages/static/Contact"));
 const Blog = lazy(() => import("../pages/static/Blog"));
 const Privacy = lazy(() => import("../pages/static/Privacy"));
 const Terms = lazy(() => import("../pages/static/Terms"));
+const Cancellation = lazy(() => import("../pages/static/Cancellation"));
+const Refund = lazy(() => import("../pages/static/Refund"));
+const ProviderTerms = lazy(() => import("../pages/static/ProviderTerms"));
 const DesignSystemShowcase = lazy(() => import("../pages/DesignSystemShowcase"));
 const NotFound = lazy(() => import("../pages/NotFound"));
+const ProfessionalOnboarding = lazy(() => import("../pages/professional/ProfessionalOnboarding"));
 
 /* ─── Lazy-loaded Auth Pages ─── */
 const Login = lazy(() => import("../pages/auth/Login"));
@@ -187,6 +191,22 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: ROUTES.PROFESSIONAL_ONBOARDING,
+        element: (
+          <LazyPage>
+            <ProfessionalOnboarding />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "/professional/onboarding",
+        element: (
+          <LazyPage>
+            <ProfessionalOnboarding />
+          </LazyPage>
+        ),
+      },
+      {
         path: ROUTES.SUPPORT,
         element: (
           <LazyPage>
@@ -223,6 +243,30 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <Terms />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.CANCELLATION,
+        element: (
+          <LazyPage>
+            <Cancellation />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.REFUND,
+        element: (
+          <LazyPage>
+            <Refund />
+          </LazyPage>
+        ),
+      },
+      {
+        path: ROUTES.PROVIDER_TERMS,
+        element: (
+          <LazyPage>
+            <ProviderTerms />
           </LazyPage>
         ),
       },
@@ -665,7 +709,23 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "professionals/:id",
+        element: (
+          <LazyPage>
+            <AdminTechnicians />
+          </LazyPage>
+        ),
+      },
+      {
         path: "technicians",
+        element: (
+          <LazyPage>
+            <AdminTechnicians />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "technicians/:id",
         element: (
           <LazyPage>
             <AdminTechnicians />

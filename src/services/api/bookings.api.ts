@@ -18,6 +18,21 @@ export interface BookingPayload {
   paymentMethod: string;
   address: string;
   addressSnapshot?: any;
+  serviceAnswers?: Record<string, string>;
+  subtotal?: number;
+  taxGst?: number;
+  safetyFee?: number;
+  discount?: number;
+  items?: Array<{
+    serviceId: string;
+    serviceName: string;
+    unitPrice: number;
+    quantity: number;
+    pricingType?: string;
+    materialsPolicy?: string;
+    subtotal: number;
+  }>;
+  pricingSnapshot?: any;
 }
 
 /**
@@ -68,7 +83,9 @@ export const bookingsApi = {
             payment_method: payload.paymentMethod,
             address: payload.address,
             address_snapshot: payload.addressSnapshot || null,
+            service_answers: payload.serviceAnswers || null,
             status: "CONFIRMED",
+            pricing_snapshot: payload.pricingSnapshot || null,
           },
         ])
         .select()
@@ -91,12 +108,15 @@ export const bookingsApi = {
       scheduledTimeSlot: payload.scheduledTimeSlot,
       address: payload.address,
       addressSnapshot: payload.addressSnapshot,
-      subtotal: payload.totalAmount,
-      safetyFee: 49,
-      taxGst: Math.round(payload.totalAmount * 0.18),
-      discount: 0,
+      serviceAnswers: payload.serviceAnswers,
+      subtotal: payload.subtotal ?? payload.totalAmount,
+      safetyFee: payload.safetyFee ?? 0,
+      taxGst: payload.taxGst ?? 0,
+      discount: payload.discount ?? 0,
       totalAmount: payload.totalAmount,
       paymentMethod: payload.paymentMethod,
+      items: payload.items,
+      pricingSnapshot: payload.pricingSnapshot,
     }) as unknown as DbBooking;
   },
 

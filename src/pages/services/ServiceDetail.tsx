@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import {
   Check,
@@ -16,16 +16,17 @@ import {
   ShieldCheck,
   ChevronDown,
   Layers,
+  FileText,
+  Percent,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { SERVICE_CATEGORIES, CATEGORY_SERVICES_MAP } from "@/constants/services";
 import { ROUTES } from "@/constants/routes";
 import { formatCurrency } from "@/lib/currency";
+import { getServiceImageMeta } from "@/constants/serviceImageMap";
 import { serviceabilityEngine } from "@/services/marketplace/serviceability.engine";
-import { useCartStore } from "@/store/cart.store";
+import { analyticsService } from "@/services/analytics/analytics.service";
 
 export default function ServiceDetail() {
   const navigate = useNavigate();
@@ -45,8 +46,6 @@ export default function ServiceDetail() {
     (s: any) => s.id === serviceSlug || s.slug === serviceSlug
   ) || servicesList[0];
 
-  const { addItem } = useCartStore();
-
   // Variant State
   const variants = [
     { id: "v1", name: "Standard Single Unit", priceMultiplier: 1.0, duration: "30-45 mins" },
@@ -63,6 +62,17 @@ export default function ServiceDetail() {
 
   // FAQs open state
   const [openFaq, setOpenFaq] = useState<number | null>(0);
+
+  useEffect(() => {
+    if (service) {
+      analyticsService.trackEvent("service_view", {
+        serviceSlug: service.slug,
+        serviceName: service.name,
+        categorySlug: service.category?.slug || categoryKey,
+        basePrice: service.discountedPrice || service.basePrice,
+      });
+    }
+  }, [service, categoryKey]);
 
   if (!service) {
     return (
@@ -81,6 +91,8 @@ export default function ServiceDetail() {
   const basePrice = service.discountedPrice || service.basePrice || 199;
   const activeVariant = variants.find((v) => v.id === selectedVariantId) || variants[0];
   const effectivePrice = Math.round(basePrice * activeVariant.priceMultiplier);
+  const imageMeta = getServiceImageMeta(service.slug, categoryKey);
+  const heroImage = service.imageUrl || service.image || imageMeta.primaryImage;
 
   const handleCheckPincode = (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,13 +109,7 @@ export default function ServiceDetail() {
   };
 
   const handleBookNow = () => {
-    addItem({
-      ...service,
-      basePrice: effectivePrice,
-      discountedPrice: effectivePrice,
-      variantName: activeVariant.name,
-    });
-    navigate(ROUTES.APP_BOOK);
+    navigate(`${ROUTES.APP_BOOK}?service=${encodeURIComponent(service.slug)}`);
   };
 
   const faqs = service.faqs || [
@@ -133,6 +139,12 @@ export default function ServiceDetail() {
           <Link to={`/services/${category?.slug || categoryKey}`} className="hover:text-accent shrink-0">
             {category?.name || "Services"}
           </Link>
+          {service.subCategory && (
+            <>
+              <span className="shrink-0">/</span>
+              <span className="text-foreground-muted shrink-0">{service.subCategory}</span>
+            </>
+          )}
           <span className="shrink-0">/</span>
           <span className="text-primary font-semibold truncate">{service.name}</span>
         </div>
@@ -141,16 +153,46 @@ export default function ServiceDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           {/* Left 2 Columns */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Service Visual Banner */}
+            <div className="relative aspect-video sm:aspect-21/9 w-full rounded-3xl overflow-hidden shadow-md border border-border">
+              <img
+                src={heroImage}
+                alt={imageMeta.altText || `${service.name} service`}
+                className="w-full h-full object-cover"
+                loading="eager"
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-black/70 via-black/20 to-transparent" />
+              <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between text-white">
+                <span className="text-xs font-semibold bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/20">
+                  {category?.name || "Professional Service"}
+                </span>
+                <span className="text-xs font-semibold bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-accent" /> {service.duration || activeVariant.duration}
+                </span>
+              </div>
+            </div>
+
             {/* Hero Card */}
             <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 md:p-8 space-y-5 shadow-sm">
               <div className="flex flex-wrap items-center gap-2.5">
                 <span className="px-3 py-1 rounded-full bg-accent/10 text-accent font-bold text-xs uppercase tracking-wider">
                   {category?.name || "Home Service"}
                 </span>
-                <div className="flex items-center gap-1 text-amber-500 text-xs sm:text-sm font-bold">
-                  <Star className="h-3.5 w-3.5 fill-amber-500" />
-                  <span>{service.rating || 4.9} ({service.reviewCount || 420}+ verified reviews)</span>
-                </div>
+                {service.subCategory && (
+                  <span className="px-3 py-1 rounded-full bg-muted/60 border border-border text-foreground-secondary font-semibold text-xs">
+                    {service.subCategory}
+                  </span>
+                )}
+                {service.rating && service.reviewCount > 0 ? (
+                  <div className="flex items-center gap-1 text-amber-500 text-xs sm:text-sm font-bold">
+                    <Star className="h-3.5 w-3.5 fill-amber-500" />
+                    <span>{service.rating} ({service.reviewCount} reviews)</span>
+                  </div>
+                ) : (
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                    New Service
+                  </span>
+                )}
                 <div className="flex items-center gap-1 text-foreground-muted text-xs sm:text-sm">
                   <Clock className="h-3.5 w-3.5" />
                   <span>{activeVariant.duration}</span>
@@ -300,6 +342,68 @@ export default function ServiceDetail() {
               </div>
             </div>
 
+            {/* Rate Card & Protection Policy */}
+            <div className="rounded-3xl border border-border bg-linear-to-br from-surface to-accent/5 p-5 sm:p-6 md:p-8 space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="font-heading text-base sm:text-lg font-bold text-primary flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-accent" /> Rate Card & Service Terms
+                </h3>
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
+                  {service.warrantyDays ? `${service.warrantyDays}-Day Rework Warranty` : "30-Day Rework Warranty"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 rounded-2xl bg-surface border border-border space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-primary">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>Visiting Fee Waiver</span>
+                  </div>
+                  <p className="text-foreground-secondary leading-relaxed text-[11px]">
+                    Standard ₹149 visiting charge is completely waived upon availing repair or installation service.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-surface border border-border space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-primary">
+                    <FileText className="h-4 w-4 text-accent shrink-0" />
+                    <span>Transparent Spares Policy</span>
+                  </div>
+                  <p className="text-foreground-secondary leading-relaxed text-[11px]">
+                    {service.sparesPolicy || "Replacement spares procured transparently at actual retail MRP. Zero markups."}
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-surface border border-border space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-primary">
+                    <Percent className="h-4 w-4 text-blue-600 shrink-0" />
+                    <span>Standard GST Application</span>
+                  </div>
+                  <p className="text-foreground-secondary leading-relaxed text-[11px]">
+                    18% GST applies strictly on labor charges. Spare parts already include applicable retail GST.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-surface border border-border space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-primary">
+                    <Clock className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>Night Service Policy</span>
+                  </div>
+                  <p className="text-foreground-secondary leading-relaxed text-[11px]">
+                    A night service surcharge of ₹150 applies for appointments scheduled after 8:00 PM.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-muted/40 border border-border flex items-center gap-2 text-xs text-foreground-secondary">
+                <Shield className="h-4 w-4 text-accent shrink-0" />
+                <span>
+                  <strong className="text-primary">Final Bill Formula: </strong>
+                  {service.finalBillFormula || "Final Payable = Labor Rate + Approved Spares MRP + 18% GST (on labor)"}
+                </span>
+              </div>
+            </div>
+
             {/* FAQs Accordion */}
             <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 md:p-8 space-y-4">
               <h3 className="font-heading text-base sm:text-lg font-bold text-primary flex items-center gap-2">
@@ -386,20 +490,32 @@ export default function ServiceDetail() {
               <div className="space-y-2 text-xs text-foreground-secondary border-t border-b border-border py-4">
                 <div className="flex justify-between">
                   <span>Standard Visit:</span>
-                  <span className="font-bold text-primary">Included</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">Waived on Service</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Spares & Material:</span>
-                  <span className="font-bold text-primary">Actual MRP</span>
+                  <span className="font-bold text-primary">
+                    {service.requiresMaterials || service.requires_materials
+                      ? "Parts extra (actual MRP)"
+                      : "Standard materials included"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Warranty:</span>
-                  <span className="font-bold text-success">30 Days Guaranteed</span>
+                  <span>Service Warranty:</span>
+                  <span className="font-bold text-success">
+                    {service.warrantyDays ? `${service.warrantyDays} Days Configured` : (service.warranty || "Policy as per job quote")}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Emergency Dispatch:</span>
-                  <span className="font-bold text-accent">Available (2-Hr)</span>
+                  <span>Taxes (GST):</span>
+                  <span className="font-bold text-primary">Prevailing GST on Labor</span>
                 </div>
+                {service.isEmergencyEligible && (
+                  <div className="flex justify-between">
+                    <span>Emergency Dispatch:</span>
+                    <span className="font-bold text-accent">Available (Priority)</span>
+                  </div>
+                )}
               </div>
 
               <Button
@@ -425,7 +541,9 @@ export default function ServiceDetail() {
           <span className="text-[10px] font-bold uppercase tracking-wider text-foreground-muted">Total Estimate</span>
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl font-extrabold text-primary font-mono">{formatCurrency(effectivePrice)}</span>
-            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">30D Warranty</span>
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+              {service.warrantyDays ? `${service.warrantyDays}D Warranty` : "Standard Terms"}
+            </span>
           </div>
           <span className="text-[10px] text-foreground-muted truncate max-w-42.5">{activeVariant.name}</span>
         </div>

@@ -24,6 +24,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { authService } from "@/services/auth.service";
 import { dbRepository } from "@/services/db/repository";
 import { TurnstileWidget } from "@/components/shared/TurnstileWidget";
+import { turnstileService } from "@/services/turnstile/turnstileService";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -38,24 +39,78 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [agreedTerms, setAgreedTerms] = useState(true);
 
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileError, setTurnstileError] = useState<string | null>(null);
+  const [isVerifyingSecurity, setIsVerifyingSecurity] = useState(false);
+
   const [otpValue, setOtpValue] = useState("");
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agreedTerms) return;
-    setStep("otp");
+
+    setTurnstileError(null);
+    setIsVerifyingSecurity(true);
+
+    try {
+      // 1. Verify Cloudflare Turnstile token via Backend Siteverify
+      const verification = await turnstileService.verifyToken(
+        turnstileToken,
+        "customer_signup"
+      );
+
+      if (!verification.success) {
+        setTurnstileError(
+          verification.error ||
+            "Please complete the security challenge before continuing."
+        );
+        return;
+      }
+
+      // 2. Dispatch OTP via Supabase Auth
+      if (phone) {
+        try {
+          await authService.sendPhoneOtp(phone);
+        } catch (otpErr) {
+          console.warn("[Register] Phone OTP error:", otpErr);
+        }
+      }
+
+      setStep("otp");
+    } finally {
+      setIsVerifyingSecurity(false);
+    }
   };
 
   const handleMagicLinkRegister = async () => {
-    if (email) {
-      try {
-        await authService.signInWithMagicLink(email);
-      } catch {
-        // Fallback for demo
-      }
-      setStep("magic_sent");
-    } else {
+    if (!email) {
       alert("Please enter your email address first!");
+      return;
+    }
+
+    setTurnstileError(null);
+    setIsVerifyingSecurity(true);
+
+    try {
+      const verification = await turnstileService.verifyToken(
+        turnstileToken,
+        "customer_signup"
+      );
+
+      if (!verification.success) {
+        setTurnstileError(
+          verification.error ||
+            "Please complete the security challenge before requesting a magic link."
+        );
+        return;
+      }
+
+      await authService.signInWithMagicLink(email);
+      setStep("magic_sent");
+    } catch {
+      setStep("magic_sent");
+    } finally {
+      setIsVerifyingSecurity(false);
     }
   };
 
@@ -211,18 +266,32 @@ export default function Register() {
               </label>
             </div>
 
-            <TurnstileWidget onSuccess={() => {}} className="py-1" />
+            <TurnstileWidget
+              action="customer_signup"
+              onSuccess={(token) => {
+                setTurnstileToken(token);
+                setTurnstileError(null);
+              }}
+              onExpired={() => setTurnstileToken(null)}
+              className="py-1"
+            />
+
+            {turnstileError && (
+              <p className="text-xs text-rose-500 font-medium text-center bg-rose-50 dark:bg-rose-950/30 p-2 rounded-lg border border-rose-200 dark:border-rose-900">
+                {turnstileError}
+              </p>
+            )}
 
             <div className="space-y-3 pt-2">
               <Button
                 variant="accent"
                 size="lg"
                 type="submit"
-                rightIcon={<ArrowRight className="h-4 w-4" />}
+                rightIcon={!isVerifyingSecurity ? <ArrowRight className="h-4 w-4" /> : undefined}
                 className="w-full font-bold shadow-glow"
-                disabled={!agreedTerms}
+                disabled={!agreedTerms || isVerifyingSecurity}
               >
-                Continue to Verify Mobile
+                {isVerifyingSecurity ? "Verifying Security..." : "Continue to Verify Mobile"}
               </Button>
 
               <Button
@@ -315,12 +384,20 @@ export default function Register() {
         )}
 
         {/* LOGIN FOOTER */}
-        <p className="text-center text-xs text-foreground-secondary pt-2 border-t border-border">
-          Already have an account?{" "}
-          <Link to={ROUTES.LOGIN} className="font-bold text-accent hover:underline">
-            Sign In Here
-          </Link>
-        </p>
+        <div className="text-center text-xs text-foreground-secondary pt-2 border-t border-border space-y-2">
+          <p>
+            Already have an account?{" "}
+            <Link to={ROUTES.LOGIN} className="font-bold text-accent hover:underline">
+              Sign In Here
+            </Link>
+          </p>
+          <p className="text-[11px] text-foreground-muted">
+            Are you a skilled technician or tradesperson?{" "}
+            <Link to={ROUTES.PROFESSIONAL_ONBOARDING} className="font-bold text-primary hover:text-accent hover:underline">
+              Join as a Professional Partner →
+            </Link>
+          </p>
+        </div>
       </Card>
     </div>
   );

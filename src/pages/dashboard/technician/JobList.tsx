@@ -13,7 +13,12 @@ import {
   DollarSign,
   Headphones,
   ShieldCheck,
+  ShieldAlert,
   Radio,
+  Lock,
+  FileWarning,
+  AlertTriangle,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,8 +26,13 @@ import { Badge } from "@/components/ui/badge";
 import { dbRepository, type BookingAssignment } from "@/services/db/repository";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/date";
+import { useAuthStore } from "@/store/auth.store";
+import { professionalService } from "@/services/professional/professionalService";
+import type { ProfessionalProfile } from "@/services/professional/professional.types";
 
 export default function JobList() {
+  const { user } = useAuthStore();
+  const [profile, setProfile] = useState<ProfessionalProfile | null>(null);
   const [tab, setTab] = useState<"new" | "active" | "completed">("new");
   const [assignments, setAssignments] = useState<BookingAssignment[]>([]);
   const [activeJobs, setActiveJobs] = useState<any[]>([]);
@@ -33,6 +43,19 @@ export default function JobList() {
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const loadData = () => {
+    // Load professional profile
+    let currentPro: ProfessionalProfile | null = null;
+    if (user?.id) {
+      currentPro = professionalService.getProfessionalByUserId(user.id);
+    }
+    if (!currentPro) {
+      const allPros = professionalService.getAllProfessionals();
+      if (allPros.length > 0) {
+        currentPro = allPros[0];
+      }
+    }
+    setProfile(currentPro);
+
     const asgs = dbRepository.getAssignments();
     setAssignments(asgs);
 
@@ -58,10 +81,19 @@ export default function JobList() {
       setNow(Date.now());
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user?.id]);
+
+  const eligibility = professionalService.canProfessionalAcceptJobs(profile);
 
   const handleAcceptJob = (asg: BookingAssignment) => {
-    const success = dbRepository.acceptAssignment(asg.id, "pro-current");
+    const check = professionalService.canProfessionalAcceptJobs(profile);
+    if (!check.allowed) {
+      setActionNotice(`Access Denied: ${check.reason || "Account is not authorized to accept jobs."}`);
+      setTimeout(() => setActionNotice(null), 6000);
+      return;
+    }
+
+    const success = dbRepository.acceptAssignment(asg.id, profile?.id || "pro-current");
     if (success) {
       loadData();
       setActionNotice(`Job #${asg.bookingNumber} accepted! Customer has been notified that you accepted the booking.`);
@@ -89,9 +121,15 @@ export default function JobList() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="font-heading text-2xl font-extrabold text-primary">Job Dispatch Center</h1>
-            <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1 font-bold text-[10px]">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> Dispatch Active
-            </Badge>
+            {eligibility.allowed ? (
+              <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 border-emerald-200 flex items-center gap-1 font-bold text-[10px]">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" /> Dispatch Active
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 flex items-center gap-1 font-bold text-[10px]">
+                <Lock className="h-2.5 w-2.5" /> Dispatch Locked
+              </Badge>
+            )}
           </div>
           <p className="text-xs text-foreground-secondary mt-1">
             Real-time incoming job offers and live active assignments across operational service hubs
@@ -149,6 +187,92 @@ export default function JobList() {
         </div>
       </div>
 
+      {/* PROFESSIONAL STATUS BANNER - Enforces Phone Verified != Approved */}
+      {!eligibility.allowed && (
+        <Card
+          className={`p-5 border shadow-xs ${
+            profile?.status === "SUSPENDED"
+              ? "border-rose-300 bg-rose-50/40 text-rose-900"
+              : profile?.status === "CORRECTION_REQUIRED"
+              ? "border-amber-300 bg-amber-50/40 text-amber-900"
+              : profile?.status === "REJECTED"
+              ? "border-rose-300 bg-rose-50/40 text-rose-900"
+              : "border-sky-300 bg-sky-50/40 text-sky-950"
+          }`}
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="p-2 rounded-xl bg-surface border shrink-0">
+                {profile?.status === "SUSPENDED" && <ShieldAlert className="h-6 w-6 text-rose-600" />}
+                {profile?.status === "CORRECTION_REQUIRED" && <AlertTriangle className="h-6 w-6 text-amber-600" />}
+                {profile?.status === "REJECTED" && <XCircle className="h-6 w-6 text-rose-600" />}
+                {(profile?.status === "DOCUMENTS_UNDER_REVIEW" || profile?.status === "APPLICATION_SUBMITTED") && (
+                  <Clock className="h-6 w-6 text-sky-600 animate-spin" />
+                )}
+                {(!profile || profile?.status === "DRAFT" || profile?.status === "PHONE_VERIFIED") && (
+                  <FileWarning className="h-6 w-6 text-amber-600" />
+                )}
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-heading font-bold text-sm md:text-base">
+                    {profile?.status === "SUSPENDED" && "Professional Account Suspended"}
+                    {profile?.status === "CORRECTION_REQUIRED" && "KYC Action Required — Correction Requested"}
+                    {profile?.status === "REJECTED" && "Application Not Approved"}
+                    {(profile?.status === "DOCUMENTS_UNDER_REVIEW" || profile?.status === "APPLICATION_SUBMITTED") &&
+                      "Application Under Compliance Review"}
+                    {(!profile || profile?.status === "DRAFT" || profile?.status === "PHONE_VERIFIED") &&
+                      "Professional Onboarding Incomplete"}
+                  </h3>
+                  <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                    {profile?.status || "INCOMPLETE"}
+                  </Badge>
+                </div>
+                <p className="text-xs leading-relaxed max-w-2xl">
+                  {eligibility.reason}
+                </p>
+                {profile?.phoneVerified && (
+                  <p className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1 mt-1">
+                    <CheckCircle2 className="h-3 w-3" /> Phone Number Verified (+91 ••••••{profile.phone.slice(-4)})
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {profile?.status === "CORRECTION_REQUIRED" && (
+                <Button variant="accent" size="sm" asChild className="gap-1.5 font-bold">
+                  <Link to="/professional/kyc">
+                    Update KYC Documents <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              )}
+              {(profile?.status === "DOCUMENTS_UNDER_REVIEW" || profile?.status === "APPLICATION_SUBMITTED") && (
+                <Button variant="outline" size="sm" asChild className="gap-1.5 font-semibold">
+                  <Link to="/become-a-professional/onboarding?step=7">
+                    View Application Tracker <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              )}
+              {(!profile || profile?.status === "DRAFT" || profile?.status === "PHONE_VERIFIED") && (
+                <Button variant="accent" size="sm" asChild className="gap-1.5 font-bold">
+                  <Link to="/become-a-professional/onboarding">
+                    Complete Onboarding <ArrowRight className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              )}
+              {(profile?.status === "SUSPENDED" || profile?.status === "REJECTED") && (
+                <Button variant="outline" size="sm" asChild className="gap-1.5 font-semibold">
+                  <Link to="/professional/support">
+                    Partner SOS Support <Headphones className="h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* ACTION BANNER */}
       {actionNotice && (
         <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 flex items-center justify-between gap-3 text-xs font-semibold animate-in fade-in">
@@ -165,7 +289,32 @@ export default function JobList() {
       {/* TAB 1: NEW INCOMING REQUESTS */}
       {tab === "new" && (
         <div className="space-y-4">
-          {pendingAssignments.length === 0 ? (
+          {!eligibility.allowed ? (
+            <Card className="p-10 text-center border border-dashed border-border bg-surface space-y-4">
+              <div className="mx-auto h-12 w-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                <Lock className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="font-heading text-base font-bold text-primary">
+                  Job Dispatch Siren Locked
+                </h3>
+                <p className="text-xs text-foreground-secondary max-w-md mx-auto">
+                  {eligibility.reason}
+                </p>
+                <p className="text-[11px] text-foreground-muted mt-2">
+                  In accordance with Home-e-Fix verification policies, direct customer dispatches are only unlocked for verified and approved technicians.
+                </p>
+              </div>
+              <div className="pt-2 flex flex-wrap justify-center gap-3">
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/professional/kyc">Review KYC Credentials</Link>
+                </Button>
+                <Button variant="accent" size="sm" asChild>
+                  <Link to="/become-a-professional/onboarding?step=7">Check Review Status</Link>
+                </Button>
+              </div>
+            </Card>
+          ) : pendingAssignments.length === 0 ? (
             <Card className="p-10 text-center border border-border bg-surface space-y-4">
               <div className="mx-auto h-12 w-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
                 <Radio className="h-6 w-6 animate-pulse" />

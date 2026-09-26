@@ -201,7 +201,7 @@ export function InvoiceModal({ isOpen, onClose, bookingData }: InvoiceModalProps
                     <td colSpan={2} className="py-3.5">
                       Total Invoice Amount (INR):
                     </td>
-                    <td className="py-3.5 text-right text-base text-[#0B2341] font-mono">
+                    <td className="py-3.5 text-right text-base text-primary font-mono font-bold">
                       {formatCurrency(payment.totalPayable)}
                     </td>
                   </tr>

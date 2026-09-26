@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/auth.store";
 import { logger } from "@/lib/observability/logger";
 import { isServiceConfigured } from "@/config/env";
+import { otpService } from "@/services/otp/otpService";
 import type { User, UserRole, LoginRequest, RegisterRequest, ForgotPasswordRequest } from "@/types/auth.types";
 
 /**
@@ -122,10 +123,16 @@ export const authService = {
 
   /**
    * Send Phone SMS OTP via Supabase Auth.
+   * Supabase Auth natively generates OTP and triggers the Send SMS Auth Hook.
    */
   async sendPhoneOtp(phone: string) {
-    // Standardize to E.164 phone format (+91 for India)
-    const formattedPhone = phone.startsWith("+") ? phone : `+91${phone.replace(/\D/g, "")}`;
+    // Canonical E.164 normalization (+91XXXXXXXXXX)
+    const formattedPhone = otpService.normalizeIndianPhone(phone);
+
+    if (!isServiceConfigured("supabase")) {
+      logger.info("[Local Dev Auth Boundary] Supabase not configured. Simulating OTP request for local development.");
+      return { data: { messageId: "dev-local-id" }, error: null };
+    }
 
     const { data, error } = await supabase.auth.signInWithOtp({
       phone: formattedPhone,
@@ -135,7 +142,7 @@ export const authService = {
     });
 
     if (error) {
-      logger.warn("Send phone OTP failed", { phone: formattedPhone });
+      logger.warn("Send phone OTP failed", { phone: formattedPhone, error: error.message });
       throw error;
     }
 
@@ -144,18 +151,39 @@ export const authService = {
 
   /**
    * Verify Phone SMS OTP via Supabase Auth.
+   * Supabase Auth verifies the OTP and yields an authoritative user session.
    */
   async verifyPhoneOtp(phone: string, token: string) {
-    const formattedPhone = phone.startsWith("+") ? phone : `+91${phone.replace(/\D/g, "")}`;
+    const formattedPhone = otpService.normalizeIndianPhone(phone);
+
+    if (!isServiceConfigured("supabase")) {
+      logger.info("[Local Dev Auth Boundary] Supabase not configured. Creating dev user session.");
+      const mockUser: User = {
+        id: `dev-pro-${formattedPhone.replace(/\D/g, "")}`,
+        email: `${formattedPhone.replace(/\D/g, "")}@phone.home-e-fix.local`,
+        phone: formattedPhone,
+        firstName: "Professional",
+        lastName: "Applicant",
+        fullName: "Professional Applicant",
+        avatar: "",
+        role: "technician",
+        isVerified: true,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      useAuthStore.getState().login(mockUser, "dev-mock-access-token", "dev-mock-refresh-token");
+      return { data: { user: mockUser, session: { access_token: "dev-mock-access-token" } }, error: null };
+    }
 
     const { data, error } = await supabase.auth.verifyOtp({
       phone: formattedPhone,
-      token,
+      token: token.trim(),
       type: "sms",
     });
 
     if (error) {
-      logger.warn("Verify phone OTP failed", { phone: formattedPhone });
+      logger.warn("Verify phone OTP failed", { phone: formattedPhone, error: error.message });
       throw error;
     }
 

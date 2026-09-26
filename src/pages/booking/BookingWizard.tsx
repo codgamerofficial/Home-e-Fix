@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate, useSearchParams, useParams, Link } from "react-router";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -37,10 +37,11 @@ import { ROUTES } from "@/constants/routes";
 import { POPULAR_SERVICES } from "@/constants/services";
 import { useCartStore } from "@/store/cart.store";
 import { useAuthStore } from "@/store/auth.store";
+import { useBookingDraftStore, type BookingItemDraft } from "@/store/booking.store";
 import { displayRazorpayCheckout } from "@/lib/razorpay";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/date";
-import { dbRepository } from "@/services/db/repository";
+import { dbRepository, DEFAULT_PRICING_CONFIG } from "@/services/db/repository";
 import { pricingEngine } from "@/services/marketplace/pricing.engine";
 import { serviceabilityEngine } from "@/services/marketplace/serviceability.engine";
 import { slotEngine } from "@/services/marketplace/slot.engine";
@@ -49,27 +50,113 @@ import { catalogueEngine } from "@/services/marketplace/catalogue.engine";
 import { useCustomerAddresses } from "@/hooks/useCustomerAddresses";
 import { AddressFormModal } from "@/components/booking/AddressFormModal";
 import { bookingsApi } from "@/services/api/bookings.api";
+import { analyticsService } from "@/services/analytics/analytics.service";
+import { isServiceConfigured } from "@/config/env";
 import type { Address, AddressSnapshot } from "@/types/address.types";
 import type { ArchitecturalService, ServiceDiagnosticQuestion, QuestionOption } from "@/types/service-architecture.types";
 
 export default function BookingWizard() {
   const navigate = useNavigate();
+  const { service: paramServiceSlug } = useParams<{ service?: string }>();
   const [searchParams] = useSearchParams();
+  const fromCart = searchParams.get("fromCart") === "true";
+  const queryServiceSlug = searchParams.get("service");
+  const requestedServiceSlug = paramServiceSlug || queryServiceSlug;
 
-  const { items: cartItems, addItem, removeItem, clearCart } = useCartStore();
+  const { items: cartItems, clearCart } = useCartStore();
   const { user } = useAuthStore();
+  const {
+    draft,
+    setSingleServiceDraft,
+    setCartDraft,
+    updateDraft,
+    clearDraft,
+    ensureIdempotencyKey,
+  } = useBookingDraftStore();
 
   // Wizard Stage (0 to 5)
   const [currentStep, setCurrentStep] = useState<number>(0);
 
-  // Selected Service Items fallback
-  const selectedServices = cartItems.length > 0 ? cartItems : [POPULAR_SERVICES[0]];
-  const primaryService = selectedServices[0] || POPULAR_SERVICES[0];
-  const categorySlug = (primaryService.category?.slug || primaryService.category || "ac") as string;
+  // Initialize booking draft:
+  // If requestedServiceSlug is present, strictly isolate to that single service.
+  // If fromCart=true, load all cartItems into draft.
+  // Otherwise, use existing draft, or fall back to cart items if any, or default service.
+  useEffect(() => {
+    if (requestedServiceSlug) {
+      const match: any =
+        catalogueEngine.getServiceBySlug(requestedServiceSlug) ||
+        POPULAR_SERVICES.find((s) => s.slug === requestedServiceSlug);
+
+      if (match) {
+        setSingleServiceDraft(match, 1);
+      } else {
+        setSingleServiceDraft(POPULAR_SERVICES[0], 1);
+      }
+    } else if (fromCart && cartItems.length > 0) {
+      setCartDraft(cartItems);
+    } else if (!draft || !draft.items || draft.items.length === 0) {
+      if (cartItems.length > 0) {
+        setCartDraft(cartItems);
+      } else {
+        setSingleServiceDraft(POPULAR_SERVICES[0], 1);
+      }
+    }
+  }, [fromCart, requestedServiceSlug, cartItems.length]);
+
+  const bookingItems: BookingItemDraft[] = useMemo(() => {
+    // If a direct service booking was requested via URL, strictly isolate calculation to it alone
+    if (requestedServiceSlug) {
+      const match: any =
+        catalogueEngine.getServiceBySlug(requestedServiceSlug) ||
+        POPULAR_SERVICES.find((s) => s.slug === requestedServiceSlug);
+      if (match) {
+        return [
+          {
+            serviceId: match.id,
+            serviceSlug: match.slug,
+            serviceName: match.name,
+            categorySlug: match.category?.slug || match.missionCategory || "electrical",
+            unitPrice: match.discountedPrice ?? match.basePrice ?? 499,
+            quantity: 1,
+            quantityUnit: "unit",
+            pricingType: "fixed" as const,
+            materialsPolicy: "extra" as const,
+            warrantyDays: match.warrantyDays ?? 30,
+            duration: match.durationMinutes || match.duration || 45,
+            subtotal: match.discountedPrice ?? match.basePrice ?? 499,
+          },
+        ];
+      }
+    }
+
+    if (draft?.items && draft.items.length > 0) {
+      return draft.items;
+    }
+
+    return [
+      {
+        serviceId: POPULAR_SERVICES[0].id,
+        serviceSlug: POPULAR_SERVICES[0].slug,
+        serviceName: POPULAR_SERVICES[0].name,
+        categorySlug: POPULAR_SERVICES[0].category.slug,
+        unitPrice: POPULAR_SERVICES[0].discountedPrice || POPULAR_SERVICES[0].basePrice,
+        quantity: 1,
+        quantityUnit: "unit",
+        pricingType: "fixed" as const,
+        materialsPolicy: "extra" as const,
+        warrantyDays: 30,
+        duration: (POPULAR_SERVICES[0] as any).durationMinutes || (POPULAR_SERVICES[0] as any).duration || 45,
+        subtotal: POPULAR_SERVICES[0].discountedPrice || POPULAR_SERVICES[0].basePrice,
+      },
+    ];
+  }, [draft?.items, requestedServiceSlug]);
+
+  const primaryService = bookingItems[0];
+  const categorySlug = primaryService?.categorySlug || "ac";
 
   // Architectural Service lookup
   const architecturalService: ArchitecturalService = useMemo(() => {
-    const slug = (primaryService as any).slug || "";
+    const slug = primaryService?.serviceSlug || "";
     return (
       catalogueEngine.getServiceBySlug(slug) ||
       catalogueEngine.ARCHITECTURAL_SERVICES.find(
@@ -78,6 +165,15 @@ export default function BookingWizard() {
       catalogueEngine.ARCHITECTURAL_SERVICES[0]
     );
   }, [primaryService, categorySlug]);
+
+  useEffect(() => {
+    analyticsService.trackEvent("booking_started", {
+      serviceSlug: primaryService?.serviceSlug,
+      serviceName: primaryService?.serviceName,
+      categorySlug,
+      isEmergency: isEmergencyRequested,
+    });
+  }, [primaryService?.serviceSlug]);
 
   // Category-Specific Questions State
   const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({
@@ -88,8 +184,8 @@ export default function BookingWizard() {
     electrician_issue: "Switchboard / Socket burning",
   });
 
-  // Emergency Option
-  const [isEmergencyRequested, setIsEmergencyRequested] = useState(false);
+  // Section 15: Emergency / Priority dispatch removed unless backend dispatch SLA is implemented
+  const isEmergencyRequested = false;
 
   // Address State (Loaded via TanStack Query from Supabase / DB repository)
   const {
@@ -173,23 +269,54 @@ export default function BookingWizard() {
     }
   }, [generatedSlots, selectedSlotId]);
 
-  // Pricing Calculation via Engine
-  const baseLaborPrice = selectedServices.reduce(
-    (sum, s: any) => sum + (s.discountedPrice || s.basePrice || 499) * (s.quantity || 1),
-    0
-  );
+  // Active Pricing Configuration from DB repository
+  const activePricingConfig = useMemo(() => {
+    try {
+      return dbRepository.getPricingConfig?.() || DEFAULT_PRICING_CONFIG;
+    } catch {
+      return DEFAULT_PRICING_CONFIG;
+    }
+  }, []);
 
-  const isPlusMember = Boolean(user?.isVerified); // PLUS check
+  // Pricing Calculation via Engine - strictly isolated from global cart
+  const baseLaborPrice = useMemo(() => {
+    return bookingItems.reduce(
+      (sum, item) => sum + item.unitPrice * Math.max(1, item.quantity),
+      0
+    );
+  }, [bookingItems]);
+
+  // Real, truthful PLUS membership check
+  const isPlusMember = useMemo(() => {
+    if (!user?.id) return false;
+    const sub = dbRepository.getMembership(user.id);
+    return Boolean(
+      sub &&
+      sub.status === "ACTIVE" &&
+      new Date(sub.endDate || sub.end_date || 0).getTime() > Date.now()
+    );
+  }, [user?.id]);
+
+  const activeSlot = generatedSlots.find((s) => s.slotId === selectedSlotId);
+  const isNightSlot = !isEmergencyRequested && Boolean(activeSlot && (activeSlot.startHour >= 20 || activeSlot.endHour > 20));
 
   const pricingBreakdown = useMemo(() => {
     return pricingEngine.calculate({
+      items: bookingItems.map((item) => ({
+        serviceId: item.serviceId,
+        serviceName: item.serviceName,
+        basePrice: item.unitPrice,
+        variantPrice: item.unitPrice,
+        quantity: item.quantity,
+      })),
       basePrice: baseLaborPrice,
       quantity: 1,
       isEmergency: isEmergencyRequested,
+      isNightSlot,
       couponCode: couponNotice.valid ? couponCode : undefined,
       isPlusMember,
     });
-  }, [baseLaborPrice, isEmergencyRequested, couponCode, couponNotice, isPlusMember]);
+  }, [bookingItems, baseLaborPrice, isEmergencyRequested, isNightSlot, couponCode, couponNotice, isPlusMember]);
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,7 +337,7 @@ export default function BookingWizard() {
     }
 
     if (!serviceability.isServiceable) {
-      setPaymentErrorNotice("Your selected address is outside active service zones. Currently available across Kolkata only.");
+      setPaymentErrorNotice("Home-e-Fix is not currently available at this location.");
       return;
     }
 
@@ -243,19 +370,36 @@ export default function BookingWizard() {
         label: currentAddress.label || "HOME",
       };
 
+      const idempotencyKey = ensureIdempotencyKey();
+
       const createdBooking = await bookingsApi.createBooking({
         bookingNumber: `HEF-${Date.now().toString().slice(-6)}`,
-        serviceId: primaryService.id,
-        serviceName: primaryService.name,
+        serviceId: primaryService.serviceId || (primaryService as any).id,
+        serviceName: primaryService.serviceName || (primaryService as any).name,
         categorySlug: categorySlug,
         customerName: addressSnapshot.full_name,
         customerPhone: addressSnapshot.phone,
         scheduledDate: formatDate(selectedDate || new Date()),
         scheduledTimeSlot: slotLabel,
         totalAmount: pricingBreakdown.totalPayableInr,
+        subtotal: pricingBreakdown.subtotal,
+        taxGst: pricingBreakdown.taxGst,
+        safetyFee: pricingBreakdown.safetyFee,
+        discount: pricingBreakdown.discountCoupon + pricingBreakdown.discountMembership,
         paymentMethod: paymentMethod.toUpperCase(),
         address: addressSnapshot.formatted_address,
         addressSnapshot,
+        serviceAnswers: questionAnswers,
+        items: bookingItems.map((item) => ({
+          serviceId: item.serviceId,
+          serviceName: item.serviceName,
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+          pricingType: item.pricingType,
+          materialsPolicy: item.materialsPolicy,
+          subtotal: item.subtotal,
+        })),
+        pricingSnapshot: pricingBreakdown,
       });
 
       // If Razorpay online payment selected
@@ -266,18 +410,24 @@ export default function BookingWizard() {
             bookingId: createdBooking.id,
             purpose: "BOOKING",
             name: "Home-e-Fix",
-            description: `${primaryService.name} Booking`,
+            description: `${primaryService.serviceName} Booking`,
             customerName: user?.fullName || "Valued Customer",
             customerEmail: user?.email || "customer@homeefix.in",
             customerPhone: user?.phone || "9830000000",
             onSuccess: (paymentId: string) => {
               dbRepository.updateBookingStatus(createdBooking.id, "CONFIRMED", `Payment verified via Razorpay: ${paymentId}`);
-              clearCart();
+              if (fromCart || draft?.source === "cart") {
+                clearCart();
+              }
+              clearDraft();
               navigate(`/booking/confirmation/${createdBooking.booking_number}`);
             },
             onCancel: () => {
               setPaymentErrorNotice("Payment window closed. Your booking is placed with pending payment status.");
-              clearCart();
+              if (fromCart || draft?.source === "cart") {
+                clearCart();
+              }
+              clearDraft();
               navigate(`/booking/confirmation/${createdBooking.booking_number}`);
             },
             onFailure: (err) => {
@@ -291,7 +441,10 @@ export default function BookingWizard() {
       }
 
       // Cash after service or instant confirmation
-      clearCart();
+      if (fromCart || draft?.source === "cart") {
+        clearCart();
+      }
+      clearDraft();
       navigate(`/booking/confirmation/${createdBooking.booking_number}`);
     } catch (err: any) {
       setPaymentErrorNotice(err.message || "Failed to create booking. Please try again.");
@@ -300,24 +453,38 @@ export default function BookingWizard() {
     }
   };
 
-  // Steps Progress
-  const wizardSteps = [
-    { title: "Service", status: currentStep > 0 ? "completed" : currentStep === 0 ? "current" : "upcoming" },
-    { title: "Questions", status: currentStep > 1 ? "completed" : currentStep === 1 ? "current" : "upcoming" },
-    { title: "Address", status: currentStep > 2 ? "completed" : currentStep === 2 ? "current" : "upcoming" },
-    { title: "Slot", status: currentStep > 3 ? "completed" : currentStep === 3 ? "current" : "upcoming" },
-    { title: "Summary", status: currentStep > 4 ? "completed" : currentStep === 4 ? "current" : "upcoming" },
-    { title: "Payment", status: currentStep === 5 ? "current" : "upcoming" },
-  ] as const;
+  // Payment Gateway Configuration Check
+  const isPaymentGatewayConfigured = isServiceConfigured("razorpay");
+  const totalSteps = isPaymentGatewayConfigured ? 6 : 5;
 
-  const stepTitles = [
-    "Select Service Package",
-    "Diagnosis Questions",
-    "Service Address",
-    "Date & Time Slot",
-    "Review & Coupons",
-    "Select Payment",
-  ];
+  // Steps Progress - dynamically adapts (5 steps if no gateway, 6 if gateway configured)
+  const wizardSteps = useMemo(() => {
+    const steps = [
+      { title: "Service", status: currentStep > 0 ? "completed" : currentStep === 0 ? "current" : "upcoming" },
+      { title: "Questions", status: currentStep > 1 ? "completed" : currentStep === 1 ? "current" : "upcoming" },
+      { title: "Address", status: currentStep > 2 ? "completed" : currentStep === 2 ? "current" : "upcoming" },
+      { title: "Slot", status: currentStep > 3 ? "completed" : currentStep === 3 ? "current" : "upcoming" },
+      { title: "Summary", status: currentStep > 4 ? "completed" : currentStep === 4 ? "current" : "upcoming" },
+    ];
+    if (isPaymentGatewayConfigured) {
+      steps.push({ title: "Payment", status: currentStep === 5 ? "current" : "upcoming" } as any);
+    }
+    return steps;
+  }, [currentStep, isPaymentGatewayConfigured]);
+
+  const stepTitles = useMemo(() => {
+    const titles = [
+      "Select Service Package",
+      "Diagnosis Questions",
+      "Service Address",
+      "Date & Time Slot",
+      "Review & Summary",
+    ];
+    if (isPaymentGatewayConfigured) {
+      titles.push("Select Payment");
+    }
+    return titles;
+  }, [isPaymentGatewayConfigured]);
 
   return (
     <div className="container-app py-5 sm:py-8 pb-32 lg:pb-12 max-w-4xl space-y-5 sm:space-y-8">
@@ -333,22 +500,22 @@ export default function BookingWizard() {
             <span>{currentStep > 0 ? "Back" : "Exit"}</span>
           </button>
           <span className="text-[11px] font-bold text-accent tracking-wider uppercase">
-            Step {currentStep + 1} of 6
+            Step {currentStep + 1} of {totalSteps}
           </span>
         </div>
         <div className="flex items-center justify-between">
           <h1 className="font-heading text-lg font-bold text-primary truncate">
-            {stepTitles[currentStep]}
+            {stepTitles[currentStep] || "Booking Step"}
           </h1>
           <Badge variant="secondary" className="bg-[#FF6A00]/10 text-[#FF6A00] font-bold text-[10px] shrink-0">
-            Guaranteed
+            {bookingItems.every((i) => i.pricingType === "fixed") ? "Fixed Price" : "Labour Pricing"}
           </Badge>
         </div>
         {/* Step Progress Bar */}
         <div className="h-1.5 w-full bg-muted/60 rounded-full overflow-hidden">
           <div
             className="h-full bg-[#FF6A00] transition-all duration-300 rounded-full"
-            style={{ width: `${((currentStep + 1) / 6) * 100}%` }}
+            style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
           />
         </div>
       </div>
@@ -361,11 +528,15 @@ export default function BookingWizard() {
               Book Home Service
             </h1>
             <Badge variant="secondary" className="bg-[#FF6A00]/10 text-[#FF6A00] font-bold text-[10px]">
-              Guaranteed Pricing
+              {bookingItems.every((i) => i.pricingType === "fixed") ? "Fixed Service Rate" : "Labour Pricing • Parts Extra"}
             </Badge>
           </div>
           <p className="text-xs text-foreground-secondary mt-1">
-            Service booked in Salt Lake & New Town operational hubs with 30-day warranty
+            {currentAddress
+              ? (serviceability.isServiceable
+                  ? `Service available in ${currentAddress.locality || currentAddress.city || "your confirmed area"}`
+                  : `Service not currently available in ${currentAddress.locality || currentAddress.city || "your selected area"}`)
+              : "Service availability depends on your confirmed location"}
           </p>
         </div>
 
@@ -402,41 +573,61 @@ export default function BookingWizard() {
                 <Sparkles className="h-5 w-5 text-accent" /> Selected Service Package
               </h2>
 
-              <div className="flex items-start justify-between p-4 rounded-2xl bg-muted/40 border border-border">
-                <div className="space-y-1">
-                  <h3 className="font-bold text-sm text-primary">{primaryService.name}</h3>
-                  <p className="text-xs text-foreground-secondary">
-                    {(primaryService as any).shortDescription || (primaryService as any).description || ""}
-                  </p>
-                  <div className="flex items-center gap-2 pt-2 text-[11px] text-foreground-muted">
-                    <span>⏱️ 45-60 mins</span>
-                    <span>•</span>
-                    <span className="text-success font-bold">🛡️ 30-Day Warranty</span>
+              {bookingItems.length === 1 ? (
+                <div className="flex items-start justify-between p-4 rounded-2xl bg-muted/40 border border-border">
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-sm text-primary">{primaryService.serviceName}</h3>
+                    <p className="text-xs text-foreground-secondary">
+                      Service appointment
+                    </p>
+                    <div className="flex items-center gap-2 pt-2 text-[11px] text-foreground-muted flex-wrap">
+                      <span>⏱️ {primaryService?.duration ? `${primaryService.duration} mins` : (architecturalService as any)?.estimatedTime || "30-45 mins"}</span>
+                      {Boolean(primaryService?.materialsPolicy === "extra" || (architecturalService as any)?.requiresMaterials) && (
+                        <>
+                          <span>•</span>
+                          <span>Labour Charge (Parts extra if needed)</span>
+                        </>
+                      )}
+                      {Boolean(primaryService?.warrantyDays && primaryService.warrantyDays > 0) && (
+                        <>
+                          <span>•</span>
+                          <span className="text-success font-bold">🛡️ {primaryService.warrantyDays}-Day Warranty</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <span className="font-mono font-bold text-lg text-[#FF6A00]">
+                    {formatCurrency(primaryService.unitPrice * primaryService.quantity)}
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-3 p-4 rounded-2xl bg-muted/40 border border-border">
+                  <div className="flex items-center justify-between pb-2 border-b border-border">
+                    <span className="text-xs font-bold text-primary uppercase tracking-wider">
+                      Cart Package ({bookingItems.length} Services)
+                    </span>
+                    <span className="font-mono font-bold text-sm text-[#FF6A00]">
+                      Subtotal: {formatCurrency(baseLaborPrice)}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {bookingItems.map((item, idx) => (
+                      <div key={item.serviceId || idx} className="flex items-center justify-between text-xs py-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground font-mono">#{idx + 1}</span>
+                          <span className="font-medium text-primary">{item.serviceName}</span>
+                          {item.quantity > 1 && (
+                            <span className="text-muted-foreground">× {item.quantity}</span>
+                          )}
+                        </div>
+                        <span className="font-mono font-bold text-foreground">
+                          {formatCurrency(item.unitPrice * item.quantity)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <span className="font-mono font-bold text-lg text-[#FF6A00]">
-                  {formatCurrency(baseLaborPrice)}
-                </span>
-              </div>
-
-              {/* Emergency Surcharge Toggle */}
-              <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/50 flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <Zap className="h-4 w-4 text-amber-600 fill-amber-500" />
-                    <span className="font-bold text-xs text-amber-900">Need Emergency Dispatch Within 2 Hours?</span>
-                  </div>
-                  <p className="text-[11px] text-amber-800 leading-relaxed">
-                    Priority allocation of closest certified master technician. Emergency visit fee ₹499 applies.
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={isEmergencyRequested}
-                  onChange={(e) => setIsEmergencyRequested(e.target.checked)}
-                  className="h-5 w-5 accent-[#FF6A00] cursor-pointer mt-1"
-                />
-              </div>
+              )}
 
               <div className="flex justify-end">
                 <Button variant="accent" onClick={() => setCurrentStep(1)} className="gap-2">
@@ -778,7 +969,14 @@ export default function BookingWizard() {
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-xs text-primary">{slot.timeRangeLabel}</span>
-                          {isSelected && <CheckCircle2 className="h-4 w-4 text-[#FF6A00]" />}
+                          <div className="flex items-center gap-1.5">
+                            {slot.endHour > 20 && (
+                              <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-1.5 py-0.5 rounded-md">
+                                +₹150 Night
+                              </span>
+                            )}
+                            {isSelected && <CheckCircle2 className="h-4 w-4 text-[#FF6A00]" />}
+                          </div>
                         </div>
                         <div className="text-[10px] text-foreground-muted mt-1">
                           {slot.isAvailable ? `Capacity: ${slot.capacityScore} slots open` : "Slot filled / past"}
@@ -829,25 +1027,47 @@ export default function BookingWizard() {
                 </p>
               )}
 
-              {/* PLUS Membership Notice */}
-              {isPlusMember && (
-                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-300 text-amber-900 flex items-center gap-2 text-xs font-bold">
-                  <Sparkles className="h-4 w-4 text-amber-600" />
-                  Home-e-Fix PLUS Member: 20% discount applied on labour + ₹29 safety fee waived!
+              {/* PLUS Membership Notice & Upsell */}
+              {isPlusMember ? (
+                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-300 text-emerald-900 flex items-center gap-2 text-xs font-bold">
+                  <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
+                  <span>Home-e-Fix PLUS Member: 20% discount applied on eligible labour charges!</span>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-300 text-amber-950 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>Join Home-e-Fix PLUS to save 20% on labour charges</span>
+                  </div>
+                  <Button variant="outline" size="sm" asChild className="text-[11px] h-7 px-2.5 font-bold shrink-0">
+                    <Link to={ROUTES.APP_MEMBERSHIP}>Explore PLUS</Link>
+                  </Button>
                 </div>
               )}
 
               <div className="flex justify-between pt-4 border-t border-border">
                 <Button variant="outline" onClick={() => setCurrentStep(3)}>Back</Button>
-                <Button variant="accent" onClick={() => setCurrentStep(5)} className="gap-2">
-                  Proceed to Payment <ArrowRight className="h-4 w-4" />
-                </Button>
+                {isPaymentGatewayConfigured ? (
+                  <Button variant="accent" onClick={() => setCurrentStep(5)} className="gap-2">
+                    Proceed to Payment <ArrowRight className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="accent"
+                    size="lg"
+                    disabled={isSubmitting}
+                    onClick={handleConfirmBooking}
+                    className="shadow-glow gap-2"
+                  >
+                    {isSubmitting ? "Placing Booking..." : `Confirm Booking • ${formatCurrency(pricingBreakdown.totalPayableInr)}`}
+                  </Button>
+                )}
               </div>
             </Card>
           )}
 
-          {/* STEP 5: PAYMENT SELECTION */}
-          {currentStep === 5 && (
+          {/* STEP 5: PAYMENT SELECTION (Conditional on Real Payment Gateway Configured) */}
+          {isPaymentGatewayConfigured && currentStep === 5 && (
             <Card className="p-6 border border-border bg-surface space-y-6">
               <div>
                 <h2 className="font-heading text-lg font-bold text-primary flex items-center gap-2">
@@ -910,7 +1130,7 @@ export default function BookingWizard() {
         <div className="hidden lg:block lg:col-span-1">
           <div className="sticky top-24 rounded-3xl border border-border bg-surface p-6 shadow-sm space-y-4">
             <h3 className="font-heading text-sm font-bold text-primary uppercase tracking-wider">
-              Payment Breakdown
+              {isPaymentGatewayConfigured ? "Payment Breakdown" : "Price Summary"}
             </h3>
 
             <div className="space-y-2.5 text-xs text-foreground-secondary border-t border-border pt-4">
@@ -919,10 +1139,30 @@ export default function BookingWizard() {
                 <span className="font-mono text-primary font-bold">{formatCurrency(pricingBreakdown.baseAmount)}</span>
               </div>
 
-              {isEmergencyRequested && (
-                <div className="flex justify-between text-amber-700 font-semibold">
-                  <span>Emergency 2-Hr Surcharge</span>
-                  <span className="font-mono">+₹499</span>
+              {bookingItems.length > 1 && (
+                <div className="pl-2 space-y-1 border-l-2 border-border/60 my-1 text-[11px] text-foreground-muted">
+                  {bookingItems.map((item, idx) => (
+                    <div key={item.serviceId || idx} className="flex justify-between">
+                      <span className="truncate max-w-42.5">{item.serviceName} ({item.quantity})</span>
+                      <span className="font-mono">{formatCurrency(item.unitPrice * item.quantity)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {pricingBreakdown.materialsAmount > 0 && (
+                <div className="flex justify-between">
+                  <span>Materials & Parts (at actuals)</span>
+                  <span className="font-mono text-primary font-bold">
+                    {formatCurrency(pricingBreakdown.materialsAmount)}
+                  </span>
+                </div>
+              )}
+
+              {Boolean(pricingBreakdown.nightFee && pricingBreakdown.nightFee > 0) && (
+                <div className="flex justify-between text-indigo-700 dark:text-indigo-400 font-semibold">
+                  <span>Night Surcharge (Post 8 PM)</span>
+                  <span className="font-mono">+{formatCurrency(pricingBreakdown.nightFee)}</span>
                 </div>
               )}
 
@@ -940,15 +1180,17 @@ export default function BookingWizard() {
                 </div>
               )}
 
-              <div className="flex justify-between">
-                <span>Safety & Sanitation Fee</span>
-                <span className="font-mono text-primary">
-                  {pricingBreakdown.safetyFee === 0 ? "FREE" : formatCurrency(pricingBreakdown.safetyFee)}
-                </span>
-              </div>
+              {pricingBreakdown.safetyFee > 0 && (
+                <div className="flex justify-between">
+                  <span>Safety & Equipment Fee</span>
+                  <span className="font-mono text-primary font-bold">
+                    {formatCurrency(pricingBreakdown.safetyFee)}
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-between">
-                <span>Taxes & GST (18%)</span>
+                <span>{activePricingConfig?.taxLabel || "Taxes & GST"}</span>
                 <span className="font-mono text-primary font-bold">{formatCurrency(pricingBreakdown.taxGst)}</span>
               </div>
 
@@ -961,10 +1203,10 @@ export default function BookingWizard() {
             </div>
 
             <div className="p-3 rounded-xl bg-muted/40 text-[11px] text-foreground-muted space-y-1">
-              <p className="font-bold text-primary">Home-e-Fix Trust Assurance:</p>
-              <p>• 100% price lock guaranteed</p>
-              <p>• 30-Day workmanship warranty</p>
-              <p>• No extra charge without customer digital approval</p>
+              <p className="font-bold text-primary">Home-e-Fix Service Standards:</p>
+              <p>• Transparent pricing with itemized bill breakdown</p>
+              <p>• Verified booking confirmation and dedicated support</p>
+              <p>• 30-day workmanship re-work guarantee on completed repairs</p>
             </div>
           </div>
         </div>
@@ -1036,13 +1278,18 @@ export default function BookingWizard() {
             <Button
               variant="accent"
               size="lg"
-              onClick={() => setCurrentStep(5)}
+              disabled={isSubmitting}
+              onClick={isPaymentGatewayConfigured ? () => setCurrentStep(5) : handleConfirmBooking}
               className="min-touch-target px-5 font-bold bg-[#FF6A00] hover:bg-accent-dark text-white rounded-2xl shadow-md gap-1.5 cursor-pointer text-sm"
             >
-              Payment <ArrowRight className="h-4 w-4" />
+              {isPaymentGatewayConfigured ? (
+                <>Payment <ArrowRight className="h-4 w-4" /></>
+              ) : (
+                isSubmitting ? "Placing..." : "Confirm Booking"
+              )}
             </Button>
           )}
-          {currentStep === 5 && (
+          {isPaymentGatewayConfigured && currentStep === 5 && (
             <Button
               variant="accent"
               size="lg"
@@ -1087,14 +1334,23 @@ export default function BookingWizard() {
 
               <div className="space-y-3 text-xs text-foreground-secondary">
                 <div className="flex justify-between">
-                  <span>Base Service Labour ({primaryService.name})</span>
+                  <span>Base Service Labour ({primaryService.serviceName})</span>
                   <span className="font-mono text-primary font-bold">{formatCurrency(pricingBreakdown.baseAmount)}</span>
                 </div>
 
-                {isEmergencyRequested && (
-                  <div className="flex justify-between text-amber-700 dark:text-amber-400 font-semibold">
-                    <span>Emergency 2-Hr Surcharge</span>
-                    <span className="font-mono">+₹499</span>
+                {pricingBreakdown.materialsAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span>Materials & Parts (at actuals)</span>
+                    <span className="font-mono text-primary font-bold">
+                      {formatCurrency(pricingBreakdown.materialsAmount)}
+                    </span>
+                  </div>
+                )}
+
+                {Boolean(pricingBreakdown.nightFee && pricingBreakdown.nightFee > 0) && (
+                  <div className="flex justify-between text-indigo-700 dark:text-indigo-400 font-semibold">
+                    <span>Night Surcharge (Post 8 PM)</span>
+                    <span className="font-mono">+{formatCurrency(pricingBreakdown.nightFee)}</span>
                   </div>
                 )}
 
@@ -1112,15 +1368,17 @@ export default function BookingWizard() {
                   </div>
                 )}
 
-                <div className="flex justify-between">
-                  <span>Safety & Sanitation Fee</span>
-                  <span className="font-mono text-primary">
-                    {pricingBreakdown.safetyFee === 0 ? "FREE" : formatCurrency(pricingBreakdown.safetyFee)}
-                  </span>
-                </div>
+                {pricingBreakdown.safetyFee > 0 && (
+                  <div className="flex justify-between">
+                    <span>Safety & Equipment Fee</span>
+                    <span className="font-mono text-primary font-bold">
+                      {formatCurrency(pricingBreakdown.safetyFee)}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex justify-between">
-                  <span>Taxes & GST (18%)</span>
+                  <span>{activePricingConfig?.taxLabel || "Taxes & GST (18%)"}</span>
                   <span className="font-mono text-primary font-bold">{formatCurrency(pricingBreakdown.taxGst)}</span>
                 </div>
 
