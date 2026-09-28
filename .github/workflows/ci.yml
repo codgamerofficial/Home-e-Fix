@@ -13,6 +13,10 @@ jobs:
   validate:
     name: Typecheck, Lint, Test & Build
     runs-on: ubuntu-latest
+    env:
+      VITE_SUPABASE_URL: https://dummy-ci.supabase.co
+      VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy_anon_key_for_ci_build_and_test_purposes
+      MODE: test
 
     steps:
       - name: Checkout repository
