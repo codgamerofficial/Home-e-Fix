@@ -1,5 +1,4 @@
-import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabase";
+import { supabase, type AuthChangeEvent, type Session } from "@/lib/supabase";
 import { useAuthStore } from "@/store/auth.store";
 import { logger } from "@/lib/observability/logger";
 import { isServiceConfigured } from "@/config/env";

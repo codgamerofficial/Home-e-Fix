@@ -21,3 +21,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
   },
 });
+
+type AuthChangeCallback = Parameters<typeof supabase.auth.onAuthStateChange>[0];
+export type AuthChangeEvent = Parameters<AuthChangeCallback>[0];
+export type Session = NonNullable<Parameters<AuthChangeCallback>[1]>;
+export type SupabaseUser = Session["user"];
+
