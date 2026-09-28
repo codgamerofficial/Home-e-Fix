@@ -86,7 +86,7 @@ export function ProfileMenu({ className }: ProfileMenuProps) {
   if (isLoading) {
     return (
       <div
-        className="h-[42px] w-[42px] rounded-xl bg-slate-200/80 dark:bg-slate-700/60 animate-pulse shrink-0"
+        className="h-10.5 w-10.5 rounded-xl bg-slate-200/80 dark:bg-slate-700/60 animate-pulse shrink-0"
         aria-label="Loading session"
       />
     );
@@ -98,7 +98,7 @@ export function ProfileMenu({ className }: ProfileMenuProps) {
       <Link
         to={ROUTES.LOGIN}
         className={cn(
-          "h-[42px] px-3.5 sm:px-4 rounded-xl inline-flex items-center gap-1.5 shrink-0 select-none",
+          "h-10.5 px-3.5 sm:px-4 rounded-xl inline-flex items-center gap-1.5 shrink-0 select-none",
           "bg-[#FF6A00] text-white hover:bg-[#E55F00] shadow-xs hover:shadow-sm",
           "text-xs sm:text-[13px] font-semibold transition-all duration-150 cursor-pointer",
           "focus:outline-hidden focus:ring-2 focus:ring-[#FF6A00]/40",
@@ -180,7 +180,7 @@ export function ProfileMenu({ className }: ProfileMenuProps) {
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
-          "h-[42px] px-2 rounded-xl flex items-center gap-2 shrink-0 cursor-pointer select-none",
+          "h-10.5 px-2 rounded-xl flex items-center gap-2 shrink-0 cursor-pointer select-none",
           "bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700/80",
           "border border-slate-200/90 dark:border-slate-700/80 text-slate-800 dark:text-slate-200",
           "transition-all duration-150 group focus:outline-hidden focus:ring-2 focus:ring-[#FF6A00]/25",

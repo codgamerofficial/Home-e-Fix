@@ -26,7 +26,7 @@ export function LocationSelector({
       type="button"
       onClick={onClick}
       className={cn(
-        "h-[42px] px-3 rounded-xl flex items-center gap-1.5 shrink-0 select-none cursor-pointer",
+        "h-10.5 px-3 rounded-xl flex items-center gap-1.5 shrink-0 select-none cursor-pointer",
         "bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700/80",
         "border border-slate-200/90 dark:border-slate-700/80 text-slate-800 dark:text-slate-100",
         "transition-colors duration-150 group focus:outline-hidden focus:ring-2 focus:ring-[#FF6A00]/25",

@@ -50,7 +50,7 @@ export function NotificationButton({ className }: NotificationButtonProps) {
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
-          "h-[42px] w-[42px] rounded-xl flex items-center justify-center shrink-0 cursor-pointer select-none relative",
+          "h-10.5 w-10.5 rounded-xl flex items-center justify-center shrink-0 cursor-pointer select-none relative",
           "bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700/80",
           "border border-slate-200/90 dark:border-slate-700/80 text-slate-700 dark:text-slate-200",
           "hover:text-[#FF6A00] dark:hover:text-[#FF6A00] hover:border-[#FF6A00]/50 transition-all duration-150",

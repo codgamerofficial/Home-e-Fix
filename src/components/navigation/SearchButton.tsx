@@ -29,7 +29,7 @@ export function SearchButton({
         type="button"
         onClick={handleClick}
         className={cn(
-          "h-[42px] w-[42px] rounded-xl flex items-center justify-center shrink-0 cursor-pointer select-none",
+          "h-10.5 w-10.5 rounded-xl flex items-center justify-center shrink-0 cursor-pointer select-none",
           "bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700/80",
           "border border-slate-200/90 dark:border-slate-700/80 text-slate-600 dark:text-slate-300",
           "hover:text-[#FF6A00] hover:border-[#FF6A00]/50 transition-all duration-150",
@@ -52,7 +52,7 @@ export function SearchButton({
           type="button"
           onClick={handleClick}
           className={cn(
-            "lg:hidden h-[42px] w-[42px] rounded-xl flex items-center justify-center shrink-0 cursor-pointer select-none",
+            "lg:hidden h-10.5 w-10.5 rounded-xl flex items-center justify-center shrink-0 cursor-pointer select-none",
             "bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700/80",
             "border border-slate-200/90 dark:border-slate-700/80 text-slate-600 dark:text-slate-300",
             "hover:text-[#FF6A00] hover:border-[#FF6A00]/50 transition-all duration-150",
@@ -71,14 +71,14 @@ export function SearchButton({
         type="button"
         onClick={handleClick}
         className={cn(
-          "h-[42px] rounded-xl flex items-center justify-between gap-2 px-3 shrink-0 cursor-pointer select-none group text-left",
+          "h-10.5 rounded-xl flex items-center justify-between gap-2 px-3 shrink-0 cursor-pointer select-none group text-left",
           "bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800",
           "border border-slate-200/90 dark:border-slate-700/80 hover:border-[#FF6A00]/60",
           "focus:outline-hidden focus:ring-2 focus:ring-[#FF6A00]/20 focus:border-[#FF6A00]",
           "transition-all duration-150",
           variant === "responsive"
-            ? "hidden lg:flex w-48 xl:w-[250px]"
-            : "w-[245px]",
+            ? "hidden lg:flex w-48 xl:w-62.5"
+            : "w-61.25",
           className
         )}
         aria-label="Search services, e.g. AC repair..."
