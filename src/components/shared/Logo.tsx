@@ -4,16 +4,18 @@ import { ROUTES } from "@/constants/routes";
 import { Sparkles, Wrench, ShieldCheck, Zap } from "lucide-react";
 
 interface LogoProps {
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "sm" | "md" | "lg" | "xl" | "header";
   variant?: "full" | "icon";
   className?: string;
   linkToHome?: boolean;
   textColor?: "auto" | "light" | "dark";
   animated?: boolean;
+  hideTaglineBelow?: "xl" | "lg" | "always" | "never";
 }
 
 const sizeConfig = {
   sm: { icon: "h-8 w-8", text: "text-lg", tagline: "text-[9px]", badge: "px-2.5 py-1 text-[11px]" },
+  header: { icon: "h-[42px] w-[42px]", text: "text-xl", tagline: "text-[9.5px]", badge: "px-3 py-1 text-xs" },
   md: { icon: "h-10 w-10", text: "text-xl", tagline: "text-[10px]", badge: "px-3.5 py-1.5 text-xs" },
   lg: { icon: "h-12 w-12", text: "text-2xl", tagline: "text-[11px]", badge: "px-4 py-2 text-sm" },
   xl: { icon: "h-16 w-16", text: "text-4xl", tagline: "text-xs", badge: "px-5 py-2.5 text-base" },
@@ -25,6 +27,7 @@ export function Logo({
   className,
   linkToHome = true,
   textColor = "auto",
+  hideTaglineBelow = "xl",
 }: LogoProps) {
   const config = sizeConfig[size];
 
@@ -75,12 +78,14 @@ export function Logo({
             <span className="text-[#FF6A00] font-black" style={{ color: "#FF6A00" }}>Fix</span>
           </span>
 
-          {size !== "sm" && (
+          {size !== "sm" && hideTaglineBelow !== "always" && (
             <span
               className={cn(
                 "mt-1 font-bold uppercase tracking-[0.16em]",
                 config.tagline,
-                taglineColor
+                taglineColor,
+                hideTaglineBelow === "xl" && "hidden xl:block",
+                hideTaglineBelow === "lg" && "hidden lg:block"
               )}
             >
               <span className="text-[#FF6A00] font-black" style={{ color: "#FF6A00" }}>FIXING</span> HOMES. EARNING TRUST.
