@@ -16,6 +16,7 @@ import type {
 interface ActiveBroadcastSession {
   bookingId: string;
   professionalId: string;
+  professionalName?: string;
   channel: any;
   lastCoords?: LocationCoordinates;
   lastSnapshotSavedEpoch: number;
@@ -31,7 +32,8 @@ export const trackingEngine = {
     bookingId: string,
     professionalId: string,
     initialCoords: LocationCoordinates,
-    destination: { latitude: number; longitude: number; address: string }
+    destination: { latitude: number; longitude: number; address: string },
+    professionalName?: string
   ): Promise<boolean> {
     try {
       const channelName = `booking:${bookingId}:tracking`;
@@ -51,6 +53,7 @@ export const trackingEngine = {
       activeTransmitters.set(bookingId, {
         bookingId,
         professionalId,
+        professionalName,
         channel,
         lastCoords: initialCoords,
         lastSnapshotSavedEpoch: Date.now(),
@@ -115,7 +118,7 @@ export const trackingEngine = {
     const payload: LiveTrackingBroadcastPayload = {
       bookingId,
       professionalId: transmitter.professionalId,
-      professionalName: "Rajesh Kumar", // Retrieved from auth profile
+      professionalName: transmitter.professionalName || "Assigned Professional",
       status,
       currentLocation: coords,
       destination,
@@ -233,7 +236,7 @@ export const trackingEngine = {
       return {
         bookingId,
         professionalId: data.professional_id,
-        professionalName: "Rajesh Kumar",
+        professionalName: data.professional_name || data.technician_name || "Assigned Professional",
         status: data.status,
         currentLocation: {
           latitude: Number(data.last_latitude),

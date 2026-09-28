@@ -40,7 +40,7 @@ export default function Technicians() {
   const [reviewLogs, setReviewLogs] = useState<ProfessionalReviewLog[]>([]);
 
   // Dialog Action States
-  const [actionType, setActionType] = useState<"APPROVE" | "REJECT" | "CORRECTION" | "SUSPEND" | null>(null);
+  const [actionType, setActionType] = useState<"APPROVE" | "REJECT" | "CORRECTION" | "SUSPEND" | "REACTIVATE" | null>(null);
   const [actionReason, setActionReason] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -74,15 +74,17 @@ export default function Technicians() {
   const stats = useMemo(() => {
     const total = professionals.length;
     const underReview = professionals.filter((p) =>
-      ["APPLICATION_SUBMITTED", "DOCUMENTS_UNDER_REVIEW", "PENDING_REVIEW"].includes(
+      ["APPLICATION_SUBMITTED", "UNDER_REVIEW", "DOCUMENTS_UNDER_REVIEW", "PENDING_REVIEW"].includes(
         (p.status || "").toUpperCase()
       )
     ).length;
     const approved = professionals.filter((p) =>
       ["APPROVED", "ACTIVE"].includes((p.status || "").toUpperCase())
     ).length;
-    const correction = professionals.filter((p) =>
-      (p.status || "").toUpperCase() === "CORRECTION_REQUIRED"
+    const incompleteOrCorrection = professionals.filter((p) =>
+      ["PROFILE_INCOMPLETE", "CORRECTION_REQUIRED", "DRAFT"].includes(
+        (p.status || "").toUpperCase()
+      )
     ).length;
     const rejected = professionals.filter((p) =>
       (p.status || "").toUpperCase() === "REJECTED"
@@ -91,7 +93,7 @@ export default function Technicians() {
       (p.status || "").toUpperCase() === "SUSPENDED"
     ).length;
 
-    return { total, underReview, approved, correction, rejected, suspended };
+    return { total, underReview, approved, incompleteOrCorrection, rejected, suspended };
   }, [professionals]);
 
   const [viewingDocId, setViewingDocId] = useState<string | null>(null);
@@ -112,7 +114,7 @@ export default function Technicians() {
       if (signedUrl) {
         window.open(signedUrl, "_blank", "noopener,noreferrer");
       } else {
-        alert("Unable to generate authorized signed URL for this KYC document.");
+        alert("Unable to generate authorized signed URL for this credential document.");
       }
     } catch (err: any) {
       alert(err?.message || "Failed to retrieve signed URL.");
@@ -156,8 +158,8 @@ export default function Technicians() {
     setIsProcessing(true);
     setErrorMessage(null);
 
-    const adminId = currentAdmin?.id || "adm-compliance-officer";
-    const adminName = currentAdmin?.fullName || "Compliance Officer";
+    const adminId = currentAdmin?.id || "adm-operations-lead";
+    const adminName = currentAdmin?.fullName || "Operations Administrator";
 
     try {
       if (actionType === "APPROVE") {
@@ -165,9 +167,9 @@ export default function Technicians() {
           reviewTarget.id,
           adminId,
           adminName,
-          actionReason || "Background and KYC credentials verified by administrator."
+          actionReason || "Partner profile and service capabilities verified by administrator."
         );
-        setSuccessNotice(`Professional "${reviewTarget.fullName}" approved successfully.`);
+        setSuccessNotice(`Professional "${reviewTarget.fullName}" approved as Home-e-Fix Verified Partner.`);
       } else if (actionType === "REJECT") {
         if (!actionReason.trim()) {
           setErrorMessage("Please specify a reason for rejection.");
@@ -207,6 +209,13 @@ export default function Technicians() {
           actionReason
         );
         setSuccessNotice(`Professional "${reviewTarget.fullName}" has been SUSPENDED.`);
+      } else if (actionType === "REACTIVATE") {
+        await professionalService.adminReactivateProfessional(
+          reviewTarget.id,
+          adminId,
+          adminName
+        );
+        setSuccessNotice(`Professional "${reviewTarget.fullName}" has been reactivated and approved for jobs.`);
       }
 
       loadData();
@@ -226,17 +235,20 @@ export default function Technicians() {
     switch (s) {
       case "APPROVED":
       case "ACTIVE":
-        return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">Approved ✓</Badge>;
+        return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">Verified Partner ✓</Badge>;
       case "DOCUMENTS_UNDER_REVIEW":
       case "APPLICATION_SUBMITTED":
       case "UNDER_REVIEW":
         return <Badge className="bg-blue-50 text-blue-700 border-blue-200">Under Review</Badge>;
+      case "PROFILE_INCOMPLETE":
+      case "DRAFT":
+        return <Badge className="bg-slate-100 text-slate-700 border-slate-300">Profile Incomplete</Badge>;
       case "CORRECTION_REQUIRED":
         return <Badge className="bg-amber-50 text-amber-700 border-amber-200">Correction Required</Badge>;
       case "REJECTED":
         return <Badge className="bg-rose-50 text-rose-700 border-rose-200">Rejected</Badge>;
       case "SUSPENDED":
-        return <Badge className="bg-slate-100 text-slate-700 border-slate-300">Suspended</Badge>;
+        return <Badge className="bg-slate-900 text-white border-slate-800">Suspended</Badge>;
       case "PHONE_VERIFIED":
         return <Badge className="bg-purple-50 text-purple-700 border-purple-200">Phone Verified</Badge>;
       default:
@@ -250,10 +262,10 @@ export default function Technicians() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-heading text-2xl font-extrabold text-primary">
-            Professional Verification & KYC Review
+            Verified Professionals & Partner Applications
           </h1>
           <p className="text-xs text-foreground-secondary mt-1">
-            Review applicant identities, verify trade credentials, and authorize service dispatch privileges
+            Review partner profiles, trade specialties, operational service areas, and authorize job dispatch privileges. (Zero Government-ID KYC Required)
           </p>
         </div>
 
@@ -277,14 +289,14 @@ export default function Technicians() {
             selectedStatus === "ALL" ? "border-accent bg-accent/5 ring-1 ring-accent" : "border-border bg-surface"
           }`}
         >
-          <span className="text-[11px] font-bold text-foreground-secondary block">Total Applicants</span>
+          <span className="text-[11px] font-bold text-foreground-secondary block">Total Partners</span>
           <span className="text-2xl font-extrabold text-primary">{stats.total}</span>
         </Card>
 
         <Card
-          onClick={() => setSelectedStatus("DOCUMENTS_UNDER_REVIEW")}
+          onClick={() => setSelectedStatus("UNDER_REVIEW")}
           className={`p-3.5 border cursor-pointer transition-all ${
-            selectedStatus === "DOCUMENTS_UNDER_REVIEW" ? "border-accent bg-accent/5 ring-1 ring-accent" : "border-border bg-surface"
+            selectedStatus === "UNDER_REVIEW" || selectedStatus === "DOCUMENTS_UNDER_REVIEW" ? "border-accent bg-accent/5 ring-1 ring-accent" : "border-border bg-surface"
           }`}
         >
           <span className="text-[11px] font-bold text-blue-600 block">Under Review</span>
@@ -302,13 +314,13 @@ export default function Technicians() {
         </Card>
 
         <Card
-          onClick={() => setSelectedStatus("CORRECTION_REQUIRED")}
+          onClick={() => setSelectedStatus("PROFILE_INCOMPLETE")}
           className={`p-3.5 border cursor-pointer transition-all ${
-            selectedStatus === "CORRECTION_REQUIRED" ? "border-accent bg-accent/5 ring-1 ring-accent" : "border-border bg-surface"
+            selectedStatus === "PROFILE_INCOMPLETE" || selectedStatus === "CORRECTION_REQUIRED" ? "border-accent bg-accent/5 ring-1 ring-accent" : "border-border bg-surface"
           }`}
         >
-          <span className="text-[11px] font-bold text-amber-600 block">Correction Req.</span>
-          <span className="text-2xl font-extrabold text-amber-700">{stats.correction}</span>
+          <span className="text-[11px] font-bold text-amber-600 block">Incomplete / Req.</span>
+          <span className="text-2xl font-extrabold text-amber-700">{stats.incompleteOrCorrection}</span>
         </Card>
 
         <Card
@@ -338,11 +350,11 @@ export default function Technicians() {
           <table className="w-full text-left text-xs">
             <thead className="bg-surface border-b border-border text-foreground-secondary font-heading font-semibold">
               <tr>
-                <th className="p-4">Applicant / Phone</th>
-                <th className="p-4">Trade Specialty</th>
-                <th className="p-4">Operational Hubs</th>
-                <th className="p-4">Documents</th>
-                <th className="p-4">KYC Status</th>
+                <th className="p-4">Applicant / Contact</th>
+                <th className="p-4">Trade Specialty & Skills</th>
+                <th className="p-4">Operational Hubs & Hours</th>
+                <th className="p-4">Partner Status</th>
+                <th className="p-4">Review Notes / Reason</th>
                 <th className="p-4 text-right">Action</th>
               </tr>
             </thead>
@@ -355,14 +367,21 @@ export default function Technicians() {
                 </tr>
               ) : (
                 filteredProfessionals.map((pro) => {
-                  const docCount = pro.documents?.length || 0;
                   return (
                     <tr key={pro.id} className="hover:bg-muted/30 transition-colors">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-accent/10 text-accent font-bold flex items-center justify-center shrink-0">
-                            {pro.fullName?.[0]?.toUpperCase() || "P"}
-                          </div>
+                          {pro.profilePhotoUrl ? (
+                            <img
+                              src={pro.profilePhotoUrl}
+                              alt={pro.fullName}
+                              className="h-9 w-9 rounded-full object-cover border border-border shrink-0"
+                            />
+                          ) : (
+                            <div className="h-9 w-9 rounded-full bg-accent/10 text-accent font-bold flex items-center justify-center shrink-0">
+                              {pro.fullName?.[0]?.toUpperCase() || "P"}
+                            </div>
+                          )}
                           <div>
                             <span className="font-bold text-primary block">{pro.fullName}</span>
                             <span className="text-foreground-secondary font-mono text-[11px]">
@@ -376,24 +395,52 @@ export default function Technicians() {
                         <span className="font-semibold text-primary block capitalize">
                           {pro.primaryCategory || "General Services"}
                         </span>
-                        <span className="text-[11px] text-foreground-muted">
+                        <span className="text-[11px] text-foreground-muted block">
                           {pro.experienceYears || 1} yrs experience
                         </span>
+                        {pro.skills && pro.skills.length > 0 && (
+                          <span className="text-[10px] text-foreground-secondary line-clamp-1 block mt-0.5">
+                            {pro.skills.slice(0, 3).join(", ")}
+                          </span>
+                        )}
                       </td>
 
                       <td className="p-4">
-                        <span className="text-foreground-secondary line-clamp-1">
-                          {pro.preferredServiceAreas?.join(", ") || pro.locality || "Kolkata"}
+                        <span className="text-foreground-secondary line-clamp-1 font-medium block">
+                          {pro.preferredServiceAreas?.join(", ") || pro.locality || "Kolkata Region"}
                         </span>
-                      </td>
-
-                      <td className="p-4">
-                        <span className="inline-flex items-center gap-1 font-semibold text-foreground-secondary">
-                          <FileText className="h-3.5 w-3.5 text-accent" /> {docCount} Uploaded
+                        <span className="text-[11px] text-foreground-muted block">
+                          {pro.workingHours ? `${pro.workingHours.start} - ${pro.workingHours.end}` : "Standard Shift"}
                         </span>
                       </td>
 
                       <td className="p-4">{getStatusBadge(pro.status)}</td>
+
+                      <td className="p-4">
+                        {pro.incompleteReason ? (
+                          <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 block truncate max-w-xs" title={pro.incompleteReason}>
+                            Incomplete: {pro.incompleteReason}
+                          </span>
+                        ) : pro.rejectionReason ? (
+                          <span className="text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 block truncate max-w-xs" title={pro.rejectionReason}>
+                            Rejected: {pro.rejectionReason}
+                          </span>
+                        ) : pro.suspensionReason ? (
+                          <span className="text-[11px] font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-300 block truncate max-w-xs" title={pro.suspensionReason}>
+                            Suspended: {pro.suspensionReason}
+                          </span>
+                        ) : pro.correctionNotes ? (
+                          <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 block truncate max-w-xs" title={pro.correctionNotes}>
+                            Needs Correction: {pro.correctionNotes}
+                          </span>
+                        ) : ["APPROVED", "ACTIVE"].includes((pro.status || "").toUpperCase()) ? (
+                          <span className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
+                            <ShieldCheck className="h-3.5 w-3.5" /> Home-e-Fix Verified Partner
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-foreground-muted italic">Pending Review</span>
+                        )}
+                      </td>
 
                       <td className="p-4 text-right">
                         <Button
@@ -428,7 +475,7 @@ export default function Technicians() {
                   {getStatusBadge(reviewTarget.status)}
                 </div>
                 <p className="text-xs text-foreground-secondary mt-0.5 font-mono">
-                  Ref ID: {reviewTarget.id} • Registered: {reviewTarget.createdAt?.slice(0, 10)}
+                  Partner ID: {reviewTarget.id} • Registered: {reviewTarget.createdAt?.slice(0, 10)}
                 </p>
               </div>
               <button
@@ -442,12 +489,45 @@ export default function Technicians() {
 
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto space-y-6 text-xs flex-1">
+              {/* Application Status Specific Banners */}
+              {reviewTarget.incompleteReason && (
+                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 font-semibold text-xs flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span><strong>Application Incomplete:</strong> {reviewTarget.incompleteReason}</span>
+                </div>
+              )}
+              {reviewTarget.rejectionReason && (
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 font-semibold text-xs flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                  <span><strong>Rejection Reason:</strong> {reviewTarget.rejectionReason}</span>
+                </div>
+              )}
+              {reviewTarget.suspensionReason && (
+                <div className="p-3.5 rounded-xl bg-slate-100 border border-slate-300 text-slate-900 font-semibold text-xs flex items-center gap-2">
+                  <Lock className="h-4 w-4 text-slate-700 shrink-0" />
+                  <span><strong>Account Suspended:</strong> {reviewTarget.suspensionReason}</span>
+                </div>
+              )}
+
               {/* 1. Applicant & Phone Verification */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border border-border bg-muted/20">
+                {reviewTarget.profilePhotoUrl && (
+                  <div className="sm:col-span-2 flex items-center gap-3 p-3 rounded-lg bg-surface border border-border">
+                    <img
+                      src={reviewTarget.profilePhotoUrl}
+                      alt={reviewTarget.fullName}
+                      className="w-12 h-12 rounded-full object-cover border border-border"
+                    />
+                    <div>
+                      <span className="font-bold text-primary block">Partner Profile Photo</span>
+                      <span className="text-[11px] text-foreground-muted">Customer-facing profile avatar</span>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <span className="font-bold text-foreground-muted block">Mobile Number</span>
                   <span className="font-mono text-sm font-bold text-primary">
-                    {reviewTarget.phone} {reviewTarget.phoneVerified && <span className="text-emerald-600">✓ (Verified)</span>}
+                    {reviewTarget.phone} {reviewTarget.phoneVerified && <span className="text-emerald-600">✓ (Phone Verified)</span>}
                   </span>
                 </div>
                 <div>
@@ -457,7 +537,7 @@ export default function Technicians() {
                   </span>
                 </div>
                 <div>
-                  <span className="font-bold text-foreground-muted block">Primary Trade</span>
+                  <span className="font-bold text-foreground-muted block">Primary Trade Specialty</span>
                   <span className="text-primary font-semibold capitalize">
                     {reviewTarget.primaryCategory} ({reviewTarget.experienceYears} Years Experience)
                   </span>
@@ -468,16 +548,48 @@ export default function Technicians() {
                     {reviewTarget.preferredServiceAreas?.join(", ") || "Kolkata Region"}
                   </span>
                 </div>
+                {reviewTarget.bio && (
+                  <div className="sm:col-span-2">
+                    <span className="font-bold text-foreground-muted block">Skills & Experience Bio</span>
+                    <p className="text-primary font-medium mt-0.5">{reviewTarget.bio}</p>
+                  </div>
+                )}
+                {reviewTarget.workingHours && (
+                  <div>
+                    <span className="font-bold text-foreground-muted block">Working Hours & Availability</span>
+                    <span className="text-primary font-medium">
+                      {reviewTarget.workingHours.start} - {reviewTarget.workingHours.end} ({reviewTarget.workingHours.daysOfWeek?.join(", ") || reviewTarget.workingDays?.join(", ") || "Mon-Sat"})
+                    </span>
+                  </div>
+                )}
+                {reviewTarget.payoutUpiId && (
+                  <div>
+                    <span className="font-bold text-foreground-muted block">Payout UPI ID</span>
+                    <span className="font-mono text-primary font-semibold">{reviewTarget.payoutUpiId}</span>
+                  </div>
+                )}
               </div>
 
-              {/* 2. KYC Documents Section */}
+              {/* 2. Trade Documents Section (Zero Government-ID Required) */}
               <div className="space-y-3">
-                <h3 className="font-bold text-sm text-primary flex items-center gap-1.5">
-                  <Lock className="h-4 w-4 text-accent" /> Submitted KYC Credentials & Documents
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-sm text-primary flex items-center gap-1.5">
+                    <ShieldCheck className="h-4 w-4 text-accent" /> Trade Certifications & Supporting Documents
+                  </h3>
+                  <Badge variant="outline" className="text-[10px] text-accent border-accent/30 bg-accent/5">
+                    Zero Government ID Required
+                  </Badge>
+                </div>
+
+                <div className="p-3 rounded-xl bg-accent/5 border border-accent/20 text-[11px] text-foreground-secondary flex items-start gap-2">
+                  <ShieldCheck className="h-4 w-4 text-accent shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Home-e-Fix Policy:</strong> No Aadhaar, PAN, Voter ID, or KYC uploads are required. Partner approval is based strictly on trade competence, service areas, availability, and manual administrator review.
+                  </span>
+                </div>
 
                 {(!reviewTarget.documents || reviewTarget.documents.length === 0) ? (
-                  <p className="text-foreground-muted italic">No documents uploaded yet.</p>
+                  <p className="text-foreground-muted italic py-2">No optional trade diplomas or certifications submitted.</p>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {reviewTarget.documents.map((doc) => (
@@ -504,9 +616,6 @@ export default function Technicians() {
                             {doc.status}
                           </Badge>
                         </div>
-                        <p className="font-mono text-[11px] text-foreground-secondary">
-                          Masked ID: {doc.documentNumberMasked}
-                        </p>
                         <p className="text-[10px] text-foreground-muted">
                           File: {doc.fileName} ({Math.round(doc.fileSize / 1024)} KB)
                         </p>
@@ -532,7 +641,7 @@ export default function Technicians() {
                             ) : (
                               <Eye className="h-3 w-3 text-accent" />
                             )}
-                            View Document (Signed URL)
+                            View Document
                           </Button>
 
                           <div className="flex items-center gap-1 ml-auto">
@@ -598,7 +707,17 @@ export default function Technicians() {
               {actionType && (
                 <div className="p-4 rounded-xl border border-accent/40 bg-accent/5 space-y-3">
                   <h4 className="font-bold text-primary">
-                    Action: {actionType === "APPROVE" ? "Approve Application" : actionType === "REJECT" ? "Reject Application" : actionType === "CORRECTION" ? "Request Correction" : "Suspend Professional"}
+                    Action: {
+                      actionType === "APPROVE"
+                        ? "Approve as Verified Partner"
+                        : actionType === "REJECT"
+                        ? "Reject Partner Application"
+                        : actionType === "CORRECTION"
+                        ? "Request Correction"
+                        : actionType === "REACTIVATE"
+                        ? "Reactivate Partner Account"
+                        : "Suspend Partner"
+                    }
                   </h4>
 
                   <Input
@@ -606,6 +725,8 @@ export default function Technicians() {
                     placeholder={
                       actionType === "APPROVE"
                         ? "Optional approval remarks or compliance notes..."
+                        : actionType === "REACTIVATE"
+                        ? "Optional reactivation notes..."
                         : "Mandatory justification or correction instructions..."
                     }
                     value={actionReason}
@@ -626,7 +747,7 @@ export default function Technicians() {
                       Cancel
                     </Button>
                     <Button
-                      variant={actionType === "APPROVE" ? "accent" : "destructive"}
+                      variant={actionType === "APPROVE" || actionType === "REACTIVATE" ? "accent" : "destructive"}
                       size="sm"
                       onClick={handleExecuteAction}
                       disabled={isProcessing}
@@ -644,7 +765,35 @@ export default function Technicians() {
                 Close
               </Button>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {["SUSPENDED", "REJECTED"].includes((reviewTarget.status || "").toUpperCase()) && (
+                  <Button
+                    variant="accent"
+                    size="sm"
+                    className="font-bold"
+                    onClick={() => {
+                      setActionType("REACTIVATE");
+                      setActionReason("");
+                    }}
+                  >
+                    Reactivate Partner
+                  </Button>
+                )}
+
+                {reviewTarget.status !== "SUSPENDED" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-rose-700 border-rose-300 hover:bg-rose-50"
+                    onClick={() => {
+                      setActionType("SUSPEND");
+                      setActionReason("");
+                    }}
+                  >
+                    Suspend Partner
+                  </Button>
+                )}
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -657,28 +806,32 @@ export default function Technicians() {
                   Request Correction
                 </Button>
 
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => {
-                    setActionType("REJECT");
-                    setActionReason("");
-                  }}
-                >
-                  Reject
-                </Button>
+                {reviewTarget.status !== "REJECTED" && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      setActionType("REJECT");
+                      setActionReason("");
+                    }}
+                  >
+                    Reject Application
+                  </Button>
+                )}
 
-                <Button
-                  variant="accent"
-                  size="sm"
-                  className="font-bold"
-                  onClick={() => {
-                    setActionType("APPROVE");
-                    setActionReason("");
-                  }}
-                >
-                  Approve Application
-                </Button>
+                {!["APPROVED", "ACTIVE"].includes((reviewTarget.status || "").toUpperCase()) && (
+                  <Button
+                    variant="accent"
+                    size="sm"
+                    className="font-bold"
+                    onClick={() => {
+                      setActionType("APPROVE");
+                      setActionReason("");
+                    }}
+                  >
+                    Approve Partner
+                  </Button>
+                )}
               </div>
             </div>
           </Card>

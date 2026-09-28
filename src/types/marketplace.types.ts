@@ -139,6 +139,7 @@ export interface GeneratedTimeSlot {
 /* ─── Pricing Engine Breakdown ─── */
 export interface PricingCalculationResult {
   baseAmount: number;
+  baseAmountPaise: number;
   selectedVariantPrice: number;
   quantity: number;
   addonsAmount: number;
@@ -147,10 +148,23 @@ export interface PricingCalculationResult {
   nightFee?: number;
   safetyFee: number;
   subtotal: number;
-  taxGst: number;
-  couponCode?: string;
   discountCoupon: number;
   discountMembership: number;
+  totalDiscount: number;
+  taxableAmount: number;
+  taxableAmountPaise: number;
+  taxRatePercent: number;
+  isGstApplicable: boolean;
+  supplyType: "INTRA_STATE" | "INTER_STATE";
+  cgstAmount: number;
+  cgstPaise: number;
+  sgstAmount: number;
+  sgstPaise: number;
+  igstAmount: number;
+  igstPaise: number;
+  taxGst: number;
+  taxGstPaise: number;
+  couponCode?: string;
   totalPayableInr: number;
   totalPayablePaise: number;
   partnerLabourShare: number;
@@ -200,22 +214,46 @@ export interface ActiveServiceWarranty {
 }
 
 export interface DigitalInvoice {
+  id?: string;
   invoiceNumber: string;
+  invoice_number?: string;
+  documentType: string;
+  documentTitle: string;
+  bookingId?: string;
+  booking_id?: string;
   bookingNumber: string;
+  booking_number?: string;
   bookingDate: string;
+  issueDate?: string;
   customerName: string;
+  customer_name?: string;
   customerPhone: string;
   customerAddress: string;
+  customerGstin?: string | null;
   serviceName: string;
   technicianName?: string;
-  taxableAmount: number;
-  cgstAmount: number;
-  sgstAmount: number;
+  sacCode: string;
+  placeOfSupply: string;
+  supplyType: "INTRA_STATE" | "INTER_STATE";
+  subtotal: number;
   safetyFee: number;
   discountAmount: number;
+  taxableAmount: number;
+  taxRatePercent: number;
+  isGstApplicable: boolean;
+  cgstAmount: number;
+  sgstAmount: number;
+  igstAmount: number;
+  totalTax?: number;
   totalAmount: number;
+  total_amount?: number;
+  totalPayable?: number;
+  totalPayableInr?: number;
+  totalAmountPaise?: number;
   paymentMethod: string;
   paymentStatus: string;
   warrantyCoverage: string;
-  gstinBusiness: string;
+  gstinBusiness: string | null;
+  supplierLegalName: string;
+  supplierAddress: string;
 }

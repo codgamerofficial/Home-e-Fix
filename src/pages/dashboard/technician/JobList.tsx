@@ -29,6 +29,7 @@ import { formatDate } from "@/lib/date";
 import { useAuthStore } from "@/store/auth.store";
 import { professionalService } from "@/services/professional/professionalService";
 import type { ProfessionalProfile } from "@/services/professional/professional.types";
+import { subscribeToBookingSync } from "@/services/realtime/sync";
 
 export default function JobList() {
   const { user } = useAuthStore();
@@ -57,30 +58,52 @@ export default function JobList() {
     setProfile(currentPro);
 
     const asgs = dbRepository.getAssignments();
-    setAssignments(asgs);
+    // Filter assignments relevant for this professional
+    const relevantAssignments = asgs.filter((a) => {
+      if (!currentPro?.id) return true;
+      if (!a.assignedProfessionalId) return true;
+      return a.assignedProfessionalId === currentPro.id || a.assignedProfessionalId === user?.id;
+    });
+    setAssignments(relevantAssignments);
 
     const allBookings = dbRepository.getBookings();
-    const active = allBookings.filter((b) =>
-      ["PROFESSIONAL_ACCEPTED", "PROFESSIONAL_ON_THE_WAY", "PROFESSIONAL_ARRIVED", "SERVICE_STARTED", "AWAITING_CUSTOMER_APPROVAL"].includes(
+    const active = allBookings.filter((b) => {
+      const statusOk = ["PROFESSIONAL_ACCEPTED", "PROFESSIONAL_ON_THE_WAY", "PROFESSIONAL_ARRIVED", "SERVICE_STARTED", "AWAITING_CUSTOMER_APPROVAL"].includes(
         (b.status || "").toUpperCase()
-      )
-    );
+      );
+      if (!statusOk) return false;
+      if (currentPro?.id && b.technician_id && b.technician_id !== currentPro.id && b.technician_id !== user?.id) {
+        return false;
+      }
+      return true;
+    });
     setActiveJobs(active);
 
-    const completed = allBookings.filter((b) =>
-      ["SERVICE_COMPLETED", "CUSTOMER_CONFIRMED", "COMPLETED"].includes(
+    const completed = allBookings.filter((b) => {
+      const statusOk = ["SERVICE_COMPLETED", "CUSTOMER_CONFIRMED", "COMPLETED"].includes(
         (b.status || "").toUpperCase()
-      )
-    );
+      );
+      if (!statusOk) return false;
+      if (currentPro?.id && b.technician_id && b.technician_id !== currentPro.id && b.technician_id !== user?.id) {
+        return false;
+      }
+      return true;
+    });
     setCompletedJobs(completed);
   };
 
   useEffect(() => {
     loadData();
+    const unsubscribe = subscribeToBookingSync("*", () => {
+      loadData();
+    });
     const interval = setInterval(() => {
       setNow(Date.now());
     }, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, [user?.id]);
 
   const eligibility = professionalService.canProfessionalAcceptJobs(profile);
@@ -93,7 +116,12 @@ export default function JobList() {
       return;
     }
 
-    const success = dbRepository.acceptAssignment(asg.id, profile?.id || "pro-current");
+    const success = dbRepository.acceptAssignment(
+      asg.id,
+      profile?.id || "pro-current",
+      profile?.fullName,
+      profile?.phone
+    );
     if (success) {
       loadData();
       setActionNotice(`Job #${asg.bookingNumber} accepted! Customer has been notified that you accepted the booking.`);
@@ -217,12 +245,12 @@ export default function JobList() {
                 <div className="flex items-center gap-2">
                   <h3 className="font-heading font-bold text-sm md:text-base">
                     {profile?.status === "SUSPENDED" && "Professional Account Suspended"}
-                    {profile?.status === "CORRECTION_REQUIRED" && "KYC Action Required — Correction Requested"}
+                    {profile?.status === "CORRECTION_REQUIRED" && "Partner Action Required — Correction Requested"}
                     {profile?.status === "REJECTED" && "Application Not Approved"}
-                    {(profile?.status === "DOCUMENTS_UNDER_REVIEW" || profile?.status === "APPLICATION_SUBMITTED") &&
-                      "Application Under Compliance Review"}
-                    {(!profile || profile?.status === "DRAFT" || profile?.status === "PHONE_VERIFIED") &&
-                      "Professional Onboarding Incomplete"}
+                    {(profile?.status === "DOCUMENTS_UNDER_REVIEW" || profile?.status === "APPLICATION_SUBMITTED" || profile?.status === "UNDER_REVIEW") &&
+                      "Application Under Operational Review"}
+                    {(!profile || profile?.status === "DRAFT" || profile?.status === "PHONE_VERIFIED" || profile?.status === "PROFILE_INCOMPLETE") &&
+                      "Partner Onboarding Incomplete"}
                   </h3>
                   <Badge variant="outline" className="text-[10px] uppercase font-bold">
                     {profile?.status || "INCOMPLETE"}
@@ -243,18 +271,18 @@ export default function JobList() {
               {profile?.status === "CORRECTION_REQUIRED" && (
                 <Button variant="accent" size="sm" asChild className="gap-1.5 font-bold">
                   <Link to="/professional/kyc">
-                    Update KYC Documents <ArrowRight className="h-3.5 w-3.5" />
+                    Update Profile / Details <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </Button>
               )}
-              {(profile?.status === "DOCUMENTS_UNDER_REVIEW" || profile?.status === "APPLICATION_SUBMITTED") && (
+              {(profile?.status === "DOCUMENTS_UNDER_REVIEW" || profile?.status === "APPLICATION_SUBMITTED" || profile?.status === "UNDER_REVIEW") && (
                 <Button variant="outline" size="sm" asChild className="gap-1.5 font-semibold">
                   <Link to="/become-a-professional/onboarding?step=7">
                     View Application Tracker <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </Button>
               )}
-              {(!profile || profile?.status === "DRAFT" || profile?.status === "PHONE_VERIFIED") && (
+              {(!profile || profile?.status === "DRAFT" || profile?.status === "PHONE_VERIFIED" || profile?.status === "PROFILE_INCOMPLETE") && (
                 <Button variant="accent" size="sm" asChild className="gap-1.5 font-bold">
                   <Link to="/become-a-professional/onboarding">
                     Complete Onboarding <ArrowRight className="h-3.5 w-3.5" />
@@ -302,12 +330,12 @@ export default function JobList() {
                   {eligibility.reason}
                 </p>
                 <p className="text-[11px] text-foreground-muted mt-2">
-                  In accordance with Home-e-Fix verification policies, direct customer dispatches are only unlocked for verified and approved technicians.
+                  In accordance with Home-e-Fix verification policies, direct customer dispatches are only unlocked for verified and approved partners.
                 </p>
               </div>
               <div className="pt-2 flex flex-wrap justify-center gap-3">
                 <Button variant="outline" size="sm" asChild>
-                  <Link to="/professional/kyc">Review KYC Credentials</Link>
+                  <Link to="/professional/kyc">Review Partner Status</Link>
                 </Button>
                 <Button variant="accent" size="sm" asChild>
                   <Link to="/become-a-professional/onboarding?step=7">Check Review Status</Link>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, Link, useNavigate } from "react-router";
 import {
   Check,
@@ -27,6 +27,14 @@ import { formatCurrency } from "@/lib/currency";
 import { getServiceImageMeta } from "@/constants/serviceImageMap";
 import { serviceabilityEngine } from "@/services/marketplace/serviceability.engine";
 import { analyticsService } from "@/services/analytics/analytics.service";
+import { useLocationStore } from "@/store/location.store";
+import { useBookingDraftStore } from "@/store/booking.store";
+import { dbRepository, DEFAULT_PRICING_CONFIG } from "@/services/db/repository";
+import {
+  resolveCanonicalService,
+  getCanonicalVariants,
+  getCanonicalInclusions,
+} from "@/services/marketplace/canonicalService.service";
 
 export default function ServiceDetail() {
   const navigate = useNavigate();
@@ -35,6 +43,10 @@ export default function ServiceDetail() {
     service: string;
   }>();
 
+  const { setSingleServiceDraft } = useBookingDraftStore();
+  const { locality, pincode: storedPincode, currentLocation } = useLocationStore();
+  const isLocationConfirmed = Boolean(currentLocation?.confirmed || (locality && storedPincode));
+
   const category = SERVICE_CATEGORIES.find(
     (c) => c.slug === categorySlug || c.id === categorySlug
   );
@@ -42,22 +54,61 @@ export default function ServiceDetail() {
   const categoryKey = (category?.slug || categorySlug || "electrical") as string;
   const servicesList = CATEGORY_SERVICES_MAP[categoryKey] || CATEGORY_SERVICES_MAP["electrical"] || [];
 
-  const service = servicesList.find(
-    (s: any) => s.id === serviceSlug || s.slug === serviceSlug
-  ) || servicesList[0];
+  // Canonical service resolution (NEVER silently falls back to another service)
+  const service = useMemo(() => {
+    if (!serviceSlug) return undefined;
+    return (
+      resolveCanonicalService(serviceSlug) ||
+      servicesList.find((s: any) => s.id === serviceSlug || s.slug === serviceSlug)
+    );
+  }, [serviceSlug, servicesList]);
 
-  // Variant State
-  const variants = [
-    { id: "v1", name: "Standard Single Unit", priceMultiplier: 1.0, duration: "30-45 mins" },
-    { id: "v2", name: "Dual Unit Combo (Save 15%)", priceMultiplier: 1.7, duration: "60-80 mins" },
-    { id: "v3", name: "Family Pack (3+ Units, Save 25%)", priceMultiplier: 2.25, duration: "90-120 mins" },
-  ];
-  const [selectedVariantId, setSelectedVariantId] = useState("v1");
+  // Canonical variants (Single source of truth for packages)
+  const variants = useMemo(() => {
+    return service ? getCanonicalVariants(service) : [];
+  }, [service]);
+
+  const [selectedVariantId, setSelectedVariantId] = useState<string>("");
+
+  useEffect(() => {
+    if (variants.length > 0) {
+      if (!selectedVariantId || !variants.some((v) => v.id === selectedVariantId)) {
+        setSelectedVariantId(variants[0].id);
+      }
+    }
+  }, [variants, selectedVariantId]);
+
+  const activeVariant = variants.find((v) => v.id === selectedVariantId) || variants[0];
+  const effectivePrice = activeVariant ? activeVariant.price : (service?.discountedPrice || service?.basePrice || 99);
+
+  // Active pricing config from DB repository (No hardcoded values)
+  const activePricingConfig = useMemo(() => {
+    try {
+      return dbRepository.getPricingConfig() || DEFAULT_PRICING_CONFIG;
+    } catch {
+      return DEFAULT_PRICING_CONFIG;
+    }
+  }, []);
+
+  // Canonical service-specific inclusions and exclusions
+  const { included, excluded } = useMemo(() => {
+    return getCanonicalInclusions(service);
+  }, [service]);
 
   // Pincode check state
-  const [pincodeInput, setPincodeInput] = useState("");
-  const [pincodeResult, setPincodeResult] = useState<{ checked: boolean; serviceable?: boolean; locality?: string; message?: string }>({
-    checked: false,
+  const [pincodeInput, setPincodeInput] = useState(storedPincode || "");
+  const [pincodeResult, setPincodeResult] = useState<{
+    checked: boolean;
+    serviceable?: boolean;
+    locality?: string;
+    message?: string;
+  }>({
+    checked: Boolean(isLocationConfirmed && storedPincode),
+    serviceable: isLocationConfirmed ? storedPincode?.startsWith("700") : undefined,
+    locality: locality || "Kolkata",
+    message: isLocationConfirmed && storedPincode?.startsWith("700")
+      ? `Confirmed for ${locality || "Kolkata"} (${storedPincode}). Available.`
+      : undefined,
   });
 
   // FAQs open state
@@ -68,7 +119,7 @@ export default function ServiceDetail() {
       analyticsService.trackEvent("service_view", {
         serviceSlug: service.slug,
         serviceName: service.name,
-        categorySlug: service.category?.slug || categoryKey,
+        categorySlug: service.categorySlug || categoryKey,
         basePrice: service.discountedPrice || service.basePrice,
       });
     }
@@ -88,42 +139,60 @@ export default function ServiceDetail() {
     );
   }
 
-  const basePrice = service.discountedPrice || service.basePrice || 199;
-  const activeVariant = variants.find((v) => v.id === selectedVariantId) || variants[0];
-  const effectivePrice = Math.round(basePrice * activeVariant.priceMultiplier);
   const imageMeta = getServiceImageMeta(service.slug, categoryKey);
-  const heroImage = service.imageUrl || service.image || imageMeta.primaryImage;
+  const heroImage = service.imageUrl || service.image || service.thumbnail || imageMeta.primaryImage;
 
   const handleCheckPincode = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pincodeInput.trim()) return;
-    const res = serviceabilityEngine.checkPincode(pincodeInput.trim());
+    const cleanPin = pincodeInput.trim();
+    if (!cleanPin) return;
+
+    if (!/^\d{6}$/.test(cleanPin)) {
+      setPincodeResult({
+        checked: true,
+        serviceable: false,
+        message: "Please enter a valid 6-digit PIN code.",
+      });
+      return;
+    }
+
+    const res = serviceabilityEngine.checkPincode(cleanPin);
     setPincodeResult({
       checked: true,
       serviceable: res.isServiceable,
       locality: res.localityName,
       message: res.isServiceable
         ? `Available in ${res.localityName}, ${res.cityName}! Earliest slot: ${res.earliestSlot}`
-        : res.reason,
+        : (res.reason || "Service is currently unavailable in this area. Home-e-Fix currently operates in Kolkata."),
     });
   };
 
   const handleBookNow = () => {
-    navigate(`${ROUTES.APP_BOOK}?service=${encodeURIComponent(service.slug)}`);
+    if (!service || !activeVariant) return;
+
+    // Direct booking: Immediately store authoritative draft context (never fall back to AC or cart)
+    setSingleServiceDraft(service, 1, activeVariant);
+
+    // Pass canonical identifiers via query parameters for refresh/new-tab resilience
+    navigate(
+      `${ROUTES.APP_BOOK}?serviceId=${encodeURIComponent(service.id)}&service=${encodeURIComponent(service.slug)}&variantId=${encodeURIComponent(activeVariant.id)}`
+    );
   };
 
   const faqs = service.faqs || [
     {
       question: "Do I need to supply any materials or tools?",
-      answer: "No. All Home-e-Fix professionals carry specialized diagnostic equipment and standard tools. Any spare parts or replacement materials are billed at actual retail MRP with zero hidden markups.",
+      answer: "No. All Home-e-Fix professionals carry specialized diagnostic equipment and standard tools. Any spare parts or replacement materials are billed according to applicable retail MRP pricing policy.",
     },
     {
       question: "What happens if the service diagnosis reveals additional issues?",
       answer: "The professional must submit a formal additional charge proposal in the application with exact part costs. Work will ONLY proceed after you tap 'Approve' on your screen.",
     },
     {
-      question: "How does the 30-Day Service Warranty work?",
-      answer: "Every completed job is automatically covered for 30 days. If the exact same issue re-occurs, raise a warranty claim from your dashboard for a 100% free technician revisit.",
+      question: `How does the ${service.warrantyDays ? `${service.warrantyDays}-Day` : "Service"} Warranty work?`,
+      answer: service.warrantyDays
+        ? `Every completed job is covered for ${service.warrantyDays} days. If the exact same issue re-occurs, raise a warranty claim from your customer account for a free technician revisit.`
+        : "Every completed job is backed by our customer satisfaction policy and verified rework inspection if any fault arises.",
     },
   ];
 
@@ -167,7 +236,7 @@ export default function ServiceDetail() {
                   {category?.name || "Professional Service"}
                 </span>
                 <span className="text-xs font-semibold bg-black/40 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-accent" /> {service.duration || activeVariant.duration}
+                  <Clock className="h-3.5 w-3.5 text-accent" /> {activeVariant ? activeVariant.durationLabel : `${service.duration} mins`}
                 </span>
               </div>
             </div>
@@ -190,12 +259,12 @@ export default function ServiceDetail() {
                   </div>
                 ) : (
                   <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                    New Service
+                    Verified Service
                   </span>
                 )}
                 <div className="flex items-center gap-1 text-foreground-muted text-xs sm:text-sm">
                   <Clock className="h-3.5 w-3.5" />
-                  <span>{activeVariant.duration}</span>
+                  <span>{activeVariant?.durationLabel || `${service.duration} mins`}</span>
                 </div>
               </div>
 
@@ -205,7 +274,7 @@ export default function ServiceDetail() {
 
               <p className="text-foreground-secondary text-sm sm:text-base leading-relaxed">
                 {service.shortDescription ||
-                  "Professional installation, precision repair, and thorough quality inspection performed by police-verified master technicians."}
+                  "Professional installation, precision repair, and thorough quality inspection performed by verified technicians."}
               </p>
 
               {/* Service Variants Selector */}
@@ -215,7 +284,6 @@ export default function ServiceDetail() {
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {variants.map((v) => {
-                    const price = Math.round(basePrice * v.priceMultiplier);
                     const isSelected = selectedVariantId === v.id;
                     return (
                       <button
@@ -229,8 +297,8 @@ export default function ServiceDetail() {
                         }`}
                       >
                         <div className="text-xs font-bold text-primary">{v.name}</div>
-                        <div className="text-sm font-extrabold text-[#FF6A00] mt-1">{formatCurrency(price)}</div>
-                        <div className="text-[10px] text-foreground-muted mt-0.5">{v.duration}</div>
+                        <div className="text-sm font-extrabold text-[#FF6A00] mt-1">{formatCurrency(v.price)}</div>
+                        <div className="text-[10px] text-foreground-muted mt-0.5">{v.durationLabel}</div>
                       </button>
                     );
                   })}
@@ -239,12 +307,19 @@ export default function ServiceDetail() {
 
               {/* Quick Mobile Pincode Check */}
               <div className="p-3.5 rounded-2xl bg-muted/30 border border-border space-y-2 lg:hidden">
-                <label className="text-xs font-bold text-primary flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-accent" /> Check Service Availability in Kolkata
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-primary flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-accent" /> Check Service Availability
+                  </label>
+                  {isLocationConfirmed && storedPincode && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                      Current: {storedPincode}
+                    </span>
+                  )}
+                </div>
                 <form onSubmit={handleCheckPincode} className="flex gap-2">
                   <Input
-                    placeholder="Enter Pincode (e.g. 700064)"
+                    placeholder="Enter 6-digit Pincode (e.g. 700064)"
                     value={pincodeInput}
                     onChange={(e) => setPincodeInput(e.target.value)}
                     maxLength={6}
@@ -272,25 +347,18 @@ export default function ServiceDetail() {
                 )}
               </div>
 
-              {/* What is Included / Excluded */}
+              {/* What is Included / Excluded (Service-Specific) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-4 border-t border-border">
                 <div className="space-y-3 bg-muted/20 md:bg-transparent p-4 md:p-0 rounded-2xl">
                   <h4 className="font-bold text-sm text-primary flex items-center gap-1.5">
                     <Check className="h-4 w-4 text-success" /> What's Included
                   </h4>
                   <ul className="space-y-2 text-xs md:text-sm text-foreground-secondary">
-                    <li className="flex items-start gap-2">
-                      <span className="text-success font-bold">✓</span> Pre-service diagnostics & testing
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-success font-bold">✓</span> Professional labor using certified tools
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-success font-bold">✓</span> 30-Day Home-e-Fix Re-work Warranty
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-success font-bold">✓</span> Post-service clean-up & waste clearing
-                    </li>
+                    {included.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-success font-bold">✓</span> {item}
+                      </li>
+                    ))}
                   </ul>
                 </div>
 
@@ -299,35 +367,31 @@ export default function ServiceDetail() {
                     <X className="h-4 w-4 text-error" /> What's Excluded
                   </h4>
                   <ul className="space-y-2 text-xs md:text-sm text-foreground-secondary">
-                    <li className="flex items-start gap-2">
-                      <span className="text-error font-bold">✕</span> Replacement spare parts (billed at actuals)
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-error font-bold">✕</span> Major masonry or civil wall demolition
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-error font-bold">✕</span> Concealed structural rewiring
-                    </li>
+                    {excluded.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-error font-bold">✕</span> {item}
+                      </li>
+                    ))}
                   </ul>
                 </div>
               </div>
             </div>
 
-            {/* Service Process Checklist */}
+            {/* Standard Service Workflow */}
             <div className="rounded-3xl border border-border bg-surface p-5 sm:p-6 md:p-8 space-y-5">
               <h3 className="font-heading text-base sm:text-lg font-bold text-primary flex items-center gap-2">
-                <Wrench className="h-5 w-5 text-accent" /> Standard Operating Process
+                <Wrench className="h-5 w-5 text-accent" /> Standard Service Workflow
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
                 <div className="p-3.5 rounded-2xl bg-muted/30 border border-border space-y-1.5">
                   <span className="h-6 w-6 rounded-full bg-primary text-white font-bold flex items-center justify-center text-[11px]">1</span>
-                  <p className="font-bold text-primary">Arrival & OTP</p>
-                  <p className="text-foreground-secondary text-[11px] leading-relaxed">Technician arrives in uniform, presents ID, verifies start OTP.</p>
+                  <p className="font-bold text-primary">Arrival & Verification</p>
+                  <p className="text-foreground-secondary text-[11px] leading-relaxed">Technician arrives in uniform, presents credentials, verifies start OTP.</p>
                 </div>
                 <div className="p-3.5 rounded-2xl bg-muted/30 border border-border space-y-1.5">
                   <span className="h-6 w-6 rounded-full bg-primary text-white font-bold flex items-center justify-center text-[11px]">2</span>
                   <p className="font-bold text-primary">Diagnosis</p>
-                  <p className="text-foreground-secondary text-[11px] leading-relaxed">Inspection using diagnostic equipment to pinpoint exact fault.</p>
+                  <p className="text-foreground-secondary text-[11px] leading-relaxed">Systematic inspection using professional equipment to pinpoint exact fault.</p>
                 </div>
                 <div className="p-3.5 rounded-2xl bg-muted/30 border border-border space-y-1.5">
                   <span className="h-6 w-6 rounded-full bg-primary text-white font-bold flex items-center justify-center text-[11px]">3</span>
@@ -337,7 +401,7 @@ export default function ServiceDetail() {
                 <div className="p-3.5 rounded-2xl bg-muted/30 border border-border space-y-1.5">
                   <span className="h-6 w-6 rounded-full bg-primary text-white font-bold flex items-center justify-center text-[11px]">4</span>
                   <p className="font-bold text-primary">Quality Test</p>
-                  <p className="text-foreground-secondary text-[11px] leading-relaxed">Full operational test, cleanup, and 30-day warranty activation.</p>
+                  <p className="text-foreground-secondary text-[11px] leading-relaxed">Full operational test, clean-up, and service guarantee activation.</p>
                 </div>
               </div>
             </div>
@@ -349,7 +413,7 @@ export default function ServiceDetail() {
                   <ShieldCheck className="h-5 w-5 text-accent" /> Rate Card & Service Terms
                 </h3>
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20">
-                  {service.warrantyDays ? `${service.warrantyDays}-Day Rework Warranty` : "30-Day Rework Warranty"}
+                  {service.warrantyDays ? `${service.warrantyDays}-Day Rework Warranty` : "Standard Terms"}
                 </span>
               </div>
 
@@ -357,10 +421,10 @@ export default function ServiceDetail() {
                 <div className="p-3.5 rounded-2xl bg-surface border border-border space-y-1">
                   <div className="flex items-center gap-1.5 font-bold text-primary">
                     <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span>Visiting Fee Waiver</span>
+                    <span>Visiting Fee Policy</span>
                   </div>
                   <p className="text-foreground-secondary leading-relaxed text-[11px]">
-                    Standard ₹149 visiting charge is completely waived upon availing repair or installation service.
+                    Standard {formatCurrency(activePricingConfig.standardVisitFee)} visiting fee is waived upon availing repair or installation service.
                   </p>
                 </div>
 
@@ -370,17 +434,17 @@ export default function ServiceDetail() {
                     <span>Transparent Spares Policy</span>
                   </div>
                   <p className="text-foreground-secondary leading-relaxed text-[11px]">
-                    {service.sparesPolicy || "Replacement spares procured transparently at actual retail MRP. Zero markups."}
+                    {service.sparesPolicy || "Replacement spares procured transparently at actual retail MRP as per pricing policy."}
                   </p>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-surface border border-border space-y-1">
                   <div className="flex items-center gap-1.5 font-bold text-primary">
                     <Percent className="h-4 w-4 text-blue-600 shrink-0" />
-                    <span>Standard GST Application</span>
+                    <span>GST Application</span>
                   </div>
                   <p className="text-foreground-secondary leading-relaxed text-[11px]">
-                    18% GST applies strictly on labor charges. Spare parts already include applicable retail GST.
+                    {activePricingConfig.gstRatePercent}% GST applies strictly on labour charges. Spare parts already include applicable retail GST.
                   </p>
                 </div>
 
@@ -390,7 +454,7 @@ export default function ServiceDetail() {
                     <span>Night Service Policy</span>
                   </div>
                   <p className="text-foreground-secondary leading-relaxed text-[11px]">
-                    A night service surcharge of ₹150 applies for appointments scheduled after 8:00 PM.
+                    A night service surcharge of {formatCurrency(activePricingConfig.nightPeakSurcharge)} applies for appointments scheduled after 8:00 PM.
                   </p>
                 </div>
               </div>
@@ -399,7 +463,7 @@ export default function ServiceDetail() {
                 <Shield className="h-4 w-4 text-accent shrink-0" />
                 <span>
                   <strong className="text-primary">Final Bill Formula: </strong>
-                  {service.finalBillFormula || "Final Payable = Labor Rate + Approved Spares MRP + 18% GST (on labor)"}
+                  Final Payable = Labour Rate + Approved Spares MRP + {activePricingConfig.gstRatePercent}% GST (on labour)
                 </span>
               </div>
             </div>
@@ -446,16 +510,28 @@ export default function ServiceDetail() {
                     {formatCurrency(effectivePrice)}
                   </span>
                   <span className="text-xs text-foreground-secondary">
-                    (Includes labor & warranty)
+                    ({service.warrantyDays ? `Labour & ${service.warrantyDays}D warranty included` : "Labour included"})
                   </span>
                 </div>
+                {activeVariant && (
+                  <p className="text-xs font-semibold text-accent mt-1">
+                    {activeVariant.name} • {activeVariant.durationLabel}
+                  </p>
+                )}
               </div>
 
               {/* Serviceability Check (Desktop) */}
               <div className="p-4 rounded-2xl bg-muted/40 border border-border space-y-2">
-                <label className="text-[11px] font-bold text-primary flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-accent" /> Check Service Availability
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-accent" /> Check Service Availability
+                  </label>
+                  {isLocationConfirmed && storedPincode && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                      PIN: {storedPincode}
+                    </span>
+                  )}
+                </div>
                 <form onSubmit={handleCheckPincode} className="flex gap-2">
                   <Input
                     placeholder="Enter 6-digit Pincode"
@@ -489,6 +565,10 @@ export default function ServiceDetail() {
               {/* Specifications checklist */}
               <div className="space-y-2 text-xs text-foreground-secondary border-t border-b border-border py-4">
                 <div className="flex justify-between">
+                  <span>Selected Package:</span>
+                  <span className="font-bold text-primary">{activeVariant?.name || "Standard Single Unit"}</span>
+                </div>
+                <div className="flex justify-between">
                   <span>Standard Visit:</span>
                   <span className="font-bold text-emerald-600 dark:text-emerald-400">Waived on Service</span>
                 </div>
@@ -508,7 +588,7 @@ export default function ServiceDetail() {
                 </div>
                 <div className="flex justify-between">
                   <span>Taxes (GST):</span>
-                  <span className="font-bold text-primary">Prevailing GST on Labor</span>
+                  <span className="font-bold text-primary">{activePricingConfig.gstRatePercent}% GST on Labour</span>
                 </div>
                 {service.isEmergencyEligible && (
                   <div className="flex justify-between">
@@ -545,7 +625,7 @@ export default function ServiceDetail() {
               {service.warrantyDays ? `${service.warrantyDays}D Warranty` : "Standard Terms"}
             </span>
           </div>
-          <span className="text-[10px] text-foreground-muted truncate max-w-42.5">{activeVariant.name}</span>
+          <span className="text-[10px] text-foreground-muted truncate max-w-42.5">{activeVariant?.name}</span>
         </div>
 
         <Button

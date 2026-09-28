@@ -1,132 +1,39 @@
-import { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router";
-import { ShieldCheck, Phone, ArrowLeft, RefreshCw, CheckCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
+import { useNavigate, Link } from "react-router";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { OtpInput } from "@/components/ui/otp-input";
+import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
-import { useAuthStore } from "@/store/auth.store";
-import { dbRepository } from "@/services/db/repository";
+import { Info, ArrowRight } from "lucide-react";
 
+/**
+ * Legacy OTP Verification route (/auth/otp).
+ * Phone OTP has been temporarily replaced with Google OAuth.
+ * Automatically routes users back to /auth/login.
+ */
 export default function OtpVerification() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const loginStore = useAuthStore((state) => state.login);
-
-  const [otpValue, setOtpValue] = useState("");
-  const [timerSeconds, setTimerSeconds] = useState(60);
-  const [canResend, setCanResend] = useState(false);
-
-  const submittedPhone = location.state?.phone || "+91 98765 00000";
-  const submittedName = location.state?.fullName || "Verified Homeowner";
-  const submittedEmail = location.state?.email || "homeowner@homeefix.in";
 
   useEffect(() => {
-    let interval: any = null;
-    if (timerSeconds > 0) {
-      interval = setInterval(() => {
-        setTimerSeconds((prev) => prev - 1);
-      }, 1000);
-    } else {
-      setCanResend(true);
-    }
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [timerSeconds]);
-
-  const handleResendOtp = () => {
-    setTimerSeconds(60);
-    setCanResend(false);
-  };
-
-  const handleVerify = (code: string) => {
-    if (code.length === 6) {
-      const verifiedUser: any = {
-        id: `usr-${Date.now()}`,
-        email: submittedEmail,
-        fullName: submittedName,
-        phone: submittedPhone,
-        role: "customer",
-        isEmailVerified: true,
-        isPhoneVerified: true,
-      };
-
-      dbRepository.saveProfile({
-        id: verifiedUser.id,
-        email: verifiedUser.email,
-        full_name: verifiedUser.fullName,
-        phone: verifiedUser.phone,
-        role: "customer",
-      });
-
-      loginStore(verifiedUser, "hef-otp-token", "hef-refresh-token");
-      navigate(ROUTES.HOME);
-    }
-  };
+    navigate(ROUTES.LOGIN, { replace: true });
+  }, [navigate]);
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-6">
-      <div className="text-center space-y-2">
-        <Badge variant="accent" className="px-3 py-1 text-xs">
-          🔒 Verification Required
-        </Badge>
-        <h1 className="font-heading text-2xl sm:text-3xl font-extrabold text-primary">
-          Verify Mobile Number
-        </h1>
-        <p className="text-xs text-foreground-secondary">
-          Enter the 6-digit verification code sent to your registered phone
-        </p>
-      </div>
-
-      <Card className="p-6 sm:p-8 border border-border/80 shadow-xl space-y-6 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-accent/10 text-accent">
-          <Phone className="h-7 w-7" />
+    <div className="w-full max-w-md mx-auto space-y-6 py-12">
+      <Card className="p-8 border border-border bg-surface text-center space-y-4 rounded-3xl shadow-xl">
+        <div className="w-12 h-12 rounded-2xl bg-accent/10 text-accent mx-auto flex items-center justify-center">
+          <Info className="w-6 h-6" />
         </div>
-
-        <OtpInput
-          value={otpValue}
-          onChange={(val) => {
-            setOtpValue(val);
-            handleVerify(val);
-          }}
-        />
-
-        <div className="text-xs text-foreground-secondary space-y-2">
-          {!canResend ? (
-            <p>
-              Resend OTP in <span className="font-bold text-accent">{timerSeconds}s</span>
-            </p>
-          ) : (
-            <button
-              type="button"
-              onClick={handleResendOtp}
-              className="inline-flex items-center gap-1.5 font-bold text-accent hover:underline cursor-pointer"
-            >
-              <RefreshCw className="h-3.5 w-3.5" /> Resend OTP Code
-            </button>
-          )}
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold text-primary">Authentication Notice</h2>
+          <p className="text-xs text-foreground-secondary">
+            Phone OTP login is temporarily paused. Please sign in with your Google account.
+          </p>
         </div>
-
-        <div className="pt-4 border-t border-border flex items-center justify-between">
-          <Link
-            to={ROUTES.LOGIN}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground-secondary hover:text-primary"
-          >
-            <ArrowLeft className="h-4 w-4" /> Back to Login
+        <Button asChild variant="accent" className="w-full font-bold gap-2">
+          <Link to={ROUTES.LOGIN}>
+            Go to Sign In <ArrowRight className="w-4 h-4" />
           </Link>
-
-          <Button
-            variant="accent"
-            size="sm"
-            onClick={() => handleVerify(otpValue)}
-            disabled={otpValue.length < 6}
-          >
-            Verify & Proceed
-          </Button>
-        </div>
+        </Button>
       </Card>
     </div>
   );

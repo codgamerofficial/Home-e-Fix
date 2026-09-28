@@ -1,11 +1,19 @@
 /**
- * Professional Domain Types & KYC Models for Home-e-Fix
+ * Professional Domain Types & Partner Status Models for Home-e-Fix
+ *
+ * Product Policy:
+ * Home-e-Fix does NOT require government-ID KYC for professional onboarding.
+ * Onboarding consists of Google account, basic profile, phone verification,
+ * services/categories, skills & experience, service areas, working hours/availability,
+ * and profile photo, followed by administrator review and approval.
  */
 
 export type ProfessionalStatus =
+  | "PROFILE_INCOMPLETE"
   | "DRAFT"
   | "PHONE_VERIFIED"
   | "APPLICATION_SUBMITTED"
+  | "UNDER_REVIEW"
   | "DOCUMENTS_UNDER_REVIEW"
   | "APPROVED"
   | "ACTIVE"
@@ -14,12 +22,15 @@ export type ProfessionalStatus =
   | "SUSPENDED"
   | "DEACTIVATED";
 
+/**
+ * Optional trade / certification document types (deprecated from mandatory onboarding)
+ */
 export type KycDocumentType =
-  | "IDENTITY_DOCUMENT" // Aadhaar Card / Voter ID
-  | "ADDRESS_DOCUMENT"  // Utility Bill / Passport / Rental Agreement
-  | "SKILL_CERTIFICATE" // Trade Diploma / ITI Certificate / Manufacturer Training
-  | "PROFILE_PHOTO"     // Passport-style clear headshot
-  | "BANK_DOCUMENT";    // Cancelled Cheque / Bank Passbook for payouts
+  | "IDENTITY_DOCUMENT" // Optional / Deprecated
+  | "ADDRESS_DOCUMENT"  // Optional / Deprecated
+  | "SKILL_CERTIFICATE" // Optional trade diploma / ITI certificate
+  | "PROFILE_PHOTO"     // Profile headshot
+  | "BANK_DOCUMENT";    // Optional payout verification
 
 export type KycDocumentStatus =
   | "PENDING"
@@ -68,6 +79,12 @@ export interface ProfessionalReviewLog {
   createdAt: string;
 }
 
+export interface ProfessionalWorkingHours {
+  start: string; // e.g. "08:00 AM" or "08:00"
+  end: string;   // e.g. "08:00 PM" or "20:00"
+  daysOfWeek: string[]; // ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+}
+
 export interface ProfessionalProfile {
   id: string;
   userId: string;
@@ -86,13 +103,19 @@ export interface ProfessionalProfile {
   longitude?: number | null;
   primaryCategory: string;
   serviceCategories: string[];
+  skills?: string[];
   experienceYears: number;
   bio?: string;
   preferredServiceAreas?: string[];
+  workingHours?: ProfessionalWorkingHours;
+  workingDays?: string[];
+  payoutUpiId?: string;
   status: ProfessionalStatus;
+  incompleteReason?: string | null;
   rejectionReason?: string | null;
+  suspensionReason?: string | null;
   correctionNotes?: string | null;
-  documents?: ProfessionalDocument[];
+  documents?: ProfessionalDocument[]; // Optional / not required for onboarding
   createdAt: string;
   updatedAt: string;
   isDevSeed?: boolean;
@@ -114,10 +137,14 @@ export interface ProfessionalRegistrationDraft {
   longitude?: number | null;
   primaryCategory: string;
   serviceCategories: string[];
+  skills?: string[];
   experienceYears: number;
   bio?: string;
   preferredServiceAreas?: string[];
-  documents: Array<{
+  workingHours?: ProfessionalWorkingHours;
+  workingDays?: string[];
+  payoutUpiId?: string;
+  documents?: Array<{
     documentType: KycDocumentType;
     documentNumberMasked: string;
     fileName: string;

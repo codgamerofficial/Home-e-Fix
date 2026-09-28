@@ -81,7 +81,7 @@ export default function Ratings() {
         </h3>
         <div className="flex flex-wrap gap-3">
           <Badge variant="secondary" className="px-3 py-1.5 text-xs font-bold text-emerald-600 bg-emerald-50">
-            🛡️ 100% KYC & Background Verified
+            🛡️ Home-e-Fix Verified Partner
           </Badge>
           {completedJobsCount >= 10 && (
             <Badge variant="accent" className="px-3 py-1.5 text-xs font-bold">

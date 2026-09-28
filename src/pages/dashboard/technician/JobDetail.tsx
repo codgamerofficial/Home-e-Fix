@@ -28,6 +28,7 @@ import { formatDate, formatTime } from "@/lib/date";
 import { getStatusConfig } from "@/lib/status";
 import { LiveLocationTransmitter } from "@/components/professional/LiveLocationTransmitter";
 import { trackingEngine } from "@/services/tracking/tracking.engine";
+import { subscribeToBookingSync } from "@/services/realtime/sync";
 
 export default function JobDetail() {
   const { id } = useParams<{ id: string }>();
@@ -68,6 +69,13 @@ export default function JobDetail() {
 
   useEffect(() => {
     loadJob();
+    if (!id) return;
+    const unsub = subscribeToBookingSync(id, () => {
+      loadJob();
+    });
+    return () => {
+      unsub();
+    };
   }, [id]);
 
   if (loading) {

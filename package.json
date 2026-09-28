@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "test": "npx tsx --test tests/**/*.test.ts",
     "preview": "vite preview",
+    "admin:bootstrap": "node scripts/admin_bootstrap.mjs",
     "deploy": "wrangler deploy",
     "edge:dev": "wrangler dev",
     "types:worker": "wrangler types --include-runtime=false",

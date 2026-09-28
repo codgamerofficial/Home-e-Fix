@@ -60,7 +60,7 @@ export default function AuditLogsCMS() {
         <div>
           <h1 className="text-2xl font-bold text-primary">Immutable System Audit Trail</h1>
           <p className="text-sm text-foreground-secondary">
-            Append-only cryptographic records of administrative overrides, KYC reviews, and financial ledger events
+            Append-only cryptographic records of administrative overrides, partner verification reviews, and financial ledger events
           </p>
         </div>
 

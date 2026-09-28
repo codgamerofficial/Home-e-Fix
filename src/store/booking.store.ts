@@ -1,15 +1,21 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { findCanonicalVariant } from "@/services/marketplace/canonicalService.service";
 
 export interface BookingItemDraft {
   serviceId: string;
   serviceSlug: string;
   serviceName: string;
   categorySlug: string;
+  variantId?: string;
+  variantName?: string;
+  variantDuration?: string;
+  packageId?: string;
+  packageName?: string;
   unitPrice: number;
   quantity: number;
   quantityUnit?: string;
-  pricingType?: "fixed" | "starting_from" | "range" | "quote";
+  pricingType?: "fixed" | "starting_from" | "range" | "quote" | "inspection_required";
   materialsPolicy?: "included" | "extra" | "customer_provided" | "technician_supplied" | "inspection_required";
   warrantyDays?: number;
   duration?: number | string;
@@ -35,7 +41,7 @@ export interface BookingDraft {
 
 interface BookingDraftStore {
   draft: BookingDraft | null;
-  setSingleServiceDraft: (service: any, quantity?: number) => void;
+  setSingleServiceDraft: (service: any, quantity?: number, variant?: any) => void;
   setCartDraft: (cartItems: any[]) => void;
   updateDraft: (partial: Partial<BookingDraft>) => void;
   updateQuestionAnswer: (questionId: string, answer: string) => void;
@@ -52,21 +58,31 @@ export const useBookingDraftStore = create<BookingDraftStore>()(
     (set, get) => ({
       draft: null,
 
-      setSingleServiceDraft: (service: any, quantity = 1) => {
+      setSingleServiceDraft: (service: any, quantity = 1, variant?: any) => {
         const qty = Math.max(1, quantity);
-        const unitPrice = service.discountedPrice ?? service.basePrice ?? service.customerPrice ?? 499;
+        const resolvedVariant = variant || (service ? findCanonicalVariant(service) : null);
+        const unitPrice = resolvedVariant?.price ?? service.discountedPrice ?? service.basePrice ?? service.customerPrice ?? 99;
+        const duration = resolvedVariant?.durationLabel || resolvedVariant?.duration || service.durationMinutes || service.duration || "30–45 mins";
+
         const item: BookingItemDraft = {
           serviceId: service.id || `srv-${service.slug || "custom"}`,
           serviceSlug: service.slug || "service",
           serviceName: service.name || "Home Service",
           categorySlug: service.category?.slug || service.categorySlug || service.category || "general",
+          variantId: resolvedVariant?.id,
+          variantName: resolvedVariant?.name,
+          variantDuration: resolvedVariant?.durationLabel,
+          packageId: resolvedVariant?.id,
+          packageName: resolvedVariant?.name,
           unitPrice,
           quantity: qty,
           quantityUnit: service.quantityUnit || "unit",
-          pricingType: service.pricingType || "fixed",
+          pricingType: resolvedVariant?.pricingType || service.pricingType || "fixed",
           materialsPolicy: service.materialsPolicy || "extra",
-          warrantyDays: typeof service.warrantyDays === "number" ? service.warrantyDays : 0,
-          duration: service.durationMinutes || service.duration || 45,
+          warrantyDays: typeof resolvedVariant?.warrantyDays === "number"
+            ? resolvedVariant.warrantyDays
+            : (typeof service.warrantyDays === "number" ? service.warrantyDays : 0),
+          duration,
           subtotal: unitPrice * qty,
           thumbnail: service.thumbnail || service.imageUrl,
         };

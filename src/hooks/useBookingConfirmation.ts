@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { bookingsApi } from "@/services/api/bookings.api";
 import { invoiceEngine } from "@/services/marketplace/invoice.engine";
+import { buildAuthoritativeTimeline } from "@/services/marketplace/status.engine";
 import { useAuthStore } from "@/store/auth.store";
 import { formatDate } from "@/lib/date";
+import { subscribeToBookingSync } from "@/services/realtime/sync";
 import type { DbBooking } from "@/types/database.types";
 import type { DigitalInvoice } from "@/types/marketplace.types";
 
@@ -250,11 +252,17 @@ export function useBookingConfirmation(bookingId?: string) {
       const paymentStatus = normalizePaymentStatus(paymentMethod, b.payment_status);
       const isPaid = paymentStatus === "PAID";
 
-      const totalPayable = b.total_amount || 499;
-      const safetyFee = b.safety_fee ?? 49;
-      const taxGst = b.tax_gst ?? Math.round(totalPayable * 0.18);
-      const discount = b.discount ?? 0;
-      const subtotal = b.subtotal ?? Math.max(0, totalPayable - safetyFee - taxGst + discount);
+      // Financial details from authoritative snapshot or record
+      const snapshot = b.pricing_snapshot;
+      const totalPayable = snapshot?.grandTotal ?? b.total_amount ?? 499;
+      const safetyFee = snapshot?.safetyFee ?? b.safety_fee ?? 0;
+      const discount = snapshot?.totalDiscount ?? snapshot?.discountAmount ?? b.discount ?? 0;
+      const taxGst = snapshot?.totalTax ?? b.tax_gst ?? 0;
+      const subtotal = snapshot?.basePrice ?? b.subtotal ?? Math.max(0, totalPayable - safetyFee - taxGst + discount);
+      const taxableAmount = snapshot?.taxableValue ?? Math.max(0, subtotal - discount + safetyFee);
+      const cgstAmount = snapshot?.cgstAmount ?? 0;
+      const sgstAmount = snapshot?.sgstAmount ?? 0;
+      const igstAmount = snapshot?.igstAmount ?? 0;
 
       // Professional details (only if genuinely assigned)
       let professional: NormalizedBookingConfirmation["professional"] = null;
@@ -264,10 +272,10 @@ export function useBookingConfirmation(bookingId?: string) {
           name: b.technician_name,
           phone: b.technician_phone || "",
           trade: b.service_name || "Verified Professional",
-          rating: 4.9,
-          experienceYears: 6,
+          rating: b.technician_rating || 4.9,
+          experienceYears: b.technician_experience || 6,
           isVerified: true,
-          avatar: "https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&q=80",
+          avatar: b.technician_avatar || "https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&q=80",
         };
       }
 
@@ -279,6 +287,7 @@ export function useBookingConfirmation(bookingId?: string) {
       };
 
       // Invoice generation if applicable
+      const isServiceCompleted = b.status === "COMPLETED" || b.status === "SERVICE_COMPLETED";
       const invoice = invoiceEngine.generate({
         bookingId: b.id,
         bookingNumber: b.booking_number || bookingId,
@@ -291,10 +300,26 @@ export function useBookingConfirmation(bookingId?: string) {
         subtotal,
         safetyFee,
         discountAmount: discount,
+        taxableAmount,
+        cgstAmount,
+        sgstAmount,
+        igstAmount,
+        totalAmount: totalPayable,
         paymentMethod,
         paymentStatus,
         warrantyDays: warranty.days,
+        isServiceCompleted,
+        pricingSnapshot: snapshot,
       });
+
+      const timeline = buildAuthoritativeTimeline(
+        b.status || "CONFIRMED",
+        b.created_at || new Date().toISOString(),
+        b.timeline || [],
+        b.technician_name,
+        paymentStatus,
+        paymentMethod
+      );
 
       return {
         booking: raw,
@@ -334,7 +359,7 @@ export function useBookingConfirmation(bookingId?: string) {
         },
         professional,
         warranty,
-        timeline: buildBookingTimeline(raw.status, raw.created_at || new Date().toISOString()),
+        timeline,
         invoice,
         canViewBooking: canView,
         unauthorizedReason,
@@ -344,7 +369,7 @@ export function useBookingConfirmation(bookingId?: string) {
     staleTime: 1000 * 15, // 15 seconds
   });
 
-  // Supabase Realtime update hookup
+  // Multi-transport Realtime update hookup (Supabase + BroadcastChannel + cross-tab)
   useEffect(() => {
     if (!bookingId) return;
 
@@ -353,8 +378,14 @@ export function useBookingConfirmation(bookingId?: string) {
       queryClient.invalidateQueries({ queryKey: ["customer-bookings"] });
     });
 
+    const unsubscribeSync = subscribeToBookingSync(bookingId, () => {
+      queryClient.invalidateQueries({ queryKey: ["booking-confirmation", bookingId] });
+      queryClient.invalidateQueries({ queryKey: ["customer-bookings"] });
+    });
+
     return () => {
       channel.unsubscribe();
+      unsubscribeSync();
     };
   }, [bookingId, queryClient]);
 

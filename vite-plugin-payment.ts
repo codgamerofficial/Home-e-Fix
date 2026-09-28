@@ -405,6 +405,204 @@ export function paymentServerPlugin(): Plugin {
           });
         }
 
+        // ── 7. PRIVATE KYC SIGNED UPLOAD URL GENERATOR ──
+        if (pathname === "/api/kyc/upload-url" && req.method === "POST") {
+          const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+          const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+          if (!supabaseUrl || !serviceRoleKey) {
+            return sendJson(503, { error: "Storage service is temporarily unavailable." });
+          }
+
+          const { docType, fileName, fileSize, mimeType, userId: clientUserId } = body;
+          const ALLOWED_MIME_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+          const ALLOWED_EXTENSIONS = new Set(["pdf", "jpg", "jpeg", "png", "webp"]);
+          const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
+          if (!fileSize || typeof fileSize !== "number" || fileSize > MAX_FILE_SIZE_BYTES) {
+            return sendJson(400, { error: "File size must be 10 MB or less." });
+          }
+
+          if (!mimeType || !ALLOWED_MIME_TYPES.has(mimeType)) {
+            return sendJson(400, { error: "Please upload a PDF, JPG, JPEG, PNG, or WEBP file." });
+          }
+
+          const rawExt = typeof fileName === "string" ? fileName.split(".").pop()?.toLowerCase() : "";
+          if (!rawExt || !ALLOWED_EXTENSIONS.has(rawExt)) {
+            return sendJson(400, { error: "Invalid file extension. Allowed formats: .pdf, .jpg, .jpeg, .png, .webp" });
+          }
+
+          const authHeader = (req.headers["authorization"] as string) || "";
+          const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+          let authenticatedUserId: string | null = null;
+
+          if (token) {
+            try {
+              const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+                headers: {
+                  apikey: serviceRoleKey,
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+              if (userRes.ok) {
+                const uData: any = await userRes.json();
+                authenticatedUserId = uData?.id || null;
+              }
+            } catch {
+              // fallback
+            }
+          }
+
+          const finalUserId = authenticatedUserId || clientUserId;
+          if (!finalUserId) {
+            return sendJson(401, { error: "Please sign in before uploading your documents." });
+          }
+
+          const CATEGORY_MAP: Record<string, string> = {
+            IDENTITY_DOCUMENT: "government-id",
+            identity_document: "government-id",
+            BANK_DOCUMENT: "bank-proof",
+            bank_document: "bank-proof",
+            SKILL_CERTIFICATE: "certification",
+            skill_certificate: "certification",
+            PROFESSIONAL_CERTIFICATE: "certification",
+            professional_certificate: "certification",
+            PROFILE_PHOTO: "profile-photo",
+            profile_photo: "profile-photo",
+          };
+          const folder = CATEGORY_MAP[docType] || "documents";
+          const uniqueId = `doc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          const storagePath = `${finalUserId}/${folder}/${uniqueId}.${rawExt}`;
+
+          try {
+            const signRes = await fetch(
+              `${supabaseUrl}/storage/v1/object/upload/sign/professional-kyc/${storagePath}`,
+              {
+                method: "POST",
+                headers: {
+                  apikey: serviceRoleKey,
+                  Authorization: `Bearer ${serviceRoleKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ upsert: true }),
+              }
+            );
+
+            if (!signRes.ok) {
+              const errText = await signRes.text();
+              console.error("[KYC Upload URL Error]", errText);
+              return sendJson(500, { error: "We couldn't initialize document upload right now. Please try again." });
+            }
+
+            const signData: any = await signRes.json();
+            const signedUrl = `${supabaseUrl}/storage/v1${signData.url}`;
+            const tokenMatch = signedUrl.match(/[?&]token=([^&]+)/);
+            const uploadToken = tokenMatch ? tokenMatch[1] : "";
+
+            return sendJson(200, {
+              success: true,
+              storagePath,
+              signedUrl,
+              token: uploadToken,
+            });
+          } catch (err: any) {
+            console.error("[KYC Upload URL Exception]", err);
+            return sendJson(500, { error: "Failed to generate upload URL. Please try again." });
+          }
+        }
+
+        // ── 9. ADMIN: LIST USERS ──
+        if (pathname === "/api/admin/users" && req.method === "GET") {
+          const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+          const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+          if (!supabaseUrl || !serviceRoleKey) {
+            return sendJson(500, { error: "Supabase service credentials not configured" });
+          }
+
+          try {
+            const listRes = await fetch(`${supabaseUrl}/auth/v1/admin/users?per_page=50`, {
+              headers: {
+                Authorization: `Bearer ${serviceRoleKey}`,
+                apikey: serviceRoleKey,
+              },
+            });
+            if (!listRes.ok) {
+              const err = await listRes.text();
+              return sendJson(listRes.status, { error: err });
+            }
+            const data: any = await listRes.json();
+            const users = (data.users || []).map((u: any) => ({
+              id: u.id,
+              email: u.email,
+              phone: u.phone,
+              name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split("@")[0],
+              role: u.app_metadata?.role || u.user_metadata?.role || "customer",
+              createdAt: u.created_at,
+              lastSignInAt: u.last_sign_in_at,
+            }));
+            return sendJson(200, { users });
+          } catch (err: any) {
+            return sendJson(500, { error: err.message });
+          }
+        }
+
+        // ── 10. ADMIN: UPDATE USER ROLE ──
+        if (pathname === "/api/admin/users/role" && req.method === "POST") {
+          const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+          const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+          if (!supabaseUrl || !serviceRoleKey) {
+            return sendJson(500, { error: "Supabase service credentials not configured" });
+          }
+
+          const { userId, role } = body || {};
+          const validRoles = ["customer", "professional", "admin", "super_admin"];
+          if (!userId || !role || !validRoles.includes(role)) {
+            return sendJson(400, { error: "Invalid userId or role. Allowed roles: " + validRoles.join(", ") });
+          }
+
+          // Protected platform owner cannot be demoted
+          const ownerId = "f3e5b3dd-24d3-46e0-9793-f54a26f48bd2";
+          if (userId === ownerId && role !== "super_admin") {
+            return sendJson(403, { error: "Platform owner account role cannot be changed from super_admin." });
+          }
+
+          try {
+            const updateRes = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+              method: "PUT",
+              headers: {
+                Authorization: `Bearer ${serviceRoleKey}`,
+                apikey: serviceRoleKey,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                app_metadata: {
+                  role,
+                  roles: role === "super_admin" ? ["super_admin", "admin"] : [role],
+                },
+                user_metadata: {
+                  role,
+                },
+              }),
+            });
+
+            if (!updateRes.ok) {
+              const err = await updateRes.text();
+              return sendJson(updateRes.status, { error: err });
+            }
+
+            const updatedUser: any = await updateRes.json();
+            return sendJson(200, {
+              success: true,
+              userId: updatedUser.id,
+              role,
+            });
+          } catch (err: any) {
+            return sendJson(500, { error: err.message });
+          }
+        }
+
         return sendJson(404, { error: `Endpoint ${pathname} not found on server` });
       });
     },

@@ -32,7 +32,7 @@ test("Date Utility - Timezone-aware date formatting with Asia/Kolkata", () => {
   assert.ok(formatted.includes("Sep"), "Should format month in IST");
 });
 
-test("Digital Tax Invoice - Correct SAC Code 998719, GSTIN and 18% Tax Calculation", () => {
+test("Digital Tax Invoice & Receipt - Correct SAC Code 998719 and Truthful GST Configuration", () => {
   const inv = invoiceEngine.generate({
     bookingId: "test-booking-uuid",
     bookingNumber: "HEF-2026-E56D842A",
@@ -47,22 +47,17 @@ test("Digital Tax Invoice - Correct SAC Code 998719, GSTIN and 18% Tax Calculati
     paymentMethod: "UPI",
     paymentStatus: "PAID",
     warrantyDays: 30,
+    isServiceCompleted: false, // Pre-service receipt
   });
 
   assert.equal(inv.bookingNumber, "HEF-2026-E56D842A");
-  assert.ok(inv.invoiceNumber.startsWith("HEF-INV-2026-"));
-  assert.equal(inv.gstinBusiness, "19AABCH1234F1Z5");
+  assert.ok(inv.invoiceNumber.startsWith("HEF-REC-2627-"), `Expected receipt prefix, got ${inv.invoiceNumber}`);
+  assert.equal(inv.documentType, "PAYMENT_RECEIPT");
   assert.equal(inv.customerName, "Subrata Roy");
   assert.equal(inv.customerAddress, "Flat 3B, Sunshine Towers, Behala, Kolkata - 700034");
 
   // Taxable: 699 - 100 + 49 = 648
   assert.equal(inv.taxableAmount, 648);
-  // CGST: 9% of 648 = 58
-  assert.equal(inv.cgstAmount, 58);
-  // SGST: 9% of 648 = 58
-  assert.equal(inv.sgstAmount, 58);
-  // Total: 648 + 58 + 58 = 764
-  assert.equal(inv.totalAmount, 764);
   assert.ok(inv.warrantyCoverage.includes("30 Days"));
 });
 

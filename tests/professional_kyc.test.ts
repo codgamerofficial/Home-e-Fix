@@ -241,7 +241,7 @@ test("Admin Approval & Audit Workflow - Full Compliance Trail", async () => {
     ],
   });
 
-  assert.equal(applicant.status, "DOCUMENTS_UNDER_REVIEW");
+  assert.equal(applicant.status, "UNDER_REVIEW");
   assert.equal(applicant.documents?.length, 1);
 
   // Admin requests correction
@@ -249,12 +249,12 @@ test("Admin Approval & Audit Workflow - Full Compliance Trail", async () => {
     applicant.id,
     "adm-001",
     "Compliance Lead",
-    "Aadhaar front image is blurry. Please upload a high resolution photo."
+    "Please update your preferred working hours."
   );
   assert.equal(correctedPro.status, "CORRECTION_REQUIRED");
-  assert.equal(correctedPro.correctionNotes, "Aadhaar front image is blurry. Please upload a high resolution photo.");
+  assert.equal(correctedPro.correctionNotes, "Please update your preferred working hours.");
 
-  // Professional re-submits corrected documentation
+  // Professional re-submits updated profile details
   const resubmittedPro = await professionalService.submitApplication("usr-electrician-10", {
     phone: "+919830055443",
     phoneVerified: true,
@@ -269,29 +269,23 @@ test("Admin Approval & Audit Workflow - Full Compliance Trail", async () => {
     experienceYears: 7,
     bio: "Certified wireman with 7 years of high-voltage and domestic distribution experience.",
     preferredServiceAreas: ["Salt Lake", "New Town"],
+    workingHours: {
+      start: "08:00 AM",
+      end: "08:00 PM",
+      daysOfWeek: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+    },
     termsAccepted: true,
-    documents: [
-      {
-        documentType: "IDENTITY_DOCUMENT",
-        documentNumberMasked: "XXXX-XXXX-8821",
-        storagePath: "usr-electrician-10/id_doc_hd.pdf",
-        fileName: "aadhaar_hd.pdf",
-        fileSize: 1548576,
-        mimeType: "application/pdf",
-      },
-    ],
   });
-  assert.equal(resubmittedPro.status, "DOCUMENTS_UNDER_REVIEW");
+  assert.equal(resubmittedPro.status, "UNDER_REVIEW");
 
   // Admin approves professional
   const approvedPro = await professionalService.adminApproveApplication(
     applicant.id,
     "adm-001",
     "Compliance Lead",
-    "Clear Aadhaar provided and background phone checks completed."
+    "Experience and profile details verified by administrator."
   );
   assert.equal(approvedPro.status, "APPROVED");
-  assert.equal(approvedPro.documents?.[0].status, "APPROVED");
 
   // Verify Audit Log trail
   const logs = professionalService.getReviewLogs(applicant.id);
@@ -299,7 +293,7 @@ test("Admin Approval & Audit Workflow - Full Compliance Trail", async () => {
   assert.equal(logs[0].action, "approved");
   assert.equal(logs[0].adminName, "Compliance Lead");
 
-  // Finally test suspension
+  // Test suspension
   const suspendedPro = await professionalService.adminSuspendProfessional(
     applicant.id,
     "adm-001",
@@ -308,6 +302,15 @@ test("Admin Approval & Audit Workflow - Full Compliance Trail", async () => {
   );
   assert.equal(suspendedPro.status, "SUSPENDED");
   assert.equal(professionalService.canProfessionalAcceptJobs(suspendedPro).allowed, false);
+
+  // Test Reactivation
+  const reactivatedPro = await professionalService.adminReactivateProfessional(
+    applicant.id,
+    "adm-001",
+    "Compliance Lead"
+  );
+  assert.equal(reactivatedPro.status, "APPROVED");
+  assert.equal(professionalService.canProfessionalAcceptJobs(reactivatedPro).allowed, true);
 });
 
 test("Supabase Phone Auth - Indian Mobile Normalization & Auth Integration", async () => {
@@ -319,15 +322,28 @@ test("Supabase Phone Auth - Indian Mobile Normalization & Auth Integration", asy
   const masked = otpService.maskPhone(normalized);
   assert.equal(masked, "+91 ******9887");
 
-  // Send OTP via authService
-  const sendResult = await authService.sendPhoneOtp(phone);
-  assert.ok(sendResult, "sendPhoneOtp dispatched successfully");
+  // Phone OTP is temporarily disabled in favor of Google OAuth
+  await assert.rejects(
+    () => authService.sendPhoneOtp(phone),
+    /Phone OTP authentication is temporarily disabled/
+  );
+  await assert.rejects(
+    () => authService.verifyPhoneOtp(phone, "123456"),
+    /Phone OTP authentication is temporarily disabled/
+  );
 
-  // Verify OTP via authService
-  const verifyResult = await authService.verifyPhoneOtp(phone, "123456");
-  assert.ok(verifyResult, "verifyPhoneOtp completed");
-  assert.ok(verifyResult.data?.user, "User session created upon phone verification");
-  assert.equal(verifyResult.data?.user.phone, "+919830099887");
+  // Authoritative Google Profile Creation
+  const profile = await authService.ensureProfile(
+    {
+      id: "usr-google-test-01",
+      email: "pro.test@gmail.com",
+      user_metadata: { full_name: "Subir Ghosh", role: "professional" },
+    },
+    "professional"
+  );
+  assert.equal(profile.id, "usr-google-test-01");
+  assert.equal(profile.role, "professional");
+  assert.equal(profile.email, "pro.test@gmail.com");
 });
 
 test("Send SMS Hook - Webhook Signature Verification Algorithm", async () => {

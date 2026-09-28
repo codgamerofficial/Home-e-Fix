@@ -54,6 +54,14 @@ export const BOOKING_STATUS_CONFIG: Record<BookingStatus, StatusMeta> = {
     badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
     pillColor: "#F59E0B",
   },
+  PAYMENT_AUTHORIZED: {
+    label: "Payment Authorized",
+    description: "Payment pre-authorized and held in escrow",
+    icon: Clock,
+    variant: "secondary",
+    badgeClass: "bg-blue-50 text-blue-700 border-blue-200",
+    pillColor: "#3B82F6",
+  },
   PAYMENT_PROCESSING: {
     label: "Processing Payment",
     description: "Payment gateway verifying transaction",
@@ -77,6 +85,14 @@ export const BOOKING_STATUS_CONFIG: Record<BookingStatus, StatusMeta> = {
     variant: "secondary",
     badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
     pillColor: "#10B981",
+  },
+  SEARCHING_PROFESSIONAL: {
+    label: "Finding Professional",
+    description: "Locating highest-rated verified pro in your area",
+    icon: Clock,
+    variant: "accent",
+    badgeClass: "bg-orange-50 text-orange-700 border-orange-200 animate-pulse",
+    pillColor: "#FF6A00",
   },
   MATCHING: {
     label: "Matching Professional",
@@ -118,6 +134,14 @@ export const BOOKING_STATUS_CONFIG: Record<BookingStatus, StatusMeta> = {
     badgeClass: "bg-orange-50 text-orange-700 border-orange-200 animate-pulse",
     pillColor: "#FF6A00",
   },
+  PROFESSIONAL_EN_ROUTE: {
+    label: "On The Way",
+    description: "Professional dispatched and travelling to your home",
+    icon: Truck,
+    variant: "accent",
+    badgeClass: "bg-orange-50 text-orange-700 border-orange-200 animate-pulse",
+    pillColor: "#FF6A00",
+  },
   PROFESSIONAL_ARRIVED: {
     label: "Pro Arrived",
     description: "Professional arrived at customer doorstep",
@@ -133,6 +157,22 @@ export const BOOKING_STATUS_CONFIG: Record<BookingStatus, StatusMeta> = {
     variant: "secondary",
     badgeClass: "bg-sky-50 text-sky-700 border-sky-200",
     pillColor: "#0284C7",
+  },
+  SERVICE_PAUSED: {
+    label: "Service Paused",
+    description: "Work temporarily paused",
+    icon: Clock,
+    variant: "outline",
+    badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
+    pillColor: "#F59E0B",
+  },
+  NO_SHOW: {
+    label: "No Show",
+    description: "Party was unavailable during the scheduled window",
+    icon: XCircle,
+    variant: "destructive",
+    badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
+    pillColor: "#EF4444",
   },
   AWAITING_CUSTOMER_APPROVAL: {
     label: "Approval Needed",

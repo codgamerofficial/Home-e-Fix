@@ -118,7 +118,7 @@ const AUTHENTIC_HOMEPAGE_FAQS = [
   {
     question: "How can I become a professional?",
     answer:
-      "Skilled technicians can apply via the 'Become a Professional' link. Complete mobile OTP verification, upload KYC documents, specify your trade skills, and await admin approval.",
+      "Skilled technicians can apply via the 'Become a Professional' link. Sign in with Google, complete mobile verification, specify your trade skills and service areas, and await admin approval.",
   },
 ];
 

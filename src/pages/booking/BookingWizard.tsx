@@ -34,15 +34,15 @@ import { Input } from "@/components/ui/input";
 import { DatePicker } from "@/components/ui/date-picker";
 import { ProgressTimeline } from "@/components/ui/progress-timeline";
 import { ROUTES } from "@/constants/routes";
-import { POPULAR_SERVICES } from "@/constants/services";
 import { useCartStore } from "@/store/cart.store";
 import { useAuthStore } from "@/store/auth.store";
 import { useBookingDraftStore, type BookingItemDraft } from "@/store/booking.store";
 import { displayRazorpayCheckout } from "@/lib/razorpay";
 import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/date";
-import { dbRepository, DEFAULT_PRICING_CONFIG } from "@/services/db/repository";
-import { pricingEngine } from "@/services/marketplace/pricing.engine";
+import { useWalletStore } from "@/store/wallet.store";
+import { dbRepository, DEFAULT_PRICING_CONFIG, generateReference } from "@/services/db/repository";
+import { pricingEngine, createCommercialPricingSnapshot } from "@/services/marketplace/pricing.engine";
 import { serviceabilityEngine } from "@/services/marketplace/serviceability.engine";
 import { slotEngine } from "@/services/marketplace/slot.engine";
 import { paymentOrchestrator } from "@/lib/payments/orchestrator";
@@ -52,6 +52,10 @@ import { AddressFormModal } from "@/components/booking/AddressFormModal";
 import { bookingsApi } from "@/services/api/bookings.api";
 import { analyticsService } from "@/services/analytics/analytics.service";
 import { isServiceConfigured } from "@/config/env";
+import {
+  resolveCanonicalService,
+  findCanonicalVariant,
+} from "@/services/marketplace/canonicalService.service";
 import type { Address, AddressSnapshot } from "@/types/address.types";
 import type { ArchitecturalService, ServiceDiagnosticQuestion, QuestionOption } from "@/types/service-architecture.types";
 
@@ -60,8 +64,10 @@ export default function BookingWizard() {
   const { service: paramServiceSlug } = useParams<{ service?: string }>();
   const [searchParams] = useSearchParams();
   const fromCart = searchParams.get("fromCart") === "true";
+  const queryServiceId = searchParams.get("serviceId") || searchParams.get("service_id");
   const queryServiceSlug = searchParams.get("service");
-  const requestedServiceSlug = paramServiceSlug || queryServiceSlug;
+  const queryVariantId = searchParams.get("variantId") || searchParams.get("variant_id") || searchParams.get("packageId") || searchParams.get("package_id");
+  const requestedIdentifier = queryServiceId || paramServiceSlug || queryServiceSlug;
 
   const { items: cartItems, clearCart } = useCartStore();
   const { user } = useAuthStore();
@@ -76,89 +82,101 @@ export default function BookingWizard() {
 
   // Wizard Stage (0 to 5)
   const [currentStep, setCurrentStep] = useState<number>(0);
+  const [serviceNotFound, setServiceNotFound] = useState<boolean>(false);
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
 
   // Initialize booking draft:
-  // If requestedServiceSlug is present, strictly isolate to that single service.
-  // If fromCart=true, load all cartItems into draft.
-  // Otherwise, use existing draft, or fall back to cart items if any, or default service.
+  // 1. If requestedIdentifier is present, strictly resolve canonical service & variant (NO fallback to AC or cart).
+  // 2. If fromCart=true, load all cartItems into draft.
+  // 3. Otherwise use existing draft items if valid.
+  // 4. If invalid or missing, do NOT select a fallback service.
   useEffect(() => {
-    if (requestedServiceSlug) {
-      const match: any =
-        catalogueEngine.getServiceBySlug(requestedServiceSlug) ||
-        POPULAR_SERVICES.find((s) => s.slug === requestedServiceSlug);
+    setIsInitializing(true);
+    setServiceNotFound(false);
 
+    if (requestedIdentifier) {
+      const match = resolveCanonicalService(requestedIdentifier);
       if (match) {
-        setSingleServiceDraft(match, 1);
+        const variant = findCanonicalVariant(match, queryVariantId);
+        setSingleServiceDraft(match, 1, variant);
       } else {
-        setSingleServiceDraft(POPULAR_SERVICES[0], 1);
+        // Specified service ID/slug is invalid or inactive -> mark unavailable, NEVER fall back to Split AC!
+        setServiceNotFound(true);
       }
     } else if (fromCart && cartItems.length > 0) {
       setCartDraft(cartItems);
-    } else if (!draft || !draft.items || draft.items.length === 0) {
-      if (cartItems.length > 0) {
-        setCartDraft(cartItems);
-      } else {
-        setSingleServiceDraft(POPULAR_SERVICES[0], 1);
-      }
+    } else if (draft?.items && draft.items.length > 0) {
+      // Existing draft preserved across refresh
     }
-  }, [fromCart, requestedServiceSlug, cartItems.length]);
+    setIsInitializing(false);
+  }, [fromCart, requestedIdentifier, queryVariantId, cartItems.length]);
 
   const bookingItems: BookingItemDraft[] = useMemo(() => {
-    // If a direct service booking was requested via URL, strictly isolate calculation to it alone
-    if (requestedServiceSlug) {
-      const match: any =
-        catalogueEngine.getServiceBySlug(requestedServiceSlug) ||
-        POPULAR_SERVICES.find((s) => s.slug === requestedServiceSlug);
+    // 1. If a direct service booking was requested via URL, strictly isolate calculation to it alone
+    if (requestedIdentifier) {
+      const match = resolveCanonicalService(requestedIdentifier);
       if (match) {
+        const variant = findCanonicalVariant(match, queryVariantId);
         return [
           {
             serviceId: match.id,
             serviceSlug: match.slug,
             serviceName: match.name,
-            categorySlug: match.category?.slug || match.missionCategory || "electrical",
-            unitPrice: match.discountedPrice ?? match.basePrice ?? 499,
+            categorySlug: match.categorySlug,
+            variantId: variant.id,
+            variantName: variant.name,
+            variantDuration: variant.durationLabel,
+            packageId: variant.id,
+            packageName: variant.name,
+            unitPrice: variant.price,
             quantity: 1,
             quantityUnit: "unit",
-            pricingType: "fixed" as const,
-            materialsPolicy: "extra" as const,
-            warrantyDays: match.warrantyDays ?? 30,
-            duration: match.durationMinutes || match.duration || 45,
-            subtotal: match.discountedPrice ?? match.basePrice ?? 499,
+            pricingType: variant.pricingType || "fixed",
+            materialsPolicy: match.requiresMaterials ? "extra" : "included",
+            warrantyDays: variant.warrantyDays ?? match.warrantyDays ?? 0,
+            duration: variant.durationLabel || `${match.duration} mins`,
+            subtotal: variant.price,
+            thumbnail: match.thumbnail || match.imageUrl,
           },
         ];
       }
+      return []; // Invalid service -> empty list, triggers unavailable state
     }
 
+    // 2. If draft has items, use draft items
     if (draft?.items && draft.items.length > 0) {
       return draft.items;
     }
 
-    return [
-      {
-        serviceId: POPULAR_SERVICES[0].id,
-        serviceSlug: POPULAR_SERVICES[0].slug,
-        serviceName: POPULAR_SERVICES[0].name,
-        categorySlug: POPULAR_SERVICES[0].category.slug,
-        unitPrice: POPULAR_SERVICES[0].discountedPrice || POPULAR_SERVICES[0].basePrice,
-        quantity: 1,
-        quantityUnit: "unit",
-        pricingType: "fixed" as const,
-        materialsPolicy: "extra" as const,
-        warrantyDays: 30,
-        duration: (POPULAR_SERVICES[0] as any).durationMinutes || (POPULAR_SERVICES[0] as any).duration || 45,
-        subtotal: POPULAR_SERVICES[0].discountedPrice || POPULAR_SERVICES[0].basePrice,
-      },
-    ];
-  }, [draft?.items, requestedServiceSlug]);
+    // 3. Otherwise empty list (NEVER default to Split AC or any other service)
+    return [];
+  }, [draft?.items, requestedIdentifier, queryVariantId]);
 
   const primaryService = bookingItems[0];
-  const categorySlug = primaryService?.categorySlug || "ac";
+  const categorySlug = primaryService?.categorySlug || "electrical";
 
-  // Architectural Service lookup
+  // Service-specific diagnostic question mapping
   const architecturalService: ArchitecturalService = useMemo(() => {
-    const slug = primaryService?.serviceSlug || "";
+    const slug = (primaryService?.serviceSlug || "").toLowerCase();
+    const cat = (primaryService?.categorySlug || "").toLowerCase();
+
+    // 1. Exact slug lookup in architectural services
+    const match = catalogueEngine.getServiceBySlug(slug);
+    if (match) return match;
+
+    // 2. Category / keyword specific matching
+    if (cat.includes("elec") || slug.includes("switch") || slug.includes("socket") || slug.includes("fan")) {
+      const elecMatch = catalogueEngine.ARCHITECTURAL_SERVICES.find((s) => s.id === "srv-switch-replacement" || s.slug === "switch-socket-replacement");
+      if (elecMatch) return elecMatch;
+    }
+
+    if (cat.includes("ac") || slug.includes("ac")) {
+      const acMatch = catalogueEngine.ARCHITECTURAL_SERVICES.find((s) => s.id === "srv-ac-repair" || s.slug.includes("ac"));
+      if (acMatch) return acMatch;
+    }
+
+    // 3. Fallback to category architectural mission or default
     return (
-      catalogueEngine.getServiceBySlug(slug) ||
       catalogueEngine.ARCHITECTURAL_SERVICES.find(
         (s: ArchitecturalService) => s.missionCategory === categorySlug || s.slug.includes(categorySlug)
       ) ||
@@ -167,13 +185,15 @@ export default function BookingWizard() {
   }, [primaryService, categorySlug]);
 
   useEffect(() => {
-    analyticsService.trackEvent("booking_started", {
-      serviceSlug: primaryService?.serviceSlug,
-      serviceName: primaryService?.serviceName,
-      categorySlug,
-      isEmergency: isEmergencyRequested,
-    });
-  }, [primaryService?.serviceSlug]);
+    if (primaryService?.serviceSlug) {
+      analyticsService.trackEvent("booking_started", {
+        serviceSlug: primaryService.serviceSlug,
+        serviceName: primaryService.serviceName,
+        categorySlug,
+        isEmergency: isEmergencyRequested,
+      });
+    }
+  }, [primaryService?.serviceSlug, primaryService?.serviceName, categorySlug]);
 
   // Category-Specific Questions State
   const [questionAnswers, setQuestionAnswers] = useState<Record<string, string>>({
@@ -315,8 +335,9 @@ export default function BookingWizard() {
       isNightSlot,
       couponCode: couponNotice.valid ? couponCode : undefined,
       isPlusMember,
+      placeOfSupplyState: currentAddress?.state || "West Bengal",
     });
-  }, [bookingItems, baseLaborPrice, isEmergencyRequested, isNightSlot, couponCode, couponNotice, isPlusMember]);
+  }, [bookingItems, baseLaborPrice, isEmergencyRequested, isNightSlot, couponCode, couponNotice, isPlusMember, currentAddress?.state]);
 
   const handleApplyCoupon = (e: React.FormEvent) => {
     e.preventDefault();
@@ -370,10 +391,30 @@ export default function BookingWizard() {
         label: currentAddress.label || "HOME",
       };
 
-      const idempotencyKey = ensureIdempotencyKey();
+      if (paymentMethod === "wallet") {
+        const currentBalance = useWalletStore.getState().balance;
+        if (currentBalance < pricingBreakdown.totalPayableInr) {
+          setPaymentErrorNotice(
+            `Insufficient wallet balance (₹${currentBalance.toFixed(2)}). Total payable is ₹${pricingBreakdown.totalPayableInr.toFixed(2)}. Please add funds or choose another payment method.`
+          );
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      const commercialSnapshot = createCommercialPricingSnapshot(pricingBreakdown, {
+        serviceId: primaryService?.serviceId,
+        serviceName: primaryService?.serviceName,
+        variantId: primaryService?.variantId,
+        variantName: primaryService?.variantName,
+        packageId: primaryService?.packageId,
+        packageName: primaryService?.packageName,
+      });
+
+      const serverBookingNumber = generateReference("HEF");
 
       const createdBooking = await bookingsApi.createBooking({
-        bookingNumber: `HEF-${Date.now().toString().slice(-6)}`,
+        bookingNumber: serverBookingNumber,
         serviceId: primaryService.serviceId || (primaryService as any).id,
         serviceName: primaryService.serviceName || (primaryService as any).name,
         categorySlug: categorySlug,
@@ -393,13 +434,19 @@ export default function BookingWizard() {
         items: bookingItems.map((item) => ({
           serviceId: item.serviceId,
           serviceName: item.serviceName,
+          variantId: item.variantId,
+          variantName: item.variantName,
+          packageId: item.packageId,
+          packageName: item.packageName,
           unitPrice: item.unitPrice,
           quantity: item.quantity,
           pricingType: item.pricingType,
           materialsPolicy: item.materialsPolicy,
+          warrantyDays: item.warrantyDays,
+          duration: item.duration,
           subtotal: item.subtotal,
         })),
-        pricingSnapshot: pricingBreakdown,
+        pricingSnapshot: commercialSnapshot,
       });
 
       // If Razorpay online payment selected
@@ -486,8 +533,62 @@ export default function BookingWizard() {
     return titles;
   }, [isPaymentGatewayConfigured]);
 
+  if (isInitializing) {
+    return (
+      <div className="container-app py-16 max-w-xl mx-auto text-center space-y-4">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-accent" />
+        <h2 className="text-lg font-bold text-primary">Loading service details...</h2>
+        <p className="text-xs text-foreground-secondary">
+          Validating canonical service configuration and pricing
+        </p>
+      </div>
+    );
+  }
+
+  if (serviceNotFound) {
+    return (
+      <div className="container-app py-16 max-w-xl mx-auto text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-primary">This service is no longer available.</h2>
+        <p className="text-sm text-foreground-secondary">
+          The service you requested could not be found or is currently inactive. Please browse our active service catalogue.
+        </p>
+        <div className="pt-2">
+          <Button variant="accent" asChild className="gap-2 font-bold">
+            <Link to="/services">
+              <ArrowLeft className="w-4 h-4" /> Browse Services
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (bookingItems.length === 0) {
+    return (
+      <div className="container-app py-16 max-w-xl mx-auto text-center space-y-4">
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
+          <Sparkles className="w-8 h-8 text-accent" />
+        </div>
+        <h2 className="text-xl font-bold text-primary">Select a service to continue.</h2>
+        <p className="text-sm text-foreground-secondary">
+          Please select a service or package from our catalogue to book verified professional assistance.
+        </p>
+        <div className="pt-2">
+          <Button variant="accent" asChild className="gap-2 font-bold">
+            <Link to="/services">
+              <ArrowLeft className="w-4 h-4" /> Browse Services
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container-app py-5 sm:py-8 pb-32 lg:pb-12 max-w-4xl space-y-5 sm:space-y-8">
+    <div className="container-app py-5 sm:py-8 pb-32 lg:pb-12 max-w-6xl w-full space-y-5 sm:space-y-8">
       {/* Mobile Top Step Indicator Bar (< sm) */}
       <div className="sm:hidden space-y-2.5">
         <div className="flex items-center justify-between">
@@ -574,31 +675,64 @@ export default function BookingWizard() {
               </h2>
 
               {bookingItems.length === 1 ? (
-                <div className="flex items-start justify-between p-4 rounded-2xl bg-muted/40 border border-border">
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-sm text-primary">{primaryService.serviceName}</h3>
-                    <p className="text-xs text-foreground-secondary">
-                      Service appointment
-                    </p>
-                    <div className="flex items-center gap-2 pt-2 text-[11px] text-foreground-muted flex-wrap">
-                      <span>⏱️ {primaryService?.duration ? `${primaryService.duration} mins` : (architecturalService as any)?.estimatedTime || "30-45 mins"}</span>
-                      {Boolean(primaryService?.materialsPolicy === "extra" || (architecturalService as any)?.requiresMaterials) && (
-                        <>
-                          <span>•</span>
-                          <span>Labour Charge (Parts extra if needed)</span>
-                        </>
+                <div className="p-5 rounded-2xl bg-muted/40 border border-border space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3.5">
+                      {primaryService.thumbnail ? (
+                        <img
+                          src={primaryService.thumbnail}
+                          alt={primaryService.serviceName}
+                          className="w-16 h-16 rounded-xl object-cover border border-border shrink-0"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                          <Sparkles className="h-7 w-7" />
+                        </div>
                       )}
-                      {Boolean(primaryService?.warrantyDays && primaryService.warrantyDays > 0) && (
-                        <>
-                          <span>•</span>
-                          <span className="text-success font-bold">🛡️ {primaryService.warrantyDays}-Day Warranty</span>
-                        </>
-                      )}
+                      <div className="space-y-1">
+                        <div className="text-[11px] font-bold text-accent uppercase tracking-wider">
+                          Selected Service
+                        </div>
+                        <h3 className="font-bold text-base text-primary leading-tight">
+                          {primaryService.serviceName}
+                        </h3>
+                        <div className="text-xs text-foreground-secondary font-medium">
+                          Selected Package:{" "}
+                          <span className="font-bold text-primary">
+                            {primaryService.variantName || primaryService.packageName || "Standard Service"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-[10px] uppercase font-bold text-foreground-muted">Package Rate</div>
+                      <span className="font-mono font-extrabold text-xl text-[#FF6A00]">
+                        {formatCurrency(primaryService.unitPrice * primaryService.quantity)}
+                      </span>
                     </div>
                   </div>
-                  <span className="font-mono font-bold text-lg text-[#FF6A00]">
-                    {formatCurrency(primaryService.unitPrice * primaryService.quantity)}
-                  </span>
+
+                  <div className="flex items-center gap-2 pt-3 border-t border-border/60 text-xs text-foreground-muted flex-wrap">
+                    <span className="flex items-center gap-1 font-medium text-foreground-secondary">
+                      <Clock className="h-3.5 w-3.5 text-accent" />
+                      {primaryService?.variantDuration || primaryService?.duration || "30–45 mins"}
+                    </span>
+                    <span>•</span>
+                    <span>
+                      {primaryService?.materialsPolicy === "extra"
+                        ? "Labour included (Parts/materials charged according to applicable pricing policy)"
+                        : "Labour included"}
+                    </span>
+                    {Boolean(primaryService?.warrantyDays && primaryService.warrantyDays > 0) && (
+                      <>
+                        <span>•</span>
+                        <span className="text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-1">
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          {primaryService.warrantyDays}-Day Warranty
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3 p-4 rounded-2xl bg-muted/40 border border-border">
@@ -1206,7 +1340,11 @@ export default function BookingWizard() {
               <p className="font-bold text-primary">Home-e-Fix Service Standards:</p>
               <p>• Transparent pricing with itemized bill breakdown</p>
               <p>• Verified booking confirmation and dedicated support</p>
-              <p>• 30-day workmanship re-work guarantee on completed repairs</p>
+              {primaryService?.warrantyDays && primaryService.warrantyDays > 0 ? (
+                <p>• {primaryService.warrantyDays}-day workmanship rework guarantee</p>
+              ) : (
+                <p>• Standard post-service support & complaint resolution</p>
+              )}
             </div>
           </div>
         </div>
@@ -1334,7 +1472,7 @@ export default function BookingWizard() {
 
               <div className="space-y-3 text-xs text-foreground-secondary">
                 <div className="flex justify-between">
-                  <span>Base Service Labour ({primaryService.serviceName})</span>
+                  <span>Base Service Labour ({primaryService?.serviceName || "Service"})</span>
                   <span className="font-mono text-primary font-bold">{formatCurrency(pricingBreakdown.baseAmount)}</span>
                 </div>
 

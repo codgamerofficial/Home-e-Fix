@@ -24,7 +24,9 @@ interface AuthStore {
   hasRole: (role: UserRole) => boolean;
   isCustomer: () => boolean;
   isTechnician: () => boolean;
+  isProfessional: () => boolean;
   isAdmin: () => boolean;
+  isSuperAdmin: () => boolean;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -37,7 +39,6 @@ export const useAuthStore = create<AuthStore>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
-
       // Actions
       setUser: (user) => set({ user, isAuthenticated: true }),
 
@@ -76,8 +77,10 @@ export const useAuthStore = create<AuthStore>()(
       // Computed helpers
       hasRole: (role) => get().user?.role === role,
       isCustomer: () => get().user?.role === "customer",
-      isTechnician: () => get().user?.role === "technician",
-      isAdmin: () => get().user?.role === "admin",
+      isTechnician: () => get().user?.role === "technician" || get().user?.role === "professional",
+      isProfessional: () => get().user?.role === "professional" || get().user?.role === "technician",
+      isAdmin: () => get().user?.role === "admin" || get().user?.role === "super_admin",
+      isSuperAdmin: () => get().user?.role === "super_admin",
     }),
     {
       name: "homeefix-auth",

@@ -8,6 +8,7 @@ import type {
 } from "./otp.types";
 import { DevelopmentOtpProvider, hashOtp } from "./developmentOtpProvider";
 import { ProductionOtpProvider } from "./productionOtpProvider";
+import { normalizeIndianPhone, validateIndianPhone, type PhoneNormalizationResult } from "@/lib/phone";
 
 export class OtpService {
   private provider: IOtpProvider;
@@ -42,31 +43,14 @@ export class OtpService {
    * Validates that the number has exactly 10 digits starting with 6, 7, 8, or 9.
    */
   normalizeIndianPhone(input: string): string {
-    if (!input || typeof input !== "string") {
-      throw new Error("Please enter a valid mobile number.");
-    }
+    return normalizeIndianPhone(input);
+  }
 
-    // Strip everything except digits
-    let digits = input.replace(/\D/g, "");
-
-    // If starts with country code 91 and has 12 digits, strip 91
-    if (digits.length === 12 && digits.startsWith("91")) {
-      digits = digits.slice(2);
-    } else if (digits.length === 11 && digits.startsWith("0")) {
-      // Strip leading 0
-      digits = digits.slice(1);
-    }
-
-    // Validate 10-digit format starting with Indian mobile prefixes (6, 7, 8, 9)
-    if (digits.length !== 10) {
-      throw new Error("Mobile number must be exactly 10 digits.");
-    }
-
-    if (!/^[6-9][0-9]{9}$/.test(digits)) {
-      throw new Error("Please enter a valid Indian mobile number starting with 6, 7, 8, or 9.");
-    }
-
-    return `+91${digits}`;
+  /**
+   * Validates and returns structured result { valid, e164, reason }
+   */
+  validateIndianPhone(input: string): PhoneNormalizationResult {
+    return validateIndianPhone(input);
   }
 
   /**

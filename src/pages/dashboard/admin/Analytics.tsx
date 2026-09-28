@@ -162,7 +162,7 @@ export default function Analytics() {
             {analytics.verifiedPros}
           </div>
           <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-600">
-            <ShieldCheck className="h-3.5 w-3.5" /> 100% KYC Approved Pros
+            <ShieldCheck className="h-3.5 w-3.5" /> Home-e-Fix Verified Partners
           </div>
         </Card>
 

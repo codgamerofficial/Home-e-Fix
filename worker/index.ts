@@ -19,11 +19,20 @@ export interface Env {
   RAZORPAY_WEBHOOK_SECRET?: string;
   SUPABASE_URL?: string;
   SUPABASE_SECRET_KEY?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
+  SUPABASE_ANON_KEY?: string;
+  OTP_RESEND_COOLDOWN_SECONDS?: string;
+  OTP_MAX_REQUESTS_PER_HOUR?: string;
+  TWOFACTOR_API_KEY?: string;
+  TWOFACTOR_TEMPLATE_ID?: string;
+  TWOFACTOR_SENDER_ID?: string;
   TURNSTILE_SECRET?: string;
   TURNSTILE_SECRET_KEY?: string;
   TURNSTILE_HOSTNAMES?: string;
   ALLOWED_ORIGINS?: string;
 }
+
+import { handleRequestOtp } from "../cloudflare/home-e-fix-auth/src/routes/requestOtp";
 
 // In-memory idempotency and rate limiting caches (Worker instance lifecycle)
 const PROCESSED_WEBHOOK_IDS = new Set<string>();
@@ -187,15 +196,30 @@ export default {
 
     // ── API ROUTES ──
     if (pathname.startsWith("/api/")) {
-      // 1. Health check
-      if (pathname === "/api/system/health" && request.method === "GET") {
+      // 0. Canonical Production Health Check
+      if ((pathname === "/api/health" || pathname === "/api/system/health") && request.method === "GET") {
         return jsonResponse({
+          ok: true,
           status: "healthy",
+          service: "home-e-fix-auth",
           timestamp: new Date().toISOString(),
           edge: "cloudflare-workers",
           environment: env.ENVIRONMENT || "production",
-          otpMode: env.OTP_PROVIDER_MODE || "development",
+          dependencies: {
+            turnstile: (env.TURNSTILE_SECRET || env.TURNSTILE_SECRET_KEY) ? "configured" : "unconfigured",
+            supabase: env.SUPABASE_URL ? "configured" : "unconfigured",
+            smsProvider: (env.TWOFACTOR_API_KEY || env.SMS_GATEWAY_URL) ? "configured" : "development_fallback",
+          },
         }, 200, safeOrigin);
+      }
+
+      // 0.1 Request OTP Endpoint (Temporarily Disabled in favor of Google OAuth)
+      if (pathname === "/api/auth/request-otp" && (request.method === "POST" || request.method === "GET")) {
+        return jsonResponse({
+          success: false,
+          code: "PHONE_OTP_DISABLED",
+          error: "Phone OTP authentication is temporarily disabled in favor of Google OAuth. Please use Google Sign-In.",
+        }, 410, safeOrigin);
       }
 
       // 2. Integrations Status (Masked)
@@ -817,6 +841,119 @@ export default {
         return jsonResponse({
           reply: `Thank you for contacting Home-e-Fix! For ${category || "home services"}, our verified technicians in Kolkata carry calibrated tools and offer a 30-day workmanship warranty. Standard visits start at ₹199, and emergency dispatches arrive within 2 hours subject to zone capacity.`,
         }, 200, safeOrigin);
+      }
+
+      // 10. Private KYC Signed Upload URL Generator
+      if (pathname === "/api/kyc/upload-url" && request.method === "POST") {
+        const supabaseUrl = env.SUPABASE_URL;
+        const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY;
+
+        if (!supabaseUrl || !serviceRoleKey) {
+          return jsonResponse({ error: "Storage service is temporarily unavailable." }, 503, safeOrigin);
+        }
+
+        let body: any = {};
+        try {
+          body = await request.json();
+        } catch {
+          return jsonResponse({ error: "Invalid JSON request payload." }, 400, safeOrigin);
+        }
+
+        const { docType, fileName, fileSize, mimeType, userId: clientUserId } = body;
+        const ALLOWED_MIME_TYPES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+        const ALLOWED_EXTENSIONS = new Set(["pdf", "jpg", "jpeg", "png", "webp"]);
+        const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+
+        if (!fileSize || typeof fileSize !== "number" || fileSize > MAX_FILE_SIZE_BYTES) {
+          return jsonResponse({ error: "File size must be 10 MB or less." }, 400, safeOrigin);
+        }
+
+        if (!mimeType || !ALLOWED_MIME_TYPES.has(mimeType)) {
+          return jsonResponse({ error: "Please upload a PDF, JPG, JPEG, PNG, or WEBP file." }, 400, safeOrigin);
+        }
+
+        const rawExt = typeof fileName === "string" ? fileName.split(".").pop()?.toLowerCase() : "";
+        if (!rawExt || !ALLOWED_EXTENSIONS.has(rawExt)) {
+          return jsonResponse({ error: "Invalid file extension. Allowed formats: .pdf, .jpg, .jpeg, .png, .webp" }, 400, safeOrigin);
+        }
+
+        const authHeader = request.headers.get("authorization") || "";
+        const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+        let authenticatedUserId: string | null = null;
+
+        if (token) {
+          try {
+            const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
+              headers: {
+                apikey: serviceRoleKey,
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            if (userRes.ok) {
+              const uData: any = await userRes.json();
+              authenticatedUserId = uData?.id || null;
+            }
+          } catch {
+            // fallback
+          }
+        }
+
+        const finalUserId = authenticatedUserId || clientUserId;
+        if (!finalUserId) {
+          return jsonResponse({ error: "Please sign in before uploading your documents." }, 401, safeOrigin);
+        }
+
+        const CATEGORY_MAP: Record<string, string> = {
+          IDENTITY_DOCUMENT: "government-id",
+          identity_document: "government-id",
+          BANK_DOCUMENT: "bank-proof",
+          bank_document: "bank-proof",
+          SKILL_CERTIFICATE: "certification",
+          skill_certificate: "certification",
+          PROFESSIONAL_CERTIFICATE: "certification",
+          professional_certificate: "certification",
+          PROFILE_PHOTO: "profile-photo",
+          profile_photo: "profile-photo",
+        };
+        const folder = CATEGORY_MAP[docType] || "documents";
+        const uniqueId = `doc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        const storagePath = `${finalUserId}/${folder}/${uniqueId}.${rawExt}`;
+
+        try {
+          const signRes = await fetch(
+            `${supabaseUrl}/storage/v1/object/upload/sign/professional-kyc/${storagePath}`,
+            {
+              method: "POST",
+              headers: {
+                apikey: serviceRoleKey,
+                Authorization: `Bearer ${serviceRoleKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ upsert: true }),
+            }
+          );
+
+          if (!signRes.ok) {
+            const errText = await signRes.text();
+            logError("kyc_sign_error", { errText });
+            return jsonResponse({ error: "We couldn't initialize document upload right now. Please try again." }, 500, safeOrigin);
+          }
+
+          const signData: any = await signRes.json();
+          const signedUrl = `${supabaseUrl}/storage/v1${signData.url}`;
+          const tokenMatch = signedUrl.match(/[?&]token=([^&]+)/);
+          const uploadToken = tokenMatch ? tokenMatch[1] : "";
+
+          return jsonResponse({
+            success: true,
+            storagePath,
+            signedUrl,
+            token: uploadToken,
+          }, 200, safeOrigin);
+        } catch (err: any) {
+          logError("kyc_upload_exception", { error: err.message });
+          return jsonResponse({ error: "Failed to generate upload URL. Please try again." }, 500, safeOrigin);
+        }
       }
 
       return jsonResponse({ error: `Endpoint ${pathname} not found on edge worker` }, 404, safeOrigin);

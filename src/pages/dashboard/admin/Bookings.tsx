@@ -21,6 +21,7 @@ import { formatCurrency } from "@/lib/currency";
 import { formatDate } from "@/lib/date";
 import { getStatusConfig } from "@/lib/status";
 import { ROUTES } from "@/constants/routes";
+import { subscribeToBookingSync } from "@/services/realtime/sync";
 
 export default function Bookings() {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -46,6 +47,10 @@ export default function Bookings() {
 
   useEffect(() => {
     loadData();
+    const unsub = subscribeToBookingSync("*", () => {
+      loadData();
+    });
+    return () => unsub();
   }, []);
 
   const handleReassignSubmit = (e: React.FormEvent) => {

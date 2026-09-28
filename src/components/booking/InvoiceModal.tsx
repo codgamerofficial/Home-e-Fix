@@ -1,6 +1,6 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Printer, ShieldCheck, CheckCircle2, FileText, Download } from "lucide-react";
+import { X, Printer, ShieldCheck, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Logo } from "@/components/shared/Logo";
@@ -19,7 +19,6 @@ export function InvoiceModal({ isOpen, onClose, bookingData }: InvoiceModalProps
 
   const {
     bookingNumber,
-    status,
     service,
     customer,
     addressSnapshot,
@@ -34,9 +33,23 @@ export function InvoiceModal({ isOpen, onClose, bookingData }: InvoiceModalProps
     window.print();
   };
 
-  const invoiceNumber = invoice?.invoiceNumber || `HEF-INV-2026-${bookingNumber.replace(/[^0-9A-Z]/gi, "").slice(-6)}`;
-  const sacCode = "998719"; // Maintenance and repair services of domestic electrical/plumbing appliances
-  const gstin = invoice?.gstinBusiness || "19AABCH1234F1Z5";
+  const invoiceNumber = invoice?.invoiceNumber || `HEF-REC-2627-${bookingNumber.replace(/[^0-9A-Z]/gi, "").slice(-6)}`;
+  const sacCode = invoice?.sacCode || "998719";
+  const isTaxInvoice = invoice?.documentType === "TAX_INVOICE";
+  const documentTitle = invoice?.documentTitle || (isTaxInvoice ? "GST Tax Invoice" : "Booking & Payment Receipt");
+  const badgeLabel = invoice?.isGstApplicable && isTaxInvoice ? "TAX INVOICE" : "BOOKING RECEIPT";
+  const gstin = invoice?.gstinBusiness || null;
+
+  // Breakdown values strictly from authoritative record
+  const subtotal = invoice?.subtotal ?? service.subtotal;
+  const safetyFee = invoice?.safetyFee ?? service.safetyFee;
+  const discount = invoice?.discountAmount ?? service.discount;
+  const taxableValue = invoice?.taxableAmount ?? Math.max(0, subtotal - discount + safetyFee);
+  const isGstApplicable = Boolean(invoice?.isGstApplicable);
+  const cgstAmount = invoice?.cgstAmount ?? 0;
+  const sgstAmount = invoice?.sgstAmount ?? 0;
+  const igstAmount = invoice?.igstAmount ?? 0;
+  const totalAmount = invoice?.totalAmount ?? payment.totalPayable;
 
   return (
     <AnimatePresence>
@@ -53,7 +66,7 @@ export function InvoiceModal({ isOpen, onClose, bookingData }: InvoiceModalProps
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-[#FF6A00]" />
               <span className="font-heading font-bold text-sm text-slate-900">
-                GST Tax Invoice — {invoiceNumber}
+                {documentTitle} — {invoiceNumber}
               </span>
             </div>
             <div className="flex items-center gap-2">
@@ -89,16 +102,31 @@ export function InvoiceModal({ isOpen, onClose, bookingData }: InvoiceModalProps
                 <div className="text-[11px] text-slate-600 leading-relaxed max-w-xs">
                   <p className="font-semibold text-slate-800">Home-e-Fix Technologies India Pvt Ltd</p>
                   <p>Sector V, Salt Lake, Kolkata, West Bengal – 700091</p>
-                  <p className="font-mono">GSTIN: {gstin} • West Bengal (19)</p>
+                  {gstin ? (
+                    <p className="font-mono font-semibold text-slate-800">
+                      GSTIN: {gstin} • West Bengal (19)
+                    </p>
+                  ) : (
+                    <p className="text-slate-500">
+                      Service Category: Domestic Appliances & Electrical • West Bengal (19)
+                    </p>
+                  )}
                 </div>
               </div>
 
               <div className="sm:text-right space-y-1">
-                <Badge variant="outline" className="text-xs font-bold text-emerald-800 bg-emerald-50 border-emerald-300">
-                  TAX INVOICE
+                <Badge
+                  variant="outline"
+                  className={`text-xs font-bold ${
+                    isTaxInvoice
+                      ? "text-emerald-800 bg-emerald-50 border-emerald-300"
+                      : "text-blue-800 bg-blue-50 border-blue-300"
+                  }`}
+                >
+                  {badgeLabel}
                 </Badge>
                 <div className="pt-1">
-                  <div className="text-[10px] uppercase font-bold text-slate-500">Invoice Number</div>
+                  <div className="text-[10px] uppercase font-bold text-slate-500">Document Number</div>
                   <div className="font-mono font-bold text-sm text-slate-900">{invoiceNumber}</div>
                 </div>
                 <div>
@@ -123,8 +151,18 @@ export function InvoiceModal({ isOpen, onClose, bookingData }: InvoiceModalProps
                 {customer.email && <p className="text-slate-600">Email: {customer.email}</p>}
                 <div className="mt-1.5 pt-1.5 border-t border-slate-100 text-slate-700 leading-snug">
                   <span className="font-semibold text-slate-800 block text-[11px]">Service Location:</span>
-                  <p>{addressSnapshot.houseFlatFloor && `${addressSnapshot.houseFlatFloor}, `}{addressSnapshot.buildingSocietyName && `${addressSnapshot.buildingSocietyName}, `}{addressSnapshot.streetRoadName}</p>
-                  <p>{addressSnapshot.areaLocality && `${addressSnapshot.areaLocality}, `}{addressSnapshot.city}, {addressSnapshot.state} – {addressSnapshot.pincode}</p>
+                  <p>
+                    {addressSnapshot.houseFlatFloor && `${addressSnapshot.houseFlatFloor}, `}
+                    {addressSnapshot.buildingSocietyName && `${addressSnapshot.buildingSocietyName}, `}
+                    {addressSnapshot.streetRoadName}
+                  </p>
+                  <p>
+                    {addressSnapshot.areaLocality && `${addressSnapshot.areaLocality}, `}
+                    {addressSnapshot.city}, {addressSnapshot.state} – {addressSnapshot.pincode}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Place of Supply: {invoice?.placeOfSupply || "West Bengal (19)"}
+                  </p>
                 </div>
               </div>
 
@@ -163,37 +201,65 @@ export function InvoiceModal({ isOpen, onClose, bookingData }: InvoiceModalProps
                       <div className="text-[11px] text-slate-500">Professional labor, tools, diagnosis and workmanship</div>
                     </td>
                     <td className="py-3 text-center font-mono text-slate-500">{sacCode}</td>
-                    <td className="py-3 text-right font-medium text-slate-900">{formatCurrency(service.subtotal)}</td>
+                    <td className="py-3 text-right font-medium text-slate-900">{formatCurrency(subtotal)}</td>
                   </tr>
 
-                  <tr>
-                    <td className="py-2.5 font-medium text-slate-900">
-                      <div>Safety, Sanitation & Operational Platform Fee</div>
-                      <div className="text-[11px] text-slate-500">Background verification, insurance & customer safety standards</div>
-                    </td>
-                    <td className="py-2.5 text-center font-mono text-slate-500">{sacCode}</td>
-                    <td className="py-2.5 text-right font-medium text-slate-900">{formatCurrency(service.safetyFee)}</td>
-                  </tr>
-
-                  {service.discount > 0 && (
-                    <tr className="text-emerald-700 font-medium">
-                      <td className="py-2">Promotional Voucher / Member Discount</td>
-                      <td className="py-2 text-center font-mono">—</td>
-                      <td className="py-2 text-right">-{formatCurrency(service.discount)}</td>
+                  {safetyFee > 0 && (
+                    <tr>
+                      <td className="py-2.5 font-medium text-slate-900">
+                        <div>Safety, Sanitation & Operational Platform Fee</div>
+                        <div className="text-[11px] text-slate-500">Background verification, insurance & customer safety standards</div>
+                      </td>
+                      <td className="py-2.5 text-center font-mono text-slate-500">{sacCode}</td>
+                      <td className="py-2.5 text-right font-medium text-slate-900">{formatCurrency(safetyFee)}</td>
                     </tr>
                   )}
 
-                  <tr>
-                    <td className="py-2 text-slate-600">Central GST (CGST 9%)</td>
+                  {discount > 0 && (
+                    <tr className="text-emerald-700 font-medium">
+                      <td className="py-2">Promotional Voucher / Member Discount</td>
+                      <td className="py-2 text-center font-mono">—</td>
+                      <td className="py-2 text-right">-{formatCurrency(discount)}</td>
+                    </tr>
+                  )}
+
+                  <tr className="bg-slate-50/60 font-semibold text-slate-800">
+                    <td className="py-2">Net Taxable Value</td>
                     <td className="py-2 text-center font-mono text-slate-400">—</td>
-                    <td className="py-2 text-right text-slate-700">{formatCurrency(Math.round(service.taxGst / 2))}</td>
+                    <td className="py-2 text-right">{formatCurrency(taxableValue)}</td>
                   </tr>
 
-                  <tr>
-                    <td className="py-2 text-slate-600">State GST (SGST 9% – West Bengal)</td>
-                    <td className="py-2 text-center font-mono text-slate-400">—</td>
-                    <td className="py-2 text-right text-slate-700">{formatCurrency(Math.round(service.taxGst / 2))}</td>
-                  </tr>
+                  {isGstApplicable ? (
+                    <>
+                      {cgstAmount > 0 && (
+                        <tr>
+                          <td className="py-2 text-slate-600">Central GST (CGST 9%)</td>
+                          <td className="py-2 text-center font-mono text-slate-400">—</td>
+                          <td className="py-2 text-right text-slate-700">{formatCurrency(cgstAmount)}</td>
+                        </tr>
+                      )}
+                      {sgstAmount > 0 && (
+                        <tr>
+                          <td className="py-2 text-slate-600">State GST (SGST 9% – West Bengal)</td>
+                          <td className="py-2 text-center font-mono text-slate-400">—</td>
+                          <td className="py-2 text-right text-slate-700">{formatCurrency(sgstAmount)}</td>
+                        </tr>
+                      )}
+                      {igstAmount > 0 && (
+                        <tr>
+                          <td className="py-2 text-slate-600">Integrated GST (IGST 18%)</td>
+                          <td className="py-2 text-center font-mono text-slate-400">—</td>
+                          <td className="py-2 text-right text-slate-700">{formatCurrency(igstAmount)}</td>
+                        </tr>
+                      )}
+                    </>
+                  ) : (
+                    <tr>
+                      <td className="py-2 text-slate-500 italic">GST Taxes (Not Applicable)</td>
+                      <td className="py-2 text-center font-mono text-slate-400">—</td>
+                      <td className="py-2 text-right text-slate-500">₹0.00</td>
+                    </tr>
+                  )}
                 </tbody>
 
                 <tfoot>
@@ -202,7 +268,7 @@ export function InvoiceModal({ isOpen, onClose, bookingData }: InvoiceModalProps
                       Total Invoice Amount (INR):
                     </td>
                     <td className="py-3.5 text-right text-base text-primary font-mono font-bold">
-                      {formatCurrency(payment.totalPayable)}
+                      {formatCurrency(totalAmount)}
                     </td>
                   </tr>
                 </tfoot>
@@ -219,7 +285,7 @@ export function InvoiceModal({ isOpen, onClose, bookingData }: InvoiceModalProps
                 • This service is backed by the Home-e-Fix 30-Day Workmanship Assurance guarantee across Kolkata. Any service dissatisfaction or rework required will be inspected and corrected at zero labor cost within the warranty window.
               </p>
               <p className="text-[10px] leading-relaxed text-slate-500">
-                • This is a computer-generated tax invoice issued in accordance with Section 31 of the CGST Act, 2017. Physical signature is not required.
+                • This is a computer-generated {isTaxInvoice ? "tax invoice issued in accordance with Section 31 of the CGST Act, 2017" : "commercial booking and payment receipt"}. Physical signature is not required.
               </p>
             </div>
           </div>
@@ -235,7 +301,7 @@ export function InvoiceModal({ isOpen, onClose, bookingData }: InvoiceModalProps
               onClick={handlePrint}
               className="gap-2 font-bold bg-[#FF6A00] hover:bg-[#E55F00] text-white"
             >
-              <Download className="h-4 w-4" /> Download / Print Tax Invoice
+              <Download className="h-4 w-4" /> Download / Print {isTaxInvoice ? "Tax Invoice" : "Receipt"}
             </Button>
           </div>
         </motion.div>

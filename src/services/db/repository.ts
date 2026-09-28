@@ -14,6 +14,7 @@ import { warrantyEngine } from "@/services/marketplace/warranty.engine";
 import { invoiceEngine } from "@/services/marketplace/invoice.engine";
 import type { KYCStatus, BookingStatus } from "@/types/database.types";
 import { SERVICE_CATEGORIES, CATEGORY_SERVICES_MAP } from "@/constants/services";
+import { broadcastBookingEvent } from "@/services/realtime/sync";
 
 const STORAGE_KEY_PREFIX = "homeefix_db_v2_";
 
@@ -93,8 +94,26 @@ export interface BookingAssignment {
   payoutAmount: number;
   status: "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED";
   assignmentExpiresAt: string; // ISO UTC
+  assignedProfessionalId?: string;
+  assignedProfessionalName?: string;
   declineReason?: string;
   isDevSeed?: boolean;
+}
+
+export interface PaymentTransactionRecord {
+  payment_id: string;
+  booking_id: string;
+  booking_number: string;
+  customer_id: string;
+  provider: string;
+  method: string;
+  amount: number;
+  currency: string;
+  status: "INITIATED" | "AUTHORIZED" | "CAPTURED" | "PAID" | "PENDING" | "FAILED" | "REFUNDED" | "PARTIALLY_REFUNDED";
+  provider_reference: string;
+  created_at: string;
+  captured_at?: string;
+  refunded_amount: number;
 }
 
 export type VisitFeePolicy = "waived_on_service" | "charged_on_decline" | "fixed" | "free";
@@ -351,7 +370,7 @@ export const dbRepository = {
   },
 
   initializeIfEmpty(): void {
-    const existing = localStorage.getItem(STORAGE_KEY_PREFIX + "bookings");
+    const existing = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY_PREFIX + "bookings") : null;
     if (!existing) {
       if (this.isDevSeedEnabled()) {
         const { devBookings, devAssignments, devPros, devInvoices } = createInitialDevSeeds();
@@ -400,6 +419,19 @@ export const dbRepository = {
 
   getBookingByReference(ref: string): any | null {
     return this.getBookingById(ref);
+  },
+
+  recordPaymentTransaction(record: PaymentTransactionRecord): PaymentTransactionRecord {
+    const all = getStored<PaymentTransactionRecord[]>("payment_transactions", []);
+    all.unshift(record);
+    setStored("payment_transactions", all);
+    return record;
+  },
+
+  getPaymentTransactions(bookingId?: string): PaymentTransactionRecord[] {
+    const all = getStored<PaymentTransactionRecord[]>("payment_transactions", []);
+    if (!bookingId) return all;
+    return all.filter((t) => t.booking_id === bookingId || t.booking_number === bookingId);
   },
 
   createBooking(payload: {
@@ -462,6 +494,63 @@ export const dbRepository = {
           },
         ];
 
+    const methodUpper = (payload.paymentMethod || "COD").toUpperCase();
+    let paymentStatus: "PAID" | "PENDING" | "AUTHORIZED" = "PENDING";
+
+    if (methodUpper === "WALLET") {
+      try {
+        if (typeof localStorage !== "undefined") {
+          const rawWallet = localStorage.getItem("homeefix-wallet-storage");
+          if (rawWallet) {
+            const parsed = JSON.parse(rawWallet);
+            const currentBal = parsed?.state?.balance ?? 0;
+            if (currentBal < payload.totalAmount) {
+              throw new Error(
+                `Insufficient wallet balance (₹${currentBal.toFixed(2)}). Total payable is ₹${payload.totalAmount.toFixed(2)}.`
+              );
+            }
+            parsed.state.balance = currentBal - payload.totalAmount;
+            const newTx = {
+              id: `tx-${Date.now()}`,
+              type: "debit",
+              amount: payload.totalAmount,
+              title: `Payment for Booking ${bookingNumber}`,
+              date: formatDate(nowIso()),
+              status: "success",
+            };
+            parsed.state.transactions = [newTx, ...(parsed.state.transactions || [])];
+            localStorage.setItem("homeefix-wallet-storage", JSON.stringify(parsed));
+            paymentStatus = "PAID";
+          } else {
+            paymentStatus = "PAID";
+          }
+        }
+      } catch (err: any) {
+        if (err.message?.includes("Insufficient wallet balance")) {
+          throw err;
+        }
+      }
+    } else if (methodUpper === "RAZORPAY" || methodUpper === "ONLINE") {
+      paymentStatus = "PAID";
+    }
+
+    const paymentTx: PaymentTransactionRecord = {
+      payment_id: generateReference("PAY"),
+      booking_id: id,
+      booking_number: bookingNumber,
+      customer_id: payload.customerId || "usr-current",
+      provider: methodUpper === "WALLET" ? "WALLET" : methodUpper === "CASH" ? "CASH_ON_DELIVERY" : "RAZORPAY",
+      method: methodUpper,
+      amount: payload.totalAmount,
+      currency: "INR",
+      status: paymentStatus,
+      provider_reference: generateReference("TXN"),
+      created_at: nowIso(),
+      captured_at: paymentStatus === "PAID" ? nowIso() : undefined,
+      refunded_amount: 0,
+    };
+    this.recordPaymentTransaction(paymentTx);
+
     const newBooking: any = {
       id,
       booking_number: bookingNumber,
@@ -482,8 +571,9 @@ export const dbRepository = {
       tax_gst: payload.taxGst,
       discount: payload.discount,
       total_amount: payload.totalAmount,
-      payment_method: payload.paymentMethod,
-      payment_status: payload.paymentMethod === "CASH" ? "PENDING" : "SUCCESS",
+      payment_method: methodUpper,
+      payment_status: paymentStatus,
+      payment_transaction_id: paymentTx.payment_id,
       customer_notes: payload.customerNotes || "",
       start_otp: payload.startOtp || generateSecureOtp(),
       created_at: nowIso(),
@@ -504,6 +594,7 @@ export const dbRepository = {
 
     // Record audit log
     this.addAuditLog("BOOKING_CREATED", "BOOKING", id, null, newBooking);
+    broadcastBookingEvent(newBooking.id, "CONFIRMED", newBooking, newBooking.booking_number);
 
     return newBooking;
   },
@@ -535,6 +626,7 @@ export const dbRepository = {
     setStored("bookings", all);
 
     this.addAuditLog("STATUS_CHANGED", "BOOKING", id, { status: oldStatus }, { status: newStatus });
+    broadcastBookingEvent(current.id, newStatus, current, current.booking_number);
     return current;
   },
 
@@ -546,6 +638,22 @@ export const dbRepository = {
     if (paymentMethod) all[idx].payment_method = paymentMethod;
     if (gatewayPaymentId) all[idx].gateway_payment_id = gatewayPaymentId;
     all[idx].updated_at = nowIso();
+
+    // Synchronize authoritative payment transaction
+    const txs = this.getPaymentTransactions(all[idx].id);
+    if (txs.length > 0) {
+      const tx = txs[0];
+      tx.status = paymentStatus === "PAID" || paymentStatus === "SUCCESS" ? "PAID" : (paymentStatus as any);
+      if (gatewayPaymentId) tx.provider_reference = gatewayPaymentId;
+      if (paymentStatus === "PAID" || paymentStatus === "SUCCESS") tx.captured_at = nowIso();
+      const allTxs = getStored<PaymentTransactionRecord[]>("payment_transactions", []);
+      const txIdx = allTxs.findIndex((t) => t.payment_id === tx.payment_id);
+      if (txIdx >= 0) {
+        allTxs[txIdx] = tx;
+        setStored("payment_transactions", allTxs);
+      }
+    }
+
     setStored("bookings", all);
     return all[idx];
   },
@@ -569,6 +677,8 @@ export const dbRepository = {
     all[idx].technician_id = techId;
     all[idx].technician_name = techName;
     all[idx].technician_phone = techPhone;
+    all[idx].assigned_technician_id = techId;
+    all[idx].assigned_technician_name = techName;
     all[idx].status = "PROFESSIONAL_ASSIGNED";
     if (!all[idx].timeline) all[idx].timeline = [];
     all[idx].timeline.push({
@@ -577,7 +687,42 @@ export const dbRepository = {
       label: `Reassigned from ${oldTech || "Unassigned"} to ${techName}`,
     });
     setStored("bookings", all);
+
+    // Synchronize assignment record
+    const assignments = getStored<BookingAssignment[]>("assignments", []);
+    const asgIdx = assignments.findIndex(
+      (a) => a.bookingId === all[idx].id || a.bookingNumber === all[idx].booking_number
+    );
+    if (asgIdx >= 0) {
+      assignments[asgIdx].status = "PENDING";
+      assignments[asgIdx].assignedProfessionalId = techId;
+      assignments[asgIdx].assignedProfessionalName = techName;
+      assignments[asgIdx].assignmentExpiresAt = new Date(Date.now() + 600 * 1000).toISOString();
+    } else {
+      assignments.unshift({
+        id: `asg-${Date.now()}`,
+        bookingId: all[idx].id,
+        bookingNumber: all[idx].booking_number,
+        serviceName: all[idx].service_name,
+        categorySlug: all[idx].category_slug,
+        customerName: all[idx].customer_name,
+        customerPhone: all[idx].customer_phone,
+        address: typeof all[idx].address === "string" ? all[idx].address : `${all[idx].address?.street}, ${all[idx].address?.city}`,
+        distance: "2.4 km",
+        scheduledDate: all[idx].scheduled_date,
+        scheduledTime: all[idx].scheduled_time_slot,
+        payoutAmount: Math.round((all[idx].subtotal || all[idx].total_amount || 0) * 0.8),
+        status: "PENDING",
+        assignedProfessionalId: techId,
+        assignedProfessionalName: techName,
+        assignmentExpiresAt: new Date(Date.now() + 600 * 1000).toISOString(),
+        isDevSeed: false,
+      });
+    }
+    setStored("assignments", assignments);
+
     this.addAuditLog("BOOKING_REASSIGNED", "BOOKING", id, { oldTech }, { newTech: techName, techId });
+    broadcastBookingEvent(all[idx].id, "PROFESSIONAL_ASSIGNED", all[idx], all[idx].booking_number);
     return all[idx];
   },
 
@@ -585,33 +730,77 @@ export const dbRepository = {
     const all = getStored<any[]>("bookings", []);
     const idx = all.findIndex((b) => b.id === id || b.booking_number === id);
     if (idx === -1) return null;
-    all[idx].status = "REFUNDED";
-    all[idx].refund_amount = amount;
-    all[idx].refund_reason = reason;
-    all[idx].refunded_at = nowIso();
-    if (!all[idx].timeline) all[idx].timeline = [];
-    all[idx].timeline.push({
+    const booking = all[idx];
+    booking.status = "REFUNDED";
+    booking.payment_status = "REFUNDED";
+    booking.refund_amount = amount;
+    booking.refund_reason = reason;
+    booking.refunded_at = nowIso();
+    if (!booking.timeline) booking.timeline = [];
+    booking.timeline.push({
       status: "REFUNDED",
       timestamp: nowIso(),
       label: `Refund of ₹${amount} processed: ${reason}`,
     });
     setStored("bookings", all);
 
+    // If paid by wallet, credit amount back to customer wallet
+    if (booking.payment_method?.toUpperCase() === "WALLET") {
+      try {
+        if (typeof localStorage !== "undefined") {
+          const rawWallet = localStorage.getItem("homeefix-wallet-storage");
+          if (rawWallet) {
+            const parsed = JSON.parse(rawWallet);
+            parsed.state.balance = (parsed.state.balance || 0) + amount;
+            const refTx = {
+              id: `tx-${Date.now()}`,
+              type: "credit",
+              amount,
+              title: `Refund for Booking ${booking.booking_number}`,
+              date: formatDate(nowIso()),
+              status: "success",
+            };
+            parsed.state.transactions = [refTx, ...(parsed.state.transactions || [])];
+            localStorage.setItem("homeefix-wallet-storage", JSON.stringify(parsed));
+          }
+        }
+      } catch {
+        // Non-blocking
+      }
+    }
+
+    // Update payment transaction record
+    const txs = this.getPaymentTransactions(booking.id);
+    const refPaymentId = txs.length > 0 ? txs[0].payment_id : generateReference("PAY");
+    if (txs.length > 0) {
+      txs[0].refunded_amount = (txs[0].refunded_amount || 0) + amount;
+      txs[0].status = txs[0].refunded_amount >= txs[0].amount ? "REFUNDED" : "PARTIALLY_REFUNDED";
+      const allTxs = getStored<PaymentTransactionRecord[]>("payment_transactions", []);
+      const txIdx = allTxs.findIndex((t) => t.payment_id === txs[0].payment_id);
+      if (txIdx >= 0) {
+        allTxs[txIdx] = txs[0];
+        setStored("payment_transactions", allTxs);
+      }
+    }
+
     const refunds = getStored<any[]>("refunds", []);
     refunds.unshift({
-      id: `RF-${Date.now().toString().slice(-4)}`,
-      bookingId: all[idx].booking_number || all[idx].id,
-      customer: all[idx].customer_name,
+      refund_id: `RF-${Date.now().toString().slice(-4)}`,
+      payment_id: refPaymentId,
+      booking_id: booking.id,
+      booking_number: booking.booking_number,
+      customer: booking.customer_name,
       amount,
       reason,
       status: "COMPLETED",
+      provider_reference: generateReference("REF"),
+      created_at: nowIso(),
       date: formatDate(nowIso()),
-      createdAt: nowIso(),
     });
     setStored("refunds", refunds);
 
     this.addAuditLog("REFUND_ISSUED", "BOOKING", id, null, { amount, reason });
-    return all[idx];
+    return booking;
   },
 
   getRefunds(): any[] {
@@ -744,7 +933,80 @@ export const dbRepository = {
 
     assignments.unshift(assignment);
     setStored("assignments", assignments);
+    broadcastBookingEvent(booking.id, "ASSIGNMENT_PENDING", assignment, booking.booking_number);
     return assignment;
+  },
+
+  assignBookingToProfessional(
+    bookingId: string,
+    professionalId: string,
+    professionalName: string,
+    professionalPhone?: string,
+    actorId?: string
+  ): any {
+    const all = getStored<any[]>("bookings", []);
+    const idx = all.findIndex((b) => b.id === bookingId || b.booking_number === bookingId);
+    if (idx === -1) return null;
+
+    const booking = all[idx];
+    booking.technician_id = professionalId;
+    booking.technician_name = professionalName;
+    booking.technician_phone = professionalPhone || "+91 98300 00000";
+    booking.assigned_technician_id = professionalId;
+    booking.assigned_technician_name = professionalName;
+    booking.status = "PROFESSIONAL_ASSIGNED";
+    booking.updated_at = nowIso();
+
+    if (!booking.timeline) booking.timeline = [];
+    booking.timeline.push({
+      status: "PROFESSIONAL_ASSIGNED",
+      timestamp: nowIso(),
+      label: `Assigned to verified professional ${professionalName}`,
+    });
+
+    all[idx] = booking;
+    setStored("bookings", all);
+
+    // Update or create assignment record for professional
+    const assignments = getStored<BookingAssignment[]>("assignments", []);
+    const asgIdx = assignments.findIndex(
+      (a) => a.bookingId === booking.id || a.bookingNumber === booking.booking_number
+    );
+    if (asgIdx >= 0) {
+      assignments[asgIdx].status = "PENDING";
+      assignments[asgIdx].assignedProfessionalId = professionalId;
+      assignments[asgIdx].assignedProfessionalName = professionalName;
+    } else {
+      assignments.unshift({
+        id: `asg-${Date.now()}`,
+        bookingId: booking.id,
+        bookingNumber: booking.booking_number,
+        serviceName: booking.service_name,
+        categorySlug: booking.category_slug,
+        customerName: booking.customer_name,
+        customerPhone: booking.customer_phone,
+        address: typeof booking.address === "string" ? booking.address : `${booking.address?.street}, ${booking.address?.city}`,
+        distance: "2.4 km",
+        scheduledDate: booking.scheduled_date,
+        scheduledTime: booking.scheduled_time_slot,
+        payoutAmount: Math.round((booking.subtotal || booking.total_amount || 0) * 0.8),
+        status: "PENDING",
+        assignedProfessionalId: professionalId,
+        assignedProfessionalName: professionalName,
+        assignmentExpiresAt: new Date(Date.now() + 600 * 1000).toISOString(),
+        isDevSeed: false,
+      });
+    }
+    setStored("assignments", assignments);
+
+    this.addAuditLog("MANUAL_ASSIGNMENT", "BOOKING", booking.id, null, {
+      professionalId,
+      professionalName,
+      assignedBy: actorId || "admin",
+    });
+
+    broadcastBookingEvent(booking.id, "PROFESSIONAL_ASSIGNED", booking, booking.booking_number);
+    return booking;
   },
 
   acceptAssignment(assignmentIdOrBookingId: string, professionalId: string, professionalName?: string, professionalPhone?: string): any {
@@ -786,10 +1048,12 @@ export const dbRepository = {
       bookings[bIdx].assigned_technician_name = finalName;
       setStored("bookings", bookings);
       this.addAuditLog("JOB_ACCEPTED", "ASSIGNMENT", assignment.id, null, { professionalId });
+      broadcastBookingEvent(assignment.bookingId, "PROFESSIONAL_ACCEPTED", bookings[bIdx], assignment.bookingNumber);
       return bookings[bIdx];
     }
 
     this.addAuditLog("JOB_ACCEPTED", "ASSIGNMENT", assignment.id, null, { professionalId });
+    broadcastBookingEvent(assignment.bookingId, "PROFESSIONAL_ACCEPTED", null, assignment.bookingNumber);
     return true;
   },
 
@@ -803,6 +1067,7 @@ export const dbRepository = {
     setStored("assignments", assignments);
 
     this.addAuditLog("JOB_DECLINED", "ASSIGNMENT", assignmentId, null, { reason });
+    broadcastBookingEvent(assignments[idx].bookingId, "ASSIGNMENT_DECLINED", assignments[idx], assignments[idx].bookingNumber);
     return true;
   },
 
@@ -866,32 +1131,39 @@ export const dbRepository = {
 
   generateInvoiceForBooking(booking: any): any {
     const invoices = getStored<any[]>("invoices", []);
-    const invoiceNumber = generateReference("INV");
-    const inv = {
-      id: `inv-${Date.now()}`,
-      invoiceNumber,
-      invoice_number: invoiceNumber,
+    const inv = invoiceEngine.generate({
       bookingId: booking.id,
-      booking_id: booking.id,
       bookingNumber: booking.booking_number,
-      booking_number: booking.booking_number,
-      serviceName: booking.service_name,
-      service_name: booking.service_name,
+      bookingDate: booking.created_at || nowIso(),
       customerName: booking.customer_name,
-      customer_name: booking.customer_name,
-      date: formatDate(nowIso()),
+      customerPhone: booking.customer_phone,
+      customerEmail: booking.customer_email,
+      customerAddress:
+        typeof booking.address === "string"
+          ? booking.address
+          : booking.address?.formatted_address || "Kolkata, West Bengal",
+      serviceName: booking.service_name,
+      technicianName: booking.technician_name,
       subtotal: booking.subtotal,
       safetyFee: booking.safety_fee,
-      safety_fee: booking.safety_fee,
-      taxGst: booking.tax_gst,
-      tax_gst: booking.tax_gst,
-      discount: booking.discount,
+      discountAmount: booking.discount,
+      taxableAmount:
+        booking.pricing_snapshot?.taxableValue ??
+        booking.subtotal - (booking.discount || 0) + (booking.safety_fee || 0),
+      taxRatePercent: booking.pricing_snapshot?.taxRatePercent ?? 18,
       totalAmount: booking.total_amount,
-      total_amount: booking.total_amount,
-      status: "PAID",
       paymentMethod: booking.payment_method,
-      isDevSeed: false,
-    };
+      paymentStatus: booking.payment_status || "PAID",
+      warrantyDays: booking.warranty_days || 30,
+    });
+
+    (inv as any).booking_id = inv.bookingId;
+    (inv as any).booking_number = inv.bookingNumber;
+    (inv as any).invoice_number = inv.invoiceNumber;
+    (inv as any).total_amount = inv.totalPayableInr;
+    (inv as any).customer_name = inv.customerName;
+    (inv as any).tax_gst = inv.totalTax;
+
     invoices.unshift(inv);
     setStored("invoices", invoices);
     return inv;
@@ -1380,18 +1652,34 @@ export const dbRepository = {
     return getStored<any[]>("audit_logs", []);
   },
 
-  addAuditLog(action: string, entityType: string, entityId: string, oldData?: any, newData?: any): void {
+  addAuditLog(
+    action: string,
+    entityType: string,
+    entityId: string,
+    metadataOrOldData?: any,
+    actorIdOrNewData?: any,
+    actorRole?: string
+  ): void {
     const logs = getStored<any[]>("audit_logs", []);
-    logs.unshift({
-      id: `log-${Date.now()}`,
+    const isActorIdString = typeof actorIdOrNewData === "string";
+    const entry = {
+      id: `LOG-${Date.now().toString().slice(-6)}`,
       action,
       entityType,
+      entity_type: entityType,
       entityId,
-      oldData,
-      newData,
+      entity_id: entityId,
+      actor: isActorIdString ? actorIdOrNewData : "admin@homeefix.in",
+      actor_id: isActorIdString ? actorIdOrNewData : "super_admin",
+      actor_role: actorRole || "super_admin",
+      metadata: typeof metadataOrOldData === "object" ? metadataOrOldData : { details: metadataOrOldData },
+      oldData: metadataOrOldData,
+      newData: !isActorIdString ? actorIdOrNewData : undefined,
       createdAt: nowIso(),
-    });
-    if (logs.length > 100) logs.pop();
+      created_at: nowIso(),
+    };
+    logs.unshift(entry);
+    if (logs.length > 200) logs.pop();
     setStored("audit_logs", logs);
   },
 

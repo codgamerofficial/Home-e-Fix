@@ -13,8 +13,13 @@ lerna-debug.log*
 .env.production
 .env.*.local
 .env.*
+!.env.example
+.dev.vars
+.dev.vars.*
 supabase/functions/.env
 supabase/functions/.env.*
+supabase/.temp
+supabase/.temp/*
 
 # Dependencies
 node_modules
@@ -23,6 +28,7 @@ node_modules
 dist
 dist-ssr
 .wrangler
+.wrangler/
 .kilo
 
 # Editor directories and files

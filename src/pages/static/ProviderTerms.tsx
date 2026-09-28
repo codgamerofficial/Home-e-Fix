@@ -60,16 +60,17 @@ export default function ProviderTerms() {
 
         <section className="space-y-3">
           <h3 className="font-heading text-base font-bold text-primary flex items-center gap-2">
-            2. Mandatory KYC & Verification
+            2. Partner Verification & Application Review
           </h3>
           <p>
-            Before receiving active customer leads, every partner must complete KYC verification:
+            Before receiving active customer job dispatches, every professional application undergoes administrative review:
           </p>
           <ul className="list-disc pl-5 space-y-1.5 text-foreground-secondary">
-            <li>Government Photo ID (Aadhaar / Voter ID / Driving License)</li>
-            <li>Permanent Account Number (PAN Card) for direct bank remittances</li>
-            <li>Police verification clearance certificate</li>
-            <li>Trade certificate or demonstrated trade competence interview (Minimum 2 years experience in Electrical or Plumbing trade)</li>
+            <li>Google account sign-in & verified mobile contact number</li>
+            <li>Detailed trade specialty, experience history, and skill declaration</li>
+            <li>Operational service area hubs and active working hours selection</li>
+            <li>Optional trade diplomas or skill certifications (Zero Government-ID / Aadhaar / PAN upload required)</li>
+            <li>Explicit administrative approval by Home-e-Fix operations</li>
           </ul>
         </section>
 

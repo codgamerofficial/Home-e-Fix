@@ -71,9 +71,11 @@ export class ProfessionalService {
     }
 
     if (
+      professional.status === "PROFILE_INCOMPLETE" ||
       professional.status === "DRAFT" ||
       professional.status === "PHONE_VERIFIED" ||
       professional.status === "APPLICATION_SUBMITTED" ||
+      professional.status === "UNDER_REVIEW" ||
       professional.status === "DOCUMENTS_UNDER_REVIEW"
     ) {
       return {
@@ -101,16 +103,18 @@ export class ProfessionalService {
     if (from === to) return true;
 
     const allowedTransitions: Record<ProfessionalStatus, ProfessionalStatus[]> = {
-      DRAFT: ["PHONE_VERIFIED", "DEACTIVATED"],
-      PHONE_VERIFIED: ["APPLICATION_SUBMITTED", "DEACTIVATED"],
-      APPLICATION_SUBMITTED: ["DOCUMENTS_UNDER_REVIEW", "CORRECTION_REQUIRED", "REJECTED"],
-      DOCUMENTS_UNDER_REVIEW: ["APPROVED", "CORRECTION_REQUIRED", "REJECTED"],
+      PROFILE_INCOMPLETE: ["PHONE_VERIFIED", "APPLICATION_SUBMITTED", "UNDER_REVIEW", "DEACTIVATED"],
+      DRAFT: ["PHONE_VERIFIED", "APPLICATION_SUBMITTED", "UNDER_REVIEW", "DEACTIVATED"],
+      PHONE_VERIFIED: ["APPLICATION_SUBMITTED", "UNDER_REVIEW", "DEACTIVATED"],
+      APPLICATION_SUBMITTED: ["UNDER_REVIEW", "DOCUMENTS_UNDER_REVIEW", "APPROVED", "CORRECTION_REQUIRED", "REJECTED"],
+      UNDER_REVIEW: ["APPROVED", "CORRECTION_REQUIRED", "REJECTED", "SUSPENDED"],
+      DOCUMENTS_UNDER_REVIEW: ["APPROVED", "CORRECTION_REQUIRED", "REJECTED", "SUSPENDED"],
       APPROVED: ["ACTIVE", "SUSPENDED", "DEACTIVATED"],
       ACTIVE: ["SUSPENDED", "DEACTIVATED"],
-      REJECTED: ["APPLICATION_SUBMITTED", "DEACTIVATED"], // Can re-apply if authorized
-      CORRECTION_REQUIRED: ["APPLICATION_SUBMITTED", "DEACTIVATED"],
+      REJECTED: ["APPLICATION_SUBMITTED", "UNDER_REVIEW", "DEACTIVATED"], // Must submit or be put under review first
+      CORRECTION_REQUIRED: ["APPLICATION_SUBMITTED", "UNDER_REVIEW", "DEACTIVATED"],
       SUSPENDED: ["ACTIVE", "APPROVED", "DEACTIVATED"],
-      DEACTIVATED: ["DRAFT"],
+      DEACTIVATED: ["PROFILE_INCOMPLETE", "DRAFT"],
     };
 
     const targetList = allowedTransitions[from] || [];
@@ -159,39 +163,119 @@ export class ProfessionalService {
   }
 
   /**
+  /**
    * Upload a KYC document to the private 'professional-kyc' Supabase Storage bucket.
-   * Enforces file size (<= 5MB), allowed MIME types, and randomized storage paths.
+   * Enforces 10MB file size, allowed MIME/extensions, and structured storage paths:
+   * professional-kyc/{userId}/{category}/{uniqueId}.{ext}
    */
   async uploadKycDocument(
     userId: string,
     docType: KycDocumentType,
-    file: File
+    file: File,
+    oldStoragePath?: string
   ): Promise<{ storagePath: string; fileName: string; fileSize: number; mimeType: string }> {
-    const MAX_SIZE = 5 * 1024 * 1024;
+    const MAX_SIZE = 10 * 1024 * 1024; // 10 MB maximum
     if (file.size > MAX_SIZE) {
-      throw new Error(`File size (${Math.round(file.size / 1024 / 1024)}MB) exceeds the maximum allowed 5MB limit.`);
+      throw new Error("File size must be 10 MB or less.");
     }
 
     const ALLOWED_MIMES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
     if (!ALLOWED_MIMES.includes(file.type)) {
-      throw new Error("Invalid file format. Allowed formats: JPG, PNG, WebP, and PDF.");
+      throw new Error("Please upload a PDF, JPG, JPEG, PNG, or WEBP file.");
     }
 
-    const ext = file.name.split(".").pop()?.toLowerCase() || "bin";
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const ALLOWED_EXTS = ["pdf", "jpg", "jpeg", "png", "webp"];
+    if (!ALLOWED_EXTS.includes(ext)) {
+      throw new Error("Please upload a PDF, JPG, JPEG, PNG, or WEBP file.");
+    }
+
+    const categoryMap: Record<string, string> = {
+      IDENTITY_DOCUMENT: "government-id",
+      identity_document: "government-id",
+      BANK_DOCUMENT: "bank-proof",
+      bank_document: "bank-proof",
+      SKILL_CERTIFICATE: "certification",
+      skill_certificate: "certification",
+      PROFESSIONAL_CERTIFICATE: "certification",
+      professional_certificate: "certification",
+      PROFILE_PHOTO: "profile-photo",
+      profile_photo: "profile-photo",
+    };
+
+    const category = categoryMap[docType] || "documents";
     const randomId = Math.random().toString(36).slice(2, 10);
-    const storagePath = `${userId}/${docType.toLowerCase()}_${Date.now()}_${randomId}.${ext}`;
+    let storagePath = `${userId}/${category}/${Date.now()}_${randomId}.${ext}`;
 
     if (isServiceConfigured("supabase")) {
-      const { error } = await supabase.storage
-        .from("professional-kyc")
-        .upload(storagePath, file, {
-          cacheControl: "3600",
-          upsert: false,
+      let signedUploadSucceeded = false;
+
+      // 1. Attempt upload via secure signed upload URL from backend
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token || "";
+
+        const res = await fetch("/api/kyc/upload-url", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            userId,
+            docType,
+            fileName: file.name,
+            fileSize: file.size,
+            mimeType: file.type,
+          }),
         });
 
-      if (error) {
-        console.error("[Storage Upload Error]", error);
-        throw new Error(`Failed to upload document: ${error.message}`);
+        if (res.ok) {
+          const signResult = await res.json();
+          if (signResult.success && signResult.token && signResult.storagePath) {
+            storagePath = signResult.storagePath;
+            const { error: uploadError } = await supabase.storage
+              .from("professional-kyc")
+              .uploadToSignedUrl(storagePath, signResult.token, file);
+
+            if (uploadError) {
+              throw uploadError;
+            }
+            signedUploadSucceeded = true;
+          }
+        }
+      } catch (signErr) {
+        console.warn("[Signed Upload Route Note, falling back to direct upload]", signErr);
+      }
+
+      // 2. Direct client-side upload fallback if signed-upload was not available
+      if (!signedUploadSucceeded) {
+        const { error } = await supabase.storage
+          .from("professional-kyc")
+          .upload(storagePath, file, {
+            cacheControl: "3600",
+            upsert: true,
+          });
+
+        if (error) {
+          console.error("[Storage Upload Error]", error);
+          if (error.message.includes("Bucket not found")) {
+            throw new Error("We couldn't upload this document right now. Please try again.");
+          } else if (error.message.includes("row-level security") || error.message.includes("AccessDenied")) {
+            throw new Error("Upload unauthorized. Please sign in again before uploading your documents.");
+          } else {
+            throw new Error(`Failed to upload document: ${error.message}`);
+          }
+        }
+      }
+
+      // 3. Clean up previously replaced document if requested
+      if (oldStoragePath && oldStoragePath !== storagePath) {
+        try {
+          await supabase.storage.from("professional-kyc").remove([oldStoragePath]);
+        } catch {
+          // Non-blocking cleanup
+        }
       }
     }
 
@@ -205,9 +289,9 @@ export class ProfessionalService {
 
   /**
    * Generates an authorized, time-limited signed URL for viewing private KYC documents.
-   * KYC documents are NEVER public.
+   * KYC documents are NEVER public. Expiry default: 300 seconds (5 minutes).
    */
-  async getDocumentSignedUrl(storagePath: string, expiresIn = 3600): Promise<string> {
+  async getDocumentSignedUrl(storagePath: string, expiresIn = 300): Promise<string> {
     if (!storagePath) return "";
 
     if (isServiceConfigured("supabase")) {
@@ -223,7 +307,21 @@ export class ProfessionalService {
       return data?.signedUrl || "";
     }
 
-    return `https://storage.home-e-fix.local/preview/${encodeURIComponent(storagePath)}?token=dev-preview-token`;
+    return "";
+  }
+
+  /**
+   * Deletes a KYC document from the private 'professional-kyc' storage bucket.
+   */
+  async deleteKycDocument(storagePath: string): Promise<boolean> {
+    if (!storagePath) return false;
+    if (isServiceConfigured("supabase")) {
+      const { error } = await supabase.storage
+        .from("professional-kyc")
+        .remove([storagePath]);
+      return !error;
+    }
+    return true;
   }
 
   /**
@@ -255,7 +353,7 @@ export class ProfessionalService {
     const proId = existingPro?.id || `pro-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const nowIso = new Date().toISOString();
 
-    const initialDocuments: ProfessionalDocument[] = draftData.documents.map((d) => ({
+    const initialDocuments: ProfessionalDocument[] = (draftData.documents || []).map((d) => ({
       id: `doc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       professionalId: proId,
       documentType: d.documentType,
@@ -294,7 +392,13 @@ export class ProfessionalService {
       experienceYears: draftData.experienceYears || 1,
       bio: draftData.bio?.trim(),
       preferredServiceAreas: draftData.preferredServiceAreas || ["Kolkata"],
-      status: "DOCUMENTS_UNDER_REVIEW", // Application completed and awaiting compliance review
+      workingHours: draftData.workingHours || {
+        start: "08:00 AM",
+        end: "08:00 PM",
+        daysOfWeek: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+      },
+      payoutUpiId: draftData.payoutUpiId?.trim(),
+      status: "UNDER_REVIEW", // Application completed and awaiting administrator review
       documents: initialDocuments,
       createdAt: existingPro?.createdAt || nowIso,
       updatedAt: nowIso,
@@ -620,6 +724,7 @@ export class ProfessionalService {
     const nowIso = new Date().toISOString();
 
     pro.status = "SUSPENDED";
+    pro.suspensionReason = reason.trim();
     pro.rejectionReason = reason.trim();
     pro.updatedAt = nowIso;
 
@@ -657,6 +762,69 @@ export class ProfessionalService {
       previousStatus,
       newStatus: "SUSPENDED",
       reason: reason.trim(),
+      createdAt: nowIso,
+    });
+
+    return pro;
+  }
+
+  /**
+   * Admin Action: Reactivate professional account.
+   */
+  async adminReactivateProfessional(
+    professionalId: string,
+    adminUserId: string,
+    adminName: string
+  ): Promise<ProfessionalProfile> {
+    const allPros = dbRepository.getProfessionals();
+    const pro = allPros.find((p) => p.id === professionalId);
+
+    if (!pro) {
+      throw new Error("Professional record not found.");
+    }
+
+    const previousStatus = pro.status;
+    const nowIso = new Date().toISOString();
+
+    pro.status = "APPROVED";
+    pro.updatedAt = nowIso;
+    pro.rejectionReason = null;
+    pro.suspensionReason = null;
+
+    dbRepository.saveProfessional(pro);
+
+    if (isServiceConfigured("supabase")) {
+      try {
+        await supabase
+          .from("professionals")
+          .update({
+            status: "approved",
+            rejection_reason: null,
+            updated_at: nowIso,
+          })
+          .eq("id", professionalId);
+
+        await supabase.from("professional_review_logs").insert({
+          professional_id: professionalId,
+          admin_user_id: adminUserId,
+          action: "reactivated",
+          previous_status: previousStatus,
+          new_status: "approved",
+          reason: "Account reactivated and approved by administrator.",
+        });
+      } catch (err) {
+        console.warn("[adminReactivateProfessional] Supabase sync deferred:", err);
+      }
+    }
+
+    this.addReviewLog({
+      professionalId,
+      adminUserId,
+      adminName,
+      action: "reactivated",
+      previousStatus,
+      newStatus: "APPROVED",
+      reason: "Professional account reactivated and approved for customer job dispatches.",
       createdAt: nowIso,
     });
 

@@ -22,7 +22,7 @@ const CACHE_TTL_MS = 30_000; // 30 seconds
 /**
  * Calculate straight-line Haversine distance in kilometers
  */
-function calculateHaversineKm(start: RouteCoordinates, end: RouteCoordinates): number {
+export function calculateHaversineKm(start: RouteCoordinates, end: RouteCoordinates): number {
   const R = 6371; // Earth radius in km
   const dLat = ((end.lat - start.lat) * Math.PI) / 180;
   const dLng = ((end.lng - start.lng) * Math.PI) / 180;

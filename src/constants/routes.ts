@@ -39,6 +39,7 @@ export const ROUTES = {
   FORGOT_PASSWORD: "/auth/forgot-password",
   OTP_VERIFY: "/auth/otp",
   PROFILE_SETUP: "/auth/profile-setup",
+  AUTH_CALLBACK: "/auth/callback",
 
   // ─── Customer Platform (/app/*) (Section 44) ───
   APP: "/app",
@@ -91,15 +92,23 @@ export const ROUTES = {
 
   // ─── Admin Platform (/admin/*) (Section 46) ───
   ADMIN: "/admin",
+  ADMIN_DASHBOARD: "/admin/dashboard",
   ADMIN_ANALYTICS: "/admin/analytics",
+  ADMIN_OPERATIONS: "/admin/operations",
+  ADMIN_LIVE_OPERATIONS: "/admin/operations/live",
   ADMIN_BOOKINGS: "/admin/bookings",
   ADMIN_CUSTOMERS: "/admin/customers",
   ADMIN_PROFESSIONALS: "/admin/professionals",
   ADMIN_PROFESSIONAL_DETAIL: "/admin/professionals/:id",
+  ADMIN_PROFESSIONAL_APPLICATIONS: "/admin/professionals/applications",
   ADMIN_SERVICES: "/admin/services",
   ADMIN_CATEGORIES: "/admin/categories",
   ADMIN_PRICING: "/admin/pricing",
+  ADMIN_AVAILABILITY: "/admin/availability",
   ADMIN_PAYMENTS: "/admin/payments",
+  ADMIN_WALLETS: "/admin/wallets",
+  ADMIN_PAYOUTS: "/admin/payouts",
+  ADMIN_INVOICES: "/admin/invoices",
   ADMIN_REFUNDS: "/admin/refunds",
   ADMIN_MEMBERSHIP: "/admin/membership",
   ADMIN_COUPONS: "/admin/coupons",
@@ -109,13 +118,13 @@ export const ROUTES = {
   ADMIN_CMS: "/admin/cms",
   ADMIN_REPORTS: "/admin/reports",
   ADMIN_AUDIT_LOGS: "/admin/audit-logs",
+  ADMIN_SERVICE_AREAS: "/admin/service-areas",
   ADMIN_SETTINGS: "/admin/settings",
-  ADMIN_LIVE_OPERATIONS: "/admin/operations/live",
+  ADMIN_ADMINS: "/admin/admins",
   ADMIN_INTEGRATIONS: "/admin/system/integrations",
   ADMIN_DATA_QUALITY: "/admin/system/data-quality",
 
   // Backward compatibility alias for admin
-  ADMIN_DASHBOARD: "/admin/analytics",
   ADMIN_USERS: "/admin/customers",
   ADMIN_TECHNICIANS: "/admin/professionals",
 

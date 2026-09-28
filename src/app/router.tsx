@@ -47,6 +47,7 @@ const Register = lazy(() => import("../pages/auth/Register"));
 const ForgotPassword = lazy(() => import("../pages/auth/ForgotPassword"));
 const OtpVerification = lazy(() => import("../pages/auth/OtpVerification"));
 const ProfileSetup = lazy(() => import("../pages/auth/ProfileSetup"));
+const AuthCallback = lazy(() => import("../pages/auth/AuthCallback"));
 
 /* ─── Lazy-loaded Customer App Pages (/app/* - Section 44) ─── */
 const BookingWizard = lazy(() => import("../pages/booking/BookingWizard"));
@@ -102,6 +103,8 @@ const AdminSettingsCMS = lazy(() => import("../pages/dashboard/admin/SettingsCMS
 const AdminLiveOperations = lazy(() => import("../pages/dashboard/admin/LiveOperations"));
 const AdminSystemIntegrations = lazy(() => import("../pages/dashboard/admin/SystemIntegrations"));
 const AdminDataQualityCMS = lazy(() => import("../pages/dashboard/admin/DataQualityCMS"));
+const AdminDashboard = lazy(() => import("../pages/dashboard/admin/AdminDashboard"));
+const AdminManagement = lazy(() => import("../pages/dashboard/admin/AdminManagement"));
 
 /* ─── Router Configuration ─── */
 export const router = createBrowserRouter([
@@ -364,6 +367,14 @@ export const router = createBrowserRouter([
           </LazyPage>
         ),
       },
+      {
+        path: "callback",
+        element: (
+          <LazyPage>
+            <AuthCallback />
+          </LazyPage>
+        ),
+      },
     ],
   },
 
@@ -506,13 +517,21 @@ export const router = createBrowserRouter([
     ],
   },
 
-  // Customer Dashboard Backwards-compatibility alias (/dashboard/* -> /app/*)
+  // Customer Dashboard Backwards-compatibility alias (/dashboard/* -> /app/*, /customer/* -> /app/*)
   {
     path: "/dashboard",
     element: <Navigate to="/app/bookings" replace />,
   },
   {
     path: "/dashboard/:subpage",
+    element: <Navigate to="/app/bookings" replace />,
+  },
+  {
+    path: "/customer",
+    element: <Navigate to="/app/bookings" replace />,
+  },
+  {
+    path: "/customer/:subpage",
     element: <Navigate to="/app/bookings" replace />,
   },
 
@@ -674,7 +693,85 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="/admin/analytics" replace />,
+        element: (
+          <LazyPage>
+            <AdminDashboard />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "dashboard",
+        element: (
+          <LazyPage>
+            <AdminDashboard />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "admins",
+        element: (
+          <RoleProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+            <LazyPage>
+              <AdminManagement />
+            </LazyPage>
+          </RoleProtectedRoute>
+        ),
+      },
+      {
+        path: "operations",
+        element: (
+          <LazyPage>
+            <AdminLiveOperations />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "professionals/applications",
+        element: (
+          <LazyPage>
+            <AdminTechnicians />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "availability",
+        element: (
+          <LazyPage>
+            <AdminTechnicians />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "wallets",
+        element: (
+          <LazyPage>
+            <AdminPayments />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "payouts",
+        element: (
+          <LazyPage>
+            <AdminPayments />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "invoices",
+        element: (
+          <LazyPage>
+            <AdminPayments />
+          </LazyPage>
+        ),
+      },
+      {
+        path: "service-areas",
+        element: (
+          <LazyPage>
+            <AdminSettingsCMS />
+          </LazyPage>
+        ),
       },
       {
         path: "analytics",

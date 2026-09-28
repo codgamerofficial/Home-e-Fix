@@ -63,9 +63,14 @@ export const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({
   const userRoleNormalized = (user.role || "").toUpperCase();
   const normalizedAllowed = allowedRoles.map((r) => r.toUpperCase());
 
+  // Super admin has access to all admin-level routes, but normal admin cannot access super_admin-only routes
+  const isSuperAdmin = userRoleNormalized === "SUPER_ADMIN";
+  const isAdminLevelPermitted = normalizedAllowed.includes("ADMIN") || normalizedAllowed.includes("SUPER_ADMIN");
+
   // Also support technician/professional equivalence
   const hasMatchingRole =
     normalizedAllowed.includes(userRoleNormalized) ||
+    (isSuperAdmin && isAdminLevelPermitted) ||
     (userRoleNormalized === "TECHNICIAN" && normalizedAllowed.includes("PROFESSIONAL")) ||
     (userRoleNormalized === "PROFESSIONAL" && normalizedAllowed.includes("TECHNICIAN"));
 
@@ -128,7 +133,7 @@ export const PublicOnlyRoute: React.FC<ProtectedRouteProps> = ({ children }) => 
 
   if (isAuthenticated && user) {
     const roleUpper = (user.role || "").toUpperCase();
-    if (roleUpper.includes("ADMIN")) {
+    if (roleUpper === "SUPER_ADMIN" || roleUpper === "ADMIN") {
       return <Navigate to={ROUTES.ADMIN} replace />;
     }
     if (roleUpper.includes("TECH") || roleUpper.includes("PROF")) {

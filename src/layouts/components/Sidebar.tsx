@@ -23,36 +23,41 @@ export function Sidebar({ links, title }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-(--navbar-height) bottom-0 z-(--z-fixed)",
+        "fixed left-0 top-0 bottom-0 z-(--z-fixed)",
         "hidden md:flex flex-col",
         "border-r border-border bg-surface",
         "transition-all duration-300 ease-smooth",
         sidebarCollapsed
-          ? "w-(--sidebar-collapsed-width)"
-          : "w-(--sidebar-width)"
+          ? "w-18"
+          : "w-65"
       )}
     >
       {/* Header */}
       <div
         className={cn(
-          "flex items-center border-b border-border p-4",
+          "flex items-center border-b border-border p-4 h-16",
           sidebarCollapsed ? "justify-center" : "justify-between"
         )}
       >
         {!sidebarCollapsed && (
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-sm font-semibold text-foreground-secondary uppercase tracking-wider"
-          >
-            {title || "Menu"}
-          </motion.span>
+          <div className="flex items-center gap-2.5">
+            <Logo size="sm" textColor="auto" />
+            <span className="h-4 w-px bg-border" />
+            <motion.span
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-xs font-bold text-foreground-secondary uppercase tracking-wider truncate max-w-28"
+            >
+              {title || "Account"}
+            </motion.span>
+          </div>
         )}
         <Button
           variant="ghost"
           size="icon"
           onClick={toggleSidebarCollapsed}
-          className="h-8 w-8 text-foreground-muted"
+          className="h-8 w-8 text-foreground-muted hover:text-foreground shrink-0"
+          aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {sidebarCollapsed ? (
             <ChevronRight className="h-4 w-4" />
@@ -68,19 +73,19 @@ export function Sidebar({ links, title }: SidebarProps) {
           const Icon = link.icon;
           const isActive =
             location.pathname === link.href ||
-            (link.href !== "/" && location.pathname.startsWith(link.href));
+            (link.href !== "/" && link.href !== "/app" && location.pathname.startsWith(link.href));
 
           const navItem = (
             <Link
               key={link.href}
               to={link.href}
               className={cn(
-                "group relative flex items-center gap-3 rounded-lg px-3 py-2.5",
+                "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium",
                 "transition-all duration-200",
                 sidebarCollapsed && "justify-center px-2",
                 isActive
-                  ? "bg-accent/10 text-accent font-medium"
-                  : "text-foreground-secondary hover:bg-muted hover:text-foreground"
+                  ? "bg-accent/10 text-accent font-bold shadow-xs border-l-2 border-accent"
+                  : "text-foreground-secondary hover:bg-muted/70 hover:text-foreground"
               )}
             >
               {/* Active indicator */}

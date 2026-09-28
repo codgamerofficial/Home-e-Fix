@@ -81,8 +81,9 @@ export default function BookingDetail() {
 
   const status = (booking.status || "CONFIRMED").toUpperCase();
   const bookingNumber = booking.booking_number || booking.id;
-  const proName = booking.technician_name || "Suresh Reddy";
-  const proPhone = booking.technician_phone || "+91 98765 43210";
+  const hasAssignedPro = Boolean(booking.technician_name && booking.technician_name.trim());
+  const proName = booking.technician_name || "";
+  const proPhone = booking.technician_phone || "";
 
   const addressText = typeof booking.address === "string"
     ? booking.address
@@ -209,50 +210,75 @@ export default function BookingDetail() {
 
           {/* Assigned Technician Card */}
           <Card className="p-6 border border-border bg-surface space-y-4">
-            <h3 className="font-heading text-base font-bold text-primary border-b border-border pb-2 flex items-center gap-2">
-              <User className="h-4 w-4 text-accent" /> Assigned Verified Professional
-            </h3>
+            <div className="border-b border-border pb-2 flex items-center justify-between">
+              <h3 className="font-heading text-base font-bold text-primary flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-accent" /> Assigned Service Professional
+              </h3>
+              {hasAssignedPro && (
+                <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+                  Home-e-Fix Verified Partner ✓
+                </Badge>
+              )}
+            </div>
 
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
-              <div className="flex items-center gap-3.5">
-                <div className="h-12 w-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center font-bold text-accent text-base shrink-0">
-                  {proName.slice(0, 2).toUpperCase()}
-                </div>
-                <div className="space-y-0.5">
-                  <h4 className="font-heading font-bold text-sm text-primary">{proName}</h4>
-                  <p className="text-foreground-muted">Verified Tradesman • Salt Lake Hub</p>
-                  <div className="flex items-center gap-1.5 text-amber-500 font-bold">
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                    <span>4.9 Rating (42 verified jobs)</span>
+            {hasAssignedPro ? (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+                <div className="flex items-center gap-3.5">
+                  <div className="h-12 w-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center font-bold text-accent text-base shrink-0">
+                    {proName.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="space-y-0.5">
+                    <h4 className="font-heading font-bold text-sm text-primary">{proName}</h4>
+                    <p className="text-foreground-muted">Home-e-Fix Verified Partner • Salt Lake Operational Hub</p>
+                    <div className="flex items-center gap-1.5 text-amber-500 font-bold">
+                      <Star className="h-3.5 w-3.5 fill-current" />
+                      <span>4.9 Rating • Background & Skill Vetted</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Phone className="h-3.5 w-3.5 text-accent" />}
-                  onClick={() => window.open(`tel:${proPhone}`)}
-                  className="font-semibold"
-                >
-                  Call Pro
-                </Button>
-                {["PROFESSIONAL_ON_THE_WAY", "PROFESSIONAL_ARRIVED", "SERVICE_STARTED"].includes(status) && (
-                  <Button
-                    asChild
-                    variant="accent"
-                    size="sm"
-                    className="font-bold shadow-glow"
-                  >
-                    <Link to={`/app/bookings/${booking.id}/track`}>
-                      <Truck className="h-3.5 w-3.5 mr-1.5" />
-                      Track Live Map
-                    </Link>
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {proPhone && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      leftIcon={<Phone className="h-3.5 w-3.5 text-accent" />}
+                      onClick={() => window.open(`tel:${proPhone}`)}
+                      className="font-semibold"
+                    >
+                      Call Pro
+                    </Button>
+                  )}
+                  {["PROFESSIONAL_ON_THE_WAY", "PROFESSIONAL_ARRIVED", "SERVICE_STARTED"].includes(status) && (
+                    <Button
+                      asChild
+                      variant="accent"
+                      size="sm"
+                      className="font-bold shadow-glow"
+                    >
+                      <Link to={`/app/bookings/${booking.id}/track`}>
+                        <Truck className="h-3.5 w-3.5 mr-1.5" />
+                        Track Live Map
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="p-4 rounded-xl bg-accent/5 border border-dashed border-accent/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-primary">Assigning Home-e-Fix Verified Partner...</span>
+                    <Badge variant="outline" className="text-[10px] border-amber-300 bg-amber-50 text-amber-800 font-semibold">
+                      Matching In Progress
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-foreground-secondary">
+                    We are matching your request with an approved, vetted professional in your service area. Partner details will appear here as soon as dispatched.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {booking.start_otp && (
               <div className="p-3.5 rounded-xl bg-accent/5 border border-accent/20 flex items-center justify-between text-xs">

@@ -144,6 +144,9 @@ export default function BookingConfirmed() {
 
   // Canonical Tracking URL
   const trackingUrl = `/bookings/${booking.id || bookingNumber}/track`;
+  const isServiceFinished = status === "SERVICE_COMPLETED" || status === "COMPLETED";
+  const downloadDocLabel = isServiceFinished ? "Download Tax Invoice" : "Download Booking Receipt";
+  const viewDocLabel = isServiceFinished ? "View / Download Tax Invoice" : "View / Download Booking Receipt";
 
   return (
     <div className="min-h-screen bg-background py-8 sm:py-14 pb-28 md:pb-14">
@@ -202,7 +205,7 @@ export default function BookingConfirmed() {
             onClick={() => setIsInvoiceOpen(true)}
             className="min-w-44 font-semibold text-sm gap-2 border-border/80 hover:bg-surface"
           >
-            <Download className="h-4 w-4 text-accent" /> Download PDF Invoice
+            <Download className="h-4 w-4 text-accent" /> {downloadDocLabel}
           </Button>
 
           <Button
@@ -366,7 +369,7 @@ export default function BookingConfirmed() {
                   <div className="space-y-0.5 text-xs">
                     <div className="font-bold text-primary">Finding your professional</div>
                     <p className="text-foreground-secondary text-[11px] leading-relaxed">
-                      We are pairing your request with the closest certified technician across Kolkata. You will receive an SMS and live notification when accepted.
+                      We are pairing your request with a verified technician. You will receive an in-app and dashboard notification as soon as your professional confirms.
                     </p>
                   </div>
                 </div>
@@ -508,7 +511,7 @@ export default function BookingConfirmed() {
                   onClick={() => setIsInvoiceOpen(true)}
                   className="w-full font-semibold text-xs gap-2 border-border/80 hover:bg-muted/30"
                 >
-                  <FileText className="h-4 w-4 text-accent" /> View / Download Tax Invoice
+                  <FileText className="h-4 w-4 text-accent" /> {viewDocLabel}
                 </Button>
               </div>
 

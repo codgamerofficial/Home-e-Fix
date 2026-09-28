@@ -1,399 +1,127 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
-import { motion } from "framer-motion";
-import {
-  User,
-  Mail,
-  Lock,
-  Phone,
-  Eye,
-  EyeOff,
-  ArrowRight,
-  ShieldCheck,
-  CheckCircle,
-  Wand2,
-  CheckCircle2,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
+import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
-import { OtpInput } from "@/components/ui/otp-input";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { ROUTES } from "@/constants/routes";
-import { useAuthStore } from "@/store/auth.store";
 import { authService } from "@/services/auth.service";
-import { dbRepository } from "@/services/db/repository";
-import { TurnstileWidget } from "@/components/shared/TurnstileWidget";
-import { turnstileService } from "@/services/turnstile/turnstileService";
+import { ShieldCheck, CheckCircle2, AlertCircle } from "lucide-react";
 
+/**
+ * Customer Registration Page.
+ * Direct Google OAuth authentication with Supabase Auth session authority.
+ * Eliminates upfront password and phone OTP friction.
+ */
 export default function Register() {
-  const navigate = useNavigate();
-  const loginStore = useAuthStore((state) => state.login);
-
-  const [step, setStep] = useState<"form" | "otp" | "magic_sent">("form");
-  const [showPassword, setShowPassword] = useState(false);
-
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [agreedTerms, setAgreedTerms] = useState(true);
-
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [turnstileError, setTurnstileError] = useState<string | null>(null);
-  const [isVerifyingSecurity, setIsVerifyingSecurity] = useState(false);
-
-  const [otpValue, setOtpValue] = useState("");
-
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!agreedTerms) return;
-
-    setTurnstileError(null);
-    setIsVerifyingSecurity(true);
-
-    try {
-      // 1. Verify Cloudflare Turnstile token via Backend Siteverify
-      const verification = await turnstileService.verifyToken(
-        turnstileToken,
-        "customer_signup"
-      );
-
-      if (!verification.success) {
-        setTurnstileError(
-          verification.error ||
-            "Please complete the security challenge before continuing."
-        );
-        return;
-      }
-
-      // 2. Dispatch OTP via Supabase Auth
-      if (phone) {
-        try {
-          await authService.sendPhoneOtp(phone);
-        } catch (otpErr) {
-          console.warn("[Register] Phone OTP error:", otpErr);
-        }
-      }
-
-      setStep("otp");
-    } finally {
-      setIsVerifyingSecurity(false);
-    }
-  };
-
-  const handleMagicLinkRegister = async () => {
-    if (!email) {
-      alert("Please enter your email address first!");
-      return;
-    }
-
-    setTurnstileError(null);
-    setIsVerifyingSecurity(true);
-
-    try {
-      const verification = await turnstileService.verifyToken(
-        turnstileToken,
-        "customer_signup"
-      );
-
-      if (!verification.success) {
-        setTurnstileError(
-          verification.error ||
-            "Please complete the security challenge before requesting a magic link."
-        );
-        return;
-      }
-
-      await authService.signInWithMagicLink(email);
-      setStep("magic_sent");
-    } catch {
-      setStep("magic_sent");
-    } finally {
-      setIsVerifyingSecurity(false);
-    }
-  };
-
-  const handleVerifyOtp = (code: string) => {
-    if (code.length === 6) {
-      const newUser: any = {
-        id: `usr-${Date.now()}`,
-        email: email || "customer@homeefix.in",
-        fullName: fullName || "Verified Homeowner",
-        phone: phone ? `+91 ${phone}` : "+91 98765 00000",
-        role: "customer",
-        isEmailVerified: true,
-        isPhoneVerified: true,
-      };
-
-      dbRepository.saveProfile({
-        id: newUser.id,
-        email: newUser.email,
-        full_name: newUser.fullName,
-        phone: newUser.phone,
-        role: "customer",
-      });
-
-      loginStore(newUser, "hef-auth-token", "hef-refresh-token");
-      navigate("/auth/profile-setup");
-    }
-  };
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleGoogleRegister = async () => {
+    setErrorMessage(null);
+    setLoading(true);
     try {
-      await authService.signInWithGoogle();
-    } catch {
-      const gUser: any = {
-        id: `usr-google-${Date.now()}`,
-        email: email || "homeowner@gmail.com",
-        fullName: fullName || "Google Authenticated User",
-        role: "customer",
-        isEmailVerified: true,
-        isPhoneVerified: false,
-      };
-      dbRepository.saveProfile({
-        id: gUser.id,
-        email: gUser.email,
-        full_name: gUser.fullName,
-        role: "customer",
-      });
-      loginStore(gUser, "hef-google-token", "hef-refresh-token");
-      navigate("/auth/profile-setup");
+      await authService.signInWithGoogle("customer");
+    } catch (err: any) {
+      setErrorMessage(err?.message || "We couldn't initiate Google sign-in. Please try again.");
+      setLoading(false);
     }
   };
 
   return (
-    <div className="w-full max-w-md mx-auto space-y-6">
+    <div className="w-full max-w-md mx-auto space-y-6 py-6">
       <div className="text-center space-y-2">
-        <Badge variant="accent" className="px-3 py-1 text-xs">
+        <Badge variant="accent" className="px-3 py-1 text-xs font-semibold">
           Home-e-Fix Verified Homeowner Account
         </Badge>
-        <h1 className="font-heading text-2xl sm:text-3xl font-extrabold text-primary">
+        <h1 className="font-heading text-2xl sm:text-3xl font-extrabold text-primary dark:text-white">
           Create Your Account
         </h1>
-        <p className="text-xs text-foreground-secondary">
-          Book verified professionals with upfront fixed pricing and 30-day warranty
+        <p className="text-xs sm:text-sm text-foreground-secondary max-w-sm mx-auto">
+          Book verified professionals with upfront fixed pricing and 30-day warranty.
         </p>
       </div>
 
-      <Card className="p-6 sm:p-8 border border-border/80 shadow-xl space-y-6">
-        {step === "form" ? (
-          <form onSubmit={handleRegisterSubmit} className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold text-foreground-secondary mb-1 block">
-                Full Name
-              </label>
-              <Input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Priya Sharma"
-                required
-                leftIcon={<User className="h-4 w-4 text-foreground-muted" />}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-foreground-secondary mb-1 block">
-                Email Address
-              </label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                required
-                leftIcon={<Mail className="h-4 w-4 text-foreground-muted" />}
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-foreground-secondary mb-1 block">
-                Mobile Number
-              </label>
-              <div className="flex gap-2">
-                <div className="flex items-center px-3.5 rounded-xl border border-white/20 bg-[#07172E] text-xs font-bold text-white shrink-0">
-                  🇮🇳 +91
-                </div>
-                <Input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="98765 43210"
-                  required
-                  maxLength={10}
-                  leftIcon={<Phone className="h-4 w-4 text-foreground-muted" />}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-foreground-secondary mb-1 block">
-                Create Password
-              </label>
-              <Input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Minimum 8 characters"
-                required
-                minLength={8}
-                leftIcon={<Lock className="h-4 w-4 text-foreground-muted" />}
-                rightIcon={
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-foreground-muted hover:text-primary cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                }
-              />
-            </div>
-
-            <div className="flex items-start gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="terms"
-                checked={agreedTerms}
-                onChange={(e) => setAgreedTerms(e.target.checked)}
-                className="mt-0.5 rounded border-border text-accent focus:ring-accent cursor-pointer"
-              />
-              <label htmlFor="terms" className="text-[11px] text-foreground-secondary leading-relaxed cursor-pointer">
-                I agree to Home-e-Fix&apos;s{" "}
-                <Link to={ROUTES.TERMS} className="text-accent underline font-semibold">Terms of Service</Link> and{" "}
-                <Link to={ROUTES.PRIVACY} className="text-accent underline font-semibold">Privacy Policy</Link>.
-              </label>
-            </div>
-
-            <TurnstileWidget
-              action="customer_signup"
-              onSuccess={(token) => {
-                setTurnstileToken(token);
-                setTurnstileError(null);
-              }}
-              onExpired={() => setTurnstileToken(null)}
-              className="py-1"
-            />
-
-            {turnstileError && (
-              <p className="text-xs text-rose-500 font-medium text-center bg-rose-50 dark:bg-rose-950/30 p-2 rounded-lg border border-rose-200 dark:border-rose-900">
-                {turnstileError}
-              </p>
-            )}
-
-            <div className="space-y-3 pt-2">
-              <Button
-                variant="accent"
-                size="lg"
-                type="submit"
-                rightIcon={!isVerifyingSecurity ? <ArrowRight className="h-4 w-4" /> : undefined}
-                className="w-full font-bold shadow-glow"
-                disabled={!agreedTerms || isVerifyingSecurity}
-              >
-                {isVerifyingSecurity ? "Verifying Security..." : "Continue to Verify Mobile"}
-              </Button>
-
-              <Button
-                variant="outline"
-                size="lg"
-                type="button"
-                onClick={handleMagicLinkRegister}
-                leftIcon={<Wand2 className="h-4 w-4 text-accent" />}
-                className="w-full font-bold text-xs border-white/20 bg-[#07172E] text-white hover:bg-white/10"
-              >
-                Register Passwordless via Magic Link ✨
-              </Button>
-
-              {/* DIVIDER */}
-              <div className="relative flex items-center justify-center pt-2">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-border" />
-                </div>
-                <span className="relative bg-background px-3 text-[11px] font-semibold text-foreground-muted uppercase">
-                  Or sign up with
-                </span>
-              </div>
-
-              {/* GOOGLE REGISTER */}
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                onClick={handleGoogleRegister}
-                className="w-full flex items-center justify-center gap-2.5 border-white/20 bg-[#07172E] text-white hover:bg-white/10 hover:border-accent font-bold cursor-pointer transition-all shadow-md py-3"
-              >
-                <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                </svg>
-                <span className="text-white font-bold text-sm">Continue with Google</span>
-              </Button>
-            </div>
-          </form>
-        ) : step === "otp" ? (
-          <div className="space-y-6 text-center">
-            <div>
-              <h3 className="font-heading text-lg font-bold text-primary">
-                Verify Mobile Number
-              </h3>
-              <p className="text-xs text-foreground-secondary mt-1">
-                Enter the 6-digit code sent to <span className="font-bold text-primary">+91 {phone}</span>
-              </p>
-            </div>
-
-            <OtpInput
-              value={otpValue}
-              onChange={(val) => {
-                setOtpValue(val);
-                handleVerifyOtp(val);
-              }}
-            />
-
-            <div className="pt-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setStep("form")}
-                className="text-xs text-accent hover:underline"
-              >
-                Change Registration Details
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center space-y-4 p-4 rounded-2xl bg-emerald-50 text-emerald-700">
-            <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
-            <div className="space-y-1">
-              <h4 className="font-heading text-base font-bold">Magic Link Sent!</h4>
-              <p className="text-xs text-emerald-600">
-                We sent a passwordless registration link to <span className="font-bold text-emerald-800">{email}</span>. Click the link in your inbox to complete your account setup.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setStep("form")}
-              className="text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-100"
-            >
-              Back to Form
-            </Button>
+      <Card className="p-6 sm:p-8 border border-border/80 bg-surface shadow-xl space-y-6 rounded-3xl">
+        {errorMessage && (
+          <div className="flex items-center gap-2.5 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-xs font-medium">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
           </div>
         )}
 
-        {/* LOGIN FOOTER */}
+        <div className="space-y-4">
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            disabled={loading}
+            onClick={handleGoogleRegister}
+            aria-label="Continue with Google"
+            className="w-full h-13 flex items-center justify-center gap-3 border border-border bg-white dark:bg-slate-900/60 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 font-bold text-sm rounded-xl transition-all shadow-sm active:scale-[0.99] cursor-pointer"
+          >
+            <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+              />
+            </svg>
+            <span>{loading ? "Connecting to Google..." : "Continue with Google"}</span>
+          </Button>
+
+          <p className="text-[11px] text-center text-foreground-muted leading-relaxed">
+            By continuing, you agree to Home-e-Fix&apos;s{" "}
+            <Link to={ROUTES.TERMS} className="text-accent underline font-semibold hover:text-accent-hover">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link to={ROUTES.PRIVACY} className="text-accent underline font-semibold hover:text-accent-hover">
+              Privacy Policy
+            </Link>.
+          </p>
+        </div>
+
+        {/* Benefits list */}
+        <div className="pt-2 border-t border-border space-y-2">
+          <div className="flex items-center gap-2 text-xs text-foreground-secondary">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+            <span>Instant booking with upfront fixed pricing</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-foreground-secondary">
+            <ShieldCheck className="w-4 h-4 text-accent shrink-0" />
+            <span>30-day post-service warranty on all repairs</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-foreground-secondary">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+            <span>Verified Kolkata technicians with background checks</span>
+          </div>
+        </div>
+
+        {/* Links */}
         <div className="text-center text-xs text-foreground-secondary pt-2 border-t border-border space-y-2">
           <p>
             Already have an account?{" "}
             <Link to={ROUTES.LOGIN} className="font-bold text-accent hover:underline">
-              Sign In Here
+              Sign in with Google
             </Link>
           </p>
           <p className="text-[11px] text-foreground-muted">
             Are you a skilled technician or tradesperson?{" "}
-            <Link to={ROUTES.PROFESSIONAL_ONBOARDING} className="font-bold text-primary hover:text-accent hover:underline">
+            <Link
+              to={ROUTES.PROFESSIONAL_ONBOARDING}
+              className="font-bold text-primary dark:text-white hover:text-accent hover:underline"
+            >
               Join as a Professional Partner →
             </Link>
           </p>

@@ -2,7 +2,7 @@ import type { BaseEntity } from "./common.types";
 
 /* ─── User Roles ─── */
 
-export type UserRole = "customer" | "technician" | "admin";
+export type UserRole = "customer" | "technician" | "admin" | "professional" | "super_admin";
 
 /* ─── User ─── */
 

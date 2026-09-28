@@ -9,14 +9,16 @@ test("Pricing Engine - Base calculation with standard GST and partner split (Tra
   });
 
   // Base: 499, Safety Fee: 0 (Home-e-Fix does not charge hidden junk fees)
-  // Taxable: 499
-  // GST 18%: Math.round(499 * 0.18) = 90
-  // Total: 499 + 0 + 90 = 589
+  // Taxable: 499 (49900 paise)
+  // GST 18%: 49900 * 18 / 100 = 8982 paise = 89.82
+  // Total: 49900 + 8982 = 58882 paise = 588.82
   assert.equal(result.baseAmount, 499);
   assert.equal(result.safetyFee, 0);
-  assert.equal(result.taxGst, 90);
-  assert.equal(result.totalPayableInr, 589);
-  assert.equal(result.totalPayablePaise, 58900);
+  assert.equal(result.taxGst, 89.82);
+  assert.equal(result.cgstAmount, 44.91);
+  assert.equal(result.sgstAmount, 44.91);
+  assert.equal(result.totalPayableInr, 588.82);
+  assert.equal(result.totalPayablePaise, 58882);
 
   // Partner 80/20 split on labour (499):
   // Partner share: Math.round(499 * 0.8) = 399
@@ -80,15 +82,16 @@ test("Pricing Engine - Emergency fee surcharge and approved materials", () => {
   // Gross labour: 400 + 499 = 899
   // Safety fee: 0
   // Materials: 350 (passed 100% to partner)
-  // Taxable services: 899
-  // GST 18%: Math.round(899 * 0.18) = 162
+  // Taxable services: 899 (89900 paise)
+  // GST 18%: 89900 * 18 / 100 = 16182 paise = 161.82
   // Subtotal (services + materials): 899 + 350 = 1249
-  // Total: 1249 + 0 + 162 = 1411
+  // Total: 124900 + 16182 = 141082 paise = 1410.82
   assert.equal(result.emergencyFee, 499);
   assert.equal(result.materialsAmount, 350);
   assert.equal(result.subtotal, 1249);
-  assert.equal(result.taxGst, 162);
-  assert.equal(result.totalPayableInr, 1411);
+  assert.equal(result.taxGst, 161.82);
+  assert.equal(result.totalPayableInr, 1410.82);
+  assert.equal(result.totalPayablePaise, 141082);
   // Partner receives 80% of 899 (719) + 100% of 350 (350) = 1069
   assert.equal(result.partnerLabourShare, 1069);
 });
@@ -152,13 +155,15 @@ test("Pricing Engine - Configurable safety fee when explicitly enabled in CMS", 
   });
 
   // Base: 499, Safety Fee: 29
-  // Taxable: 499 + 29 = 528
-  // GST 18%: Math.round(528 * 0.18) = 95
-  // Total: 499 + 29 + 95 = 623
+  // Taxable: 499 + 29 = 528 (52800 paise)
+  // GST 18%: 52800 * 18 / 100 = 9504 paise = 95.04
+  // Total: 52800 + 9504 = 62304 paise = 623.04
   assert.equal(result.baseAmount, 499);
   assert.equal(result.safetyFee, 29);
-  assert.equal(result.taxGst, 95);
-  assert.equal(result.totalPayableInr, 623);
-  assert.equal(result.totalPayablePaise, 62300);
+  assert.equal(result.taxGst, 95.04);
+  assert.equal(result.cgstAmount, 47.52);
+  assert.equal(result.sgstAmount, 47.52);
+  assert.equal(result.totalPayableInr, 623.04);
+  assert.equal(result.totalPayablePaise, 62304);
 });
 

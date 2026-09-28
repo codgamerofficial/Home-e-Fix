@@ -1,0 +1,17 @@
+name = "home-e-fix-auth"
+main = "src/index.ts"
+compatibility_date = "2026-09-25"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+OTP_RESEND_COOLDOWN_SECONDS = "60"
+OTP_MAX_REQUESTS_PER_HOUR = "5"
+TURNSTILE_HOSTNAMES = "home-e-fix.vercel.app,localhost,127.0.0.1"
+
+# Secrets to be set via: wrangler secret put <NAME>
+# - TURNSTILE_SECRET
+# - SUPABASE_SERVICE_ROLE_KEY
+# - TWOFACTOR_API_KEY
+# - TWOFACTOR_TEMPLATE_ID
+# - TWOFACTOR_SENDER_ID
