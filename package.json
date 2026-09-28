@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "test": "npx tsx --test tests/**/*.test.ts",
+    "test": "npx -y tsx --test tests/**/*.test.ts",
     "preview": "vite preview",
     "admin:bootstrap": "node scripts/admin_bootstrap.mjs",
     "deploy": "wrangler deploy",
@@ -44,6 +44,7 @@
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",
+    "tsx": "^4.19.3",
     "vite": "^8.2.0",
     "vite-tsconfig-paths": "^6.1.1",
     "wrangler": "^4.140.0"
