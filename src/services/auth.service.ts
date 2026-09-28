@@ -1,3 +1,4 @@
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/store/auth.store";
 import { logger } from "@/lib/observability/logger";
@@ -14,7 +15,7 @@ export const authService = {
    * Listen to Supabase Auth State changes and sync session with Zustand store.
    */
   initAuthListener() {
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    supabase.auth.onAuthStateChange(async (event: AuthChangeEvent, session: Session | null) => {
       const authStore = useAuthStore.getState();
 
       if (session?.user) {
@@ -30,7 +31,7 @@ export const authService = {
    * Helper: Resolves database profile & role for a session.
    * Creates or syncs public.profiles and role-specific profile records.
    */
-  async buildUserFromSession(session: any, roleIntent?: UserRole): Promise<User> {
+  async buildUserFromSession(session: Session, roleIntent?: UserRole): Promise<User> {
     const suUser = session.user;
     if (!suUser) {
       throw new Error("No authenticated user found in session.");

@@ -3,7 +3,8 @@
   "scss.lint.unknownAtRules": "ignore",
   "less.lint.unknownAtRules": "ignore",
   "files.associations": {
-    "*.sql": "plaintext"
+    "*.sql": "plaintext",
+    ".github/workflows/*.yml": "yaml"
   },
   "json.schemaDownload.enable": false
 }
